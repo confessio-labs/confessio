@@ -151,8 +151,8 @@ class RegularRule(BaseModel, frozen=True):
         not_in_periods, but openapi schema generation does not support tuple (for now)."""
         return hash((
             hash(self.rule),
-            tuple(sorted(self.only_in_periods)),
-            tuple(sorted(self.not_in_periods)),
+            tuple(sort_periods(self.only_in_periods)),
+            tuple(sort_periods(self.not_in_periods)),
             tuple(sorted(self.not_on_dates)),
         ))
 
