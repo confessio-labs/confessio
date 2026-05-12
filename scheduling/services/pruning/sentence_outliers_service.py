@@ -19,6 +19,7 @@ def add_sentence_moderation(sentence: Sentence, other_action: Action):
         category=category,
         action=sentence.action,
         other_action=other_action,
+        status=ModerationStatus.TO_VALIDATE,
     )
     sentence_moderation.save()
 
@@ -44,6 +45,7 @@ def add_sentence_v2_moderation(sentence: Sentence):
     sentence_moderation = SentenceModeration(
         sentence=sentence,
         category=category,
+        status=ModerationStatus.TO_VALIDATE,
     )
     sentence_moderation.save()
 

@@ -6,6 +6,7 @@ from django.contrib.gis.geos import Point
 
 from crawling.public_workflow import crawling_redirects_to_other_url
 from registry.models import Parish, Diocese, ParishModeration, Website, ExternalSource
+from registry.models.base_moderation_models import ModerationStatus
 from registry.services.parish_website_service import save_website_of_parish
 from registry.utils.geo_utils import get_geo_distance
 from registry.utils.string_utils import get_string_similarity
@@ -97,6 +98,7 @@ def update_parish(parish: Parish,
             parish=parish, category=ParishModeration.Category.NAME_DIFFERS,
             source=parish_retriever.source, name=external_parish.name,
             diocese=parish.diocese,
+            status=ModerationStatus.TO_VALIDATE,
         ), parish_retriever)
 
     # Check website
@@ -123,6 +125,7 @@ def update_parish(parish: Parish,
                 parish=parish, category=ParishModeration.Category.WEBSITE_DIFFERS,
                 source=parish_retriever.source, website=website,
                 diocese=parish.diocese,
+                status=ModerationStatus.TO_VALIDATE,
             ), parish_retriever)
 
 
@@ -249,6 +252,7 @@ def sync_parishes(external_parishes: list[Parish],
                     category=ParishModeration.Category.ADDED_PARISH,
                     source=parish_retriever.source,
                     diocese=diocese,
+                    status=ModerationStatus.TO_VALIDATE,
                 ), parish_retriever, similar_parishes=similar_parishes)
 
     if alert_on_delete:
@@ -260,6 +264,7 @@ def sync_parishes(external_parishes: list[Parish],
                     category=ParishModeration.Category.DELETED_PARISH,
                     source=parish_retriever.source,
                     diocese=diocese,
+                    status=ModerationStatus.TO_VALIDATE,
                 ), parish_retriever)
 
 

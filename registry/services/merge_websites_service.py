@@ -1,4 +1,5 @@
 from registry.models import Website, WebsiteModeration, Diocese
+from registry.models.base_moderation_models import ModerationStatus
 from registry.services.website_name_service import clean_website_name
 from registry.utils.extract_title import get_page_title
 
@@ -16,6 +17,7 @@ def add_website_moderation(website: Website, category: WebsiteModeration.Categor
         website=website,
         category=category,
         diocese=diocese or website.get_diocese(),
+        status=ModerationStatus.TO_VALIDATE,
     )
     website_moderation.save()
 

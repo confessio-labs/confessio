@@ -21,6 +21,7 @@ def add_organization_moderation(website: Website,
             website=website, category=category,
             diocese=website.get_diocese(),
             oclocher_organization=oclocher_organization,
+            status=ModerationStatus.TO_VALIDATE,
         )
         moderation.save()
 

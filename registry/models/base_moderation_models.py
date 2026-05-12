@@ -84,6 +84,13 @@ class ModerationMixin(TimeStampMixin):
 
         return stats
 
+    def save(self, *args, **kwargs):
+        if not self.status:
+            raise ValueError(
+                f"{type(self).__name__} cannot be saved without an explicit status"
+            )
+        super().save(*args, **kwargs)
+
     def validate(self, user: User):
         if self.delete_on_validate():
             self.delete()

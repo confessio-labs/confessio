@@ -80,7 +80,8 @@ def sync_trouverunemesse_location_and_name(church: Church,
                     zipcode=trouverunemesse_church.code_postal,
                     city=trouverunemesse_church.commune,
                     location=trouverunemesse_point,
-                    diocese=church.parish.diocese
+                    diocese=church.parish.diocese,
+                    status=ModerationStatus.TO_VALIDATE,
                 )
             )
             location_moderation_added = True

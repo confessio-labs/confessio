@@ -3,6 +3,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpRequest
 from core.utils.discord_utils import send_discord_alert, DiscordChanel
 from front.models import Report, ReportModeration
 from registry.models import Website
+from registry.models.base_moderation_models import ModerationStatus
 from core.services.admin_email_service import send_email_to_admin
 from front.utils.web_utils import get_user_user_agent_and_ip
 
@@ -91,7 +92,8 @@ def get_report_moderation_category(report: Report) -> ReportModeration.Category:
 def add_necessary_moderation_for_report(report: Report):
     category = get_report_moderation_category(report)
     report_moderation = ReportModeration(report=report, category=category,
-                                         diocese=report.website.get_diocese())
+                                         diocese=report.website.get_diocese(),
+                                         status=ModerationStatus.TO_VALIDATE)
     report_moderation.save()
 
 

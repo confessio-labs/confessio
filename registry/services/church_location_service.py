@@ -117,6 +117,7 @@ def add_church_location_conflict(existing_church: Church, church: Church,
         city=church.city,
         messesinfo_id=church.messesinfo_id,
         diocese=existing_church.parish.diocese,
+        status=ModerationStatus.TO_VALIDATE,
     )
 
     try:

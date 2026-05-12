@@ -30,6 +30,7 @@ def add_website_moderation(website: Website, category: WebsiteModeration.Categor
             other_website=other_website,
             home_url=home_url,
             diocese=website.get_diocese(),
+            status=ModerationStatus.TO_VALIDATE,
         )
         moderation.save()
 

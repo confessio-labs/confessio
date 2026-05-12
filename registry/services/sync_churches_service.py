@@ -122,7 +122,8 @@ def update_church(church: Church, external_church: Church, church_retriever: Chu
         add_church_moderation_if_not_exists(ChurchModeration(
             church=church, category=ChurchModeration.Category.NAME_DIFFERS,
             source=church_retriever.source, name=external_church.name,
-            diocese=church.parish.diocese
+            diocese=church.parish.diocese,
+            status=ModerationStatus.TO_VALIDATE,
         ), church_retriever)
 
     # Check parish
@@ -133,7 +134,8 @@ def update_church(church: Church, external_church: Church, church_retriever: Chu
         add_church_moderation_if_not_exists(ChurchModeration(
             church=church, category=ChurchModeration.Category.PARISH_DIFFERS,
             source=church_retriever.source, parish=external_parish,
-            diocese=church.parish.diocese
+            diocese=church.parish.diocese,
+            status=ModerationStatus.TO_VALIDATE,
         ), church_retriever)
 
     # Location
@@ -147,7 +149,8 @@ def update_church(church: Church, external_church: Church, church_retriever: Chu
             source=church_retriever.source, location=external_church.location,
             address=external_church.address, zipcode=external_church.zipcode,
             city=external_church.city,
-            diocese=church.parish.diocese
+            diocese=church.parish.diocese,
+            status=ModerationStatus.TO_VALIDATE,
         ), church_retriever)
 
 
@@ -254,6 +257,7 @@ def sync_churches(external_churches: list[Church],
                     category=ChurchModeration.Category.ADDED_CHURCH,
                     source=church_retriever.source,
                     diocese=diocese,
+                    status=ModerationStatus.TO_VALIDATE,
                 ), church_retriever, similar_churches=similar_churches)
 
     if alert_on_delete:
@@ -265,6 +269,7 @@ def sync_churches(external_churches: list[Church],
                     category=ChurchModeration.Category.DELETED_CHURCH,
                     source=church_retriever.source,
                     diocese=diocese,
+                    status=ModerationStatus.TO_VALIDATE,
                 ), church_retriever)
 
 
