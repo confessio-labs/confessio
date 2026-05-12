@@ -134,6 +134,7 @@ def add_new_moderation(pruning: Pruning, category):
         pruning=pruning,
         category=category,
         diocese=pruning.get_diocese(),
+        status=ModerationStatus.TO_VALIDATE,
     )
     try:
         with transaction.atomic():
