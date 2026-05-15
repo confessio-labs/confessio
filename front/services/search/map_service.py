@@ -1,5 +1,6 @@
 import json
 import os
+import random
 from datetime import date, datetime
 from statistics import mean
 from typing import List, Tuple, Dict, Optional
@@ -70,7 +71,7 @@ def prepare_map(center, churches: List[Church], bounds,
                 is_around_me: bool
                 ) -> Tuple[Map, Dict[UUID, str]]:
     # Create Map Object
-    jawg_api_key = os.environ['JAWG_API_KEY']
+    jawg_api_key = os.environ[random.choice(['JAWG_API_KEY1', 'JAWG_API_KEY2', 'JAWG_API_KEY3'])]
     folium_map = Map(
         location=center,
         tiles="https://tile.jawg.io/jawg-sunny/{z}/{x}/{y}{r}.png?"

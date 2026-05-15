@@ -100,4 +100,6 @@ cloudflare_turnstile_secret_key: "{{ lookup('ansible.builtin.env', 'CLOUDFLARE_T
 mailgun_webhook_signing_key: "{{ lookup('ansible.builtin.env', 'MAILGUN_WEBHOOK_SIGNING_KEY') }}"
 
 # Jawg Maps
-jawg_api_key: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY') }}"
+jawg_api_key1: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY1') }}"
+jawg_api_key2: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY2') }}"
+jawg_api_key3: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY3') }}"
