@@ -28,7 +28,7 @@ def find_error_in_document_to_upload(document) -> str | None:
     return None
 
 
-def upload_image(document, website: Website, request
+def upload_image(document, website: Website, request, comment: str | None = None,
                  ) -> tuple[Image | None, str | None]:
     if too_many_recent_images():
         subject = 'Too many images uploaded recently'
@@ -39,7 +39,6 @@ def upload_image(document, website: Website, request
 
     # Generate unique filename
     image_name = document.name.replace(' ', '_').replace('/', '_')
-    comment = request.POST.get('comment', None)
     user, user_agent, ip_address_hash = get_user_user_agent_and_ip(request)
 
     image = Image(

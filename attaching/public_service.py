@@ -5,9 +5,9 @@ from attaching.tasks import worker_recognize_and_extract_image
 from registry.models import Website
 
 
-def attaching_upload_image(document, website: Website, request
+def attaching_upload_image(document, website: Website, request, comment: str | None = None,
                            ) -> tuple[Image | None, str | None]:
-    return upload_image(document, website, request)
+    return upload_image(document, website, request, comment=comment)
 
 
 def attaching_find_error_in_document_to_upload(document) -> str | None:

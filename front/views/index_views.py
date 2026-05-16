@@ -443,7 +443,9 @@ def website_upload_image(request, website_uuid: str):
         document = request.FILES.get('file-input', None)
         upload_error_message = attaching_find_error_in_document_to_upload(document)
         if not upload_error_message:
-            image, error_message = attaching_upload_image(document, website, request)
+            comment = request.POST.get('comment', None)
+            image, error_message = attaching_upload_image(document, website, request,
+                                                          comment=comment)
             if image:
                 success = True
                 attaching_recognize_and_extract_image(image)

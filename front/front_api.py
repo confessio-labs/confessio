@@ -3,10 +3,14 @@ from enum import Enum
 from typing import Literal
 from uuid import UUID
 
+from django.core.exceptions import BadRequest
 from django.http import Http404
-from ninja import NinjaAPI, Schema
+from ninja import NinjaAPI, Schema, File, Form
+from ninja.files import UploadedFile
 
-from attaching.public_service import attaching_get_image_public_url
+from attaching.public_service import attaching_get_image_public_url, \
+    attaching_upload_image, attaching_find_error_in_document_to_upload, \
+    attaching_recognize_and_extract_image
 from front.models import Report, AutocompleteHit
 from front.services.card.report_service import save_report
 from front.services.card.scraping_url_service import get_scraping_parsing_urls
@@ -314,6 +318,11 @@ class DioceseOut(Schema):
         )
 
 
+class ImageOut(Schema):
+    image_uuid: UUID
+    public_url: str
+
+
 class ErrorSchema(Schema):
     detail: str
 
@@ -509,3 +518,30 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
     report.refresh_from_db()
 
     return ReportOut.from_report(report, [])
+
+
+@api.post("/images", response={200: ImageOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_images(request,
+                          website_uuid: UUID = Form(...),
+                          document: UploadedFile = File(...),
+                          comment: str | None = Form(None)) -> ImageOut:
+    try:
+        website = Website.objects.get(uuid=website_uuid)
+    except Website.DoesNotExist:
+        raise Http404(f'Website {website_uuid} does not exist')
+
+    validation_error = attaching_find_error_in_document_to_upload(document)
+    if validation_error:
+        raise BadRequest(validation_error)
+
+    image, error_message = attaching_upload_image(document, website, request,
+                                                  comment=comment)
+    if image is None:
+        raise BadRequest(error_message or 'Upload failed')
+
+    attaching_recognize_and_extract_image(image)
+
+    return ImageOut(
+        image_uuid=image.uuid,
+        public_url=attaching_get_image_public_url(image),
+    )
