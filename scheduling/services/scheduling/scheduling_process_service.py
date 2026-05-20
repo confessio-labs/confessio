@@ -25,21 +25,27 @@ def init_scheduling(website: Website, instant_deindex: bool = False) -> Scheduli
     new_scheduling, scheduling_related_objects = build_scheduling(website)
     with transaction.atomic():
         # Cancel any existing in-progress Scheduling for this website
-        Scheduling.objects.filter(
-            website=website,
-            status__in=[
-                Scheduling.Status.BUILT,
-                Scheduling.Status.PRUNED,
-                Scheduling.Status.PARSED,
-                Scheduling.Status.MATCHED,
-            ]
-        ).delete()
+        uuids_to_cancel = list(
+            Scheduling.objects.select_for_update().filter(
+                website=website,
+                status__in=[
+                    Scheduling.Status.BUILT,
+                    Scheduling.Status.PRUNED,
+                    Scheduling.Status.PARSED,
+                    Scheduling.Status.MATCHED,
+                ],
+            ).values_list('uuid', flat=True)
+        )
+        Scheduling.objects.filter(uuid__in=uuids_to_cancel).delete()
 
         if instant_deindex:
-            Scheduling.objects.filter(
-                website=website,
-                status=Scheduling.Status.INDEXED,
-            ).delete()
+            uuids_to_deindex = list(
+                Scheduling.objects.select_for_update().filter(
+                    website=website,
+                    status=Scheduling.Status.INDEXED,
+                ).values_list('uuid', flat=True)
+            )
+            Scheduling.objects.filter(uuid__in=uuids_to_deindex).delete()
 
         # Save new Scheduling
         new_scheduling.save()
