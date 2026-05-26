@@ -94,19 +94,40 @@ A good dependency visualization tool is [tach](https://github.com/tach-org/tach)
 
 # Dev environment
 
+## Quick start with mise (recommended)
+
+The project ships a [`mise`](https://mise.jdx.dev) config (`mise.toml`) that pins the tool versions
+(Python 3.13.9 + uv), loads `.env`, and defines task shortcuts. Once mise is
+[installed and activated](https://mise.jdx.dev/getting-started.html) in your shell:
+
+```shell
+mise trust      # required once: mise.toml loads .env and defines tasks
+mise install    # install pinned Python + uv
+mise run setup  # install dev dependencies (uv sync --group dev)
+```
+
+Then use the task shortcuts:
+
+```shell
+mise run server        # python manage.py runserver
+mise run worker        # python manage.py process_tasks --sleep 1
+mise run lint          # flake8 .
+mise run test          # unit tests
+mise run check-deps    # module dependency check (tach)
+mise run check         # pre-commit checks: lint + check-deps + test
+mise run migrate       # python manage.py migrate
+mise run makemigrations
+mise run translations  # makemessages + compilemessages
+```
+
+mise loads `.env` into your shell environment, so `direnv`/`.envrc` is optional.
+
+If you'd rather not use mise, follow the manual setup below.
+
 ## Python install & setup
 
 ### Environment variables
 Copy the `.env.sample` file to `.env` and fill in the values.
-
-### uv
-Install uv from this [instructions](https://docs.astral.sh/uv/getting-started/installation/).
-
-### Python virtualenv with uv
-```shell
-uv python pin 3.13.9
-uv sync --group dev
-```
 
 ### Install GIS dependencies
 For MacOS, follow instructions [here](https://mits003.github.io/studio_null/2021/07/install-gdal-on-macos/).

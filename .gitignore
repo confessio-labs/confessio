@@ -23,3 +23,7 @@ profiling_prof_files/
 
 # Direnv
 .envrc
+
+# mise
+mise.local.toml
+.mise.local.toml

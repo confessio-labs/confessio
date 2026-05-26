@@ -2,29 +2,41 @@
 
 ## Commands
 
+Each command below has a `mise run` shortcut (defined in `mise.toml`). Both forms work.
+
 ### Run server
 ```bash
 python manage.py runserver
+# or: mise run server
 ```
 
 ### Run background tasks worker
 ```bash
 python manage.py process_tasks --sleep 1
+# or: mise run worker
 ```
 
 ### Lint
 ```bash
 flake8 .
+# or: mise run lint
 ```
 
 ### Test
 ```bash
 python -m unittest discover -s scheduling/tests -s crawling/tests
+# or: mise run test
 ```
 
 ### Check module dependencies
 ```bash
 python scripts/check_dependencies.py
+# or: mise run check-deps
+```
+
+### Run all pre-commit checks (lint + deps + test)
+```bash
+mise run check
 ```
 
 ### Translations (front app only)
@@ -33,6 +45,7 @@ python scripts/check_dependencies.py
 python manage.py makemessages -l fr
 # Compile
 python manage.py compilemessages
+# or both: mise run translations
 ```
 
 ## Architecture

@@ -1,0 +1,57 @@
+[tools]
+python = "3.13.9"   # matches `uv python pin 3.13.9` in README and `requires-python ~= 3.13.0`
+uv = "latest"       # matches Ansible install + CI's astral-sh/setup-uv
+
+[env]
+# Make uv reuse mise's Python (on PATH) instead of downloading its own.
+UV_PYTHON_PREFERENCE = "only-system"
+# Load local secrets/config (same file python-dotenv reads in core/settings.py).
+_.file = ".env"
+
+[settings]
+# Auto-create the uv .venv if missing, then activate it for tasks/shell.
+python.uv_venv_auto = "create|source"
+
+[tasks.setup]
+description = "Install dev dependencies"
+run = "uv sync --group dev"
+
+[tasks.server]
+description = "Run the Django dev server"
+run = "python manage.py runserver"
+
+[tasks.worker]
+description = "Run the background-tasks worker (all queues)"
+run = "python manage.py process_tasks --sleep 1"
+
+[tasks.migrate]
+description = "Apply DB migrations"
+run = "python manage.py migrate"
+
+[tasks.makemigrations]
+description = "Detect new migrations"
+run = "python manage.py makemigrations"
+
+[tasks.lint]
+description = "Run flake8"
+run = "flake8 ."
+
+[tasks.test]
+description = "Run unit tests (no Django loading)"
+run = "python -m unittest discover -s scheduling/tests -s crawling/tests"
+
+[tasks.check-deps]
+description = "Validate module dependencies (tach)"
+run = "python scripts/check_dependencies.py"
+
+[tasks.check]
+description = "Pre-commit checks: lint + module deps + tests"
+depends = ["lint", "check-deps", "test"]
+
+[tasks.translations]
+description = "Extract and compile French translations"
+dir = "front"
+run = [
+  "django-admin makemessages -l fr",
+  "django-admin compilemessages",
+]
