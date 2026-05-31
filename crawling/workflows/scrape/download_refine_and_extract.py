@@ -29,7 +29,8 @@ def get_fresh_extracted_html_list(url) -> list[str] | None:
 
 
 if __name__ == '__main__':
-    url_ = ('https://www.bayonnecentre.fr/index.php/s-informer/la-reconciliation')
+    url_ = ('https://www.paroissehasparren.com/sacrements-et-vie-chretienne/'
+            '14-le-sacrement-du-pardon')
     extracted_html_list_ = get_fresh_extracted_html_list(url_)
 
     print()

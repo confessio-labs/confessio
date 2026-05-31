@@ -76,6 +76,7 @@ IGNORED_EXTENSIONS = [
 
 
 def might_be_confession_link(path, text):
+    path = path[:-1] if path.endswith('/') else path
     last_part_of_path = path.split('/')[-1] if '/' in path else path
 
     if has_any_of_words(last_part_of_path, CONFESSIONS_OR_SCHEDULES_MENTIONS) \
@@ -205,7 +206,7 @@ def get_links(element: el, home_url: str, aliases_domains: set[str],
                         forbidden_paths):
             continue
 
-        full_url = get_clean_full_url(full_url)  # we use standardized url to ensure unicity
+        full_url = get_clean_full_url(full_url, keep_trailing_slash=True)
         url_parsed = urlparse(full_url)
 
         if len(full_url) > 300:

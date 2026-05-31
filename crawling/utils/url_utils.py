@@ -29,18 +29,19 @@ def replace_scheme_and_hostname(url_parsed: ParseResult, new_url: str) -> str:
     return url_parsed.geturl()
 
 
-def get_clean_full_url(url) -> str:
+def get_clean_full_url(url, keep_trailing_slash: bool = False) -> str:
     url_parsed = urlparse(url)
 
-    url_parsed = clean_parsed_url(url_parsed)
+    url_parsed = clean_parsed_url(url_parsed, keep_trailing_slash)
 
     return url_parsed.geturl()
 
 
-def clean_parsed_url(url_parsed: ParseResult) -> ParseResult:
+def clean_parsed_url(url_parsed: ParseResult, keep_trailing_slash: bool) -> ParseResult:
     path = url_parsed.path
-    if path.endswith('/'):
-        url_parsed = url_parsed._replace(path=path[:-1])
+    if not keep_trailing_slash:
+        if path.endswith('/'):
+            url_parsed = url_parsed._replace(path=path[:-1])
 
     url_parsed = url_parsed._replace(fragment='')
 
