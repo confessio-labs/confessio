@@ -135,8 +135,8 @@
                     {% if date_filter_value or hour_min or hour_max %}
                         {% trans 'noResultsWithDate' %}
                     {% else %}
-                        Confessio est en lancement et n'opère que dans les diocèses de Paris, Lyon et d'<a href="{% url 'dioceses_list' %}">autres diocèses</a> pour des raisons financières.
-                        <a href="{% trans 'donateUrl' %}"><strong>{% trans 'navDonate' %}</strong></a>
+                        Confessio n'opère que dans les diocèses de France.
+                        <a href="{% url 'contact' %}">Contactez-nous</a> s'il s'agit d'une erreur.
                     {% endif %}
                 </span>
                 <button type="button" class="close" data-dismiss="alert" aria-label="Close">
