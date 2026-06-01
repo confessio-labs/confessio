@@ -2,6 +2,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 from core.models.base_models import TimeStampMixin
+from scheduling.workflows.parsing.liturgical import PeriodEnum
 
 
 class IndexEvent(TimeStampMixin):
@@ -18,6 +19,8 @@ class IndexEvent(TimeStampMixin):
     schedules_indices = ArrayField(models.SmallIntegerField())
     has_been_moderated = models.BooleanField()
     church_color = models.CharField(max_length=9)
+    periods = ArrayField(models.CharField(max_length=16, choices=PeriodEnum.choices),
+                         default=list)
 
     class Meta:
         unique_together = ('church', 'day', 'start_time', 'displayed_end_time')

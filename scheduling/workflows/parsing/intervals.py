@@ -32,6 +32,10 @@ def intervals_from_period(period: PeriodEnum, year: int,
     if period == PeriodEnum.SOLEMNITIES:
         return [(d, d) for d in get_solemnities_dates(year)]
 
+    if period == PeriodEnum.HOLY_WEEK:
+        return [(get_liturgical_date(LiturgicalDayEnum.PALM_SUNDAY, year),
+                 get_liturgical_date(LiturgicalDayEnum.EASTER_SUNDAY, year))]
+
     # Holidays
     if period == PeriodEnum.SCHOOL_HOLIDAYS:
         if holiday_zone not in HOLIDAY_BY_ZONE:
@@ -45,6 +49,19 @@ def intervals_from_period(period: PeriodEnum, year: int,
         return period_by_year[year]
 
     raise ValueError(f'Period {period} not implemented')
+
+
+def date_is_in_period(d: date, holiday_zone: HolidayZoneEnum, period: PeriodEnum) -> bool:
+    for start, end in intervals_from_period(period, d.year, holiday_zone):
+        if start <= d <= end:
+            return True
+
+    return False
+
+
+def periods_of_date(d: date, holiday_zone: HolidayZoneEnum) -> list[PeriodEnum]:
+    return [p for p in [PeriodEnum.SCHOOL_HOLIDAYS, PeriodEnum.HOLY_WEEK]
+            if date_is_in_period(d, holiday_zone, p)]
 
 
 def interval_from_custom_period(custom_period: CustomPeriod, year: int) -> tuple[date, date]:

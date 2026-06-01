@@ -9,6 +9,8 @@ from scheduling.services.merging.holiday_zone_service import get_website_holiday
 from scheduling.services.merging.sourced_schedules_service import SchedulingElements
 from scheduling.services.merging.timezone_service import get_timezone_of_church
 from scheduling.utils.date_utils import datetime_in_timezone
+from scheduling.workflows.parsing.intervals import periods_of_date
+from scheduling.workflows.parsing.liturgical import PeriodEnum
 from scheduling.workflows.parsing.rrule_utils import get_events_from_schedule_item
 from scheduling.workflows.parsing.schedules import Event
 
@@ -26,7 +28,10 @@ def source_has_been_moderated(source: BaseSource,
 
 def generate_unique_events_by_church_id(website: Website, scheduling_elements: SchedulingElements,
                                         schedules_match_with_validated: bool | None
-                                        ) -> dict[int | None, list[tuple[Event, list[int], bool]]]:
+                                        ) -> dict[
+    int | None,
+    list[tuple[Event, list[int], bool, list[PeriodEnum]]]
+]:
     parsing_by_uuid = {parsing.uuid: parsing for parsing in scheduling_elements.parsings}
     holiday_zone = get_website_holiday_zone(website,
                                             list(scheduling_elements.church_by_id.values()))
@@ -54,7 +59,12 @@ def generate_unique_events_by_church_id(website: Website, scheduling_elements: S
 
         unique_events = []
         for event, (schedules_indices, has_been_moderated) in tuple_by_event.items():
-            unique_events.append((event, schedules_indices, has_been_moderated))
+            unique_events.append((
+                event,
+                schedules_indices,
+                has_been_moderated,
+                periods_of_date(event.start.date(), holiday_zone)
+            ))
 
         events_by_church_id[sourced_schedules_of_church.church_id] = unique_events
 
@@ -63,7 +73,10 @@ def generate_unique_events_by_church_id(website: Website, scheduling_elements: S
 
 def build_index_events(scheduling: Scheduling,
                        scheduling_elements: SchedulingElements,
-                       events_by_church_id: dict[int | None, list[tuple[Event, list[int], bool]]]
+                       events_by_church_id: dict[
+                           int | None,
+                           list[tuple[Event, list[int], bool, list[PeriodEnum]]]
+                       ]
                        ) -> list[IndexEvent]:
     church_color_by_uuid = front_get_church_color_by_uuid(
         scheduling_elements.sourced_schedules_list,
@@ -76,7 +89,7 @@ def build_index_events(scheduling: Scheduling,
         church_color = church_color_by_uuid[church.uuid]
         church_tz = get_timezone_of_church(church)
 
-        for event, schedules_indices, has_been_moderated in event_and_moderations:
+        for event, schedules_indices, has_been_moderated, periods in event_and_moderations:
             midnight = event.start.replace(hour=23, minute=59, second=0, microsecond=0)
             if event.end is None:
                 indexed_end_datetime = min(event.start + timedelta(hours=4), midnight)
@@ -106,6 +119,7 @@ def build_index_events(scheduling: Scheduling,
                 schedules_indices=schedules_indices,
                 has_been_moderated=has_been_moderated,
                 church_color=church_color,
+                periods=periods,
             ))
 
     return index_events

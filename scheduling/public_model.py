@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from scheduling.workflows.parsing.liturgical import PeriodEnum  # noqa
 from scheduling.workflows.parsing.schedules import ScheduleItem
 from scheduling.workflows.parsing.schedules import SchedulesList
 

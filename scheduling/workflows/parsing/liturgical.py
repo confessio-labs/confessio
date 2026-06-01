@@ -112,6 +112,7 @@ class PeriodEnum(str, Enum):
     ADVENT = 'advent'
     LENT = 'lent'
     SOLEMNITIES = 'solemnities'
+    HOLY_WEEK = 'holy_week'
 
     # Holidays
     SCHOOL_HOLIDAYS = 'school_holidays'

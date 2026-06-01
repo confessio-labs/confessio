@@ -26,6 +26,7 @@ from scheduling.models import IndexEvent
 from scheduling.public_model import SourcedScheduleItem, BaseSource, ParsingSource, OClocherSource
 from scheduling.public_service import scheduling_get_indexed_scheduling, \
     scheduling_retrieve_scheduling_elements, scheduling_get_scheduling_primary_sources
+from scheduling.public_model import PeriodEnum
 
 api = NinjaAPI(urls_namespace='front_api')
 
@@ -197,6 +198,7 @@ class ChurchDetails(ChurchOut):
     website: WebsiteOut
     schedules: list[ScheduleOut]
     parsings: list[ParsingOut]
+    periods: list[PeriodEnum]
 
     @classmethod
     def from_church_and_schedules(cls, church: Church, index_events: list[IndexEvent],
@@ -205,12 +207,15 @@ class ChurchDetails(ChurchOut):
                                   parsings: list[ParsingOut],
                                   ) -> 'ChurchDetails':
         base = ChurchOut.from_church_and_events(church, index_events)
+        periods = list(set(period for index_event in index_events
+                           for period in index_event.periods))
 
         return cls(
             **base.dict(),
             website=website,
             schedules=schedules,
             parsings=parsings,
+            periods=periods,
         )
 
 
