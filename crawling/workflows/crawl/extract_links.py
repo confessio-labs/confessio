@@ -253,8 +253,9 @@ def parse_content_links(content, home_url: str, aliases_domains: set[str],
     return links
 
 
-def remove_http_https_duplicate(extracted_html_list_by_link: dict[str, list[str]]
-                                ) -> dict[str, list[str]]:
+def remove_http_https_duplicate(
+        extracted_html_list_by_link: dict[str, tuple[list[str], bytes | None]]
+) -> dict[str, tuple[list[str], bytes | None]]:
     """If links appear twice in given list with different scheme, we keep only https"""
     d = {}
     for link, extracted_html_list in extracted_html_list_by_link.items():

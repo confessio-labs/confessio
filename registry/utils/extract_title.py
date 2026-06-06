@@ -4,9 +4,10 @@ from crawling.public_workflow import crawling_get_content_from_url
 
 
 def get_page_title(url):
-    html = crawling_get_content_from_url(url)
-    if not html:
+    content = crawling_get_content_from_url(url)
+    if content is None:
         return None
+    html, _ = content
 
     try:
         soup = BeautifulSoup(html, 'html.parser')

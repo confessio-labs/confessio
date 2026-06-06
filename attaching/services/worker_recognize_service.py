@@ -36,15 +36,15 @@ def recognize_image(image: Image):
     image.save()
 
 
-def recognize_pdf(pdf_name: str, pdf_bytes: bytes) -> PdfRecognition:
+def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
     pdf_sha256 = hash_bytes_to_sha256_hex(pdf_bytes)
 
     existing = PdfRecognition.objects.filter(pdf_sha256=pdf_sha256).first()
-    if existing is not None:
-        print(f'Pdf {pdf_name} already recognized with LLM')
-        return existing
+    if existing is not None and existing.llm_error_detail is None:
+        print(f'Pdf {pdf_url} already recognized with LLM')
+        return existing.llm_html
 
-    print(f'Recognizing pdf {pdf_name} with LLM')
+    print(f'Recognizing pdf {pdf_url} with LLM')
 
     prompt = get_pdf_prompt()
     prompt_hash = hash_string_to_hex(prompt)
@@ -52,8 +52,8 @@ def recognize_pdf(pdf_name: str, pdf_bytes: bytes) -> PdfRecognition:
     llm_model = get_pdf_llm_model()
     llm_html, llm_error_detail = get_html_from_pdf(pdf_bytes, prompt, llm_provider, llm_model)
 
-    return PdfRecognition(
-        pdf_name=pdf_name,
+    pdf_recognition = PdfRecognition(
+        pdf_url=pdf_url,
         pdf_sha256=pdf_sha256,
         llm_html=llm_html,
         llm_error_detail=llm_error_detail,
@@ -61,6 +61,9 @@ def recognize_pdf(pdf_name: str, pdf_bytes: bytes) -> PdfRecognition:
         llm_provider=llm_provider,
         llm_model=llm_model,
     )
+    pdf_recognition.save()
+
+    return pdf_recognition.llm_html
 
 
 def extract_image(image: Image):

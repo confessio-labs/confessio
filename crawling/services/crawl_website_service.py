@@ -1,3 +1,4 @@
+from attaching.public_service import attaching_recognize_pdf
 from core.utils.log_utils import info
 from crawling.models import CrawlingModeration
 from crawling.services.crawling_moderation_service import upsert_crawling_moderation, \
@@ -8,6 +9,7 @@ from crawling.services.widget_extraction_service import process_extracted_widget
 from crawling.utils.url_utils import get_path, get_domain, have_similar_domain
 from crawling.workflows.crawl.download_and_search_urls import search_for_confession_pages, \
     get_new_url_and_aliases, forbid_diocese_home_links, CrawlingResult, is_new_url_valid
+from crawling.workflows.scrape.download_refine_and_extract import get_extracted_html_list
 from registry.models import Website, WebsiteModeration
 from registry.public_service import registry_add_website_moderation, \
     registry_remove_not_validated_moderation
@@ -123,12 +125,28 @@ def crawl_website(
         return CrawlingModeration.Category.NO_RESPONSE, CrawlingResult()
 
     crawling_result = do_crawl_website(website)
+    # use LLM vision to refine pdf extraction
+    crawling_result = recognize_pdf_in_results(crawling_result)
 
     process_extracted_html(website, crawling_result)
     process_extracted_widgets(website, crawling_result.widgets)
 
     category = add_crawling_moderation(website, crawling_result)
     return category, crawling_result
+
+
+def recognize_pdf_in_results(crawling_result: CrawlingResult) -> CrawlingResult:
+    new_confession_pages = {}
+    for url, (extracted_html_list, pdf_bytes) in crawling_result.confession_pages.items():
+        if pdf_bytes is not None:
+            pdf_html = attaching_recognize_pdf(url, pdf_bytes)
+            new_extracted_html_list = get_extracted_html_list(pdf_html)
+            if new_extracted_html_list:
+                new_confession_pages[url] = (new_extracted_html_list, pdf_bytes)
+        else:
+            new_confession_pages[url] = (extracted_html_list, pdf_bytes)
+
+    return crawling_result.model_copy(update={'confession_pages': new_confession_pages})
 
 
 def process_extracted_html(
@@ -140,7 +158,7 @@ def process_extracted_html(
 
     # New pages
     if crawling_result.confession_pages:
-        for url, extracted_html_list in crawling_result.confession_pages.items():
+        for url, (extracted_html_list, _) in crawling_result.confession_pages.items():
             if url not in existing_urls:
                 # Create new scraping
                 create_scraping(extracted_html_list, url, website)
@@ -152,7 +170,7 @@ def process_extracted_html(
             delete_scraping(scraping)
         else:
             # Scraping still exists, we update scraping
-            upsert_extracted_html_list(scraping, crawling_result.confession_pages[scraping.url])
+            upsert_extracted_html_list(scraping, crawling_result.confession_pages[scraping.url][0])
 
 
 def add_crawling_moderation(website: Website,

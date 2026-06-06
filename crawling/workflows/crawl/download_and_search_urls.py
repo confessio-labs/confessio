@@ -14,8 +14,8 @@ from scheduling.utils.html_utils import split_lines
 MAX_VISITED_LINKS = 50
 
 
-class CrawlingResult(BaseModel):
-    confession_pages: dict[str, list[str]] = Field(default_factory=dict)
+class CrawlingResult(BaseModel, frozen=True):
+    confession_pages: dict[str, tuple[list[str], bytes | None]] = Field(default_factory=dict)
     visited_links_count: int = 0
     error_detail: str | None = None
     widgets: list[BaseWidget] = Field(default_factory=list)
@@ -23,10 +23,11 @@ class CrawlingResult(BaseModel):
 
 def forbid_diocese_home_links(diocese_url: str, aliases_domains: set[str],
                               path_redirection: dict[str, str]) -> set[str]:
-    html_content = get_content_from_url(diocese_url)
-    if html_content is None:
+    content = get_content_from_url(diocese_url)
+    if content is None:
         print('no content for diocese home url')
         return set()
+    html_content, _ = content
 
     new_links = parse_content_links(html_content, diocese_url, aliases_domains, set(),
                                     path_redirection, set())
@@ -96,17 +97,18 @@ def search_for_confession_pages(home_url, aliases_domains: set[str],
         link = links_to_visit.pop()
         visited_links.add(link)
 
-        html_content = get_content_from_url(link)
-        if html_content is None:
+        content = get_content_from_url(link)
+        if content is None:
             # something went wrong (e.g. 404), we just ignore this page
             print(f'no content for {link}')
             continue
+        html_content, pdf_bytes = content
 
         # Looking if new confession part is found
         extracted_html_list = get_extracted_html_list(html_content)
-        if any(extracted_html not in extracted_html_seen
-               for extracted_html in extracted_html_list or []):
-            content_by_url[link] = extracted_html_list
+        if extracted_html_list and any(extracted_html not in extracted_html_seen
+                                       for extracted_html in extracted_html_list or []):
+            content_by_url[link] = (extracted_html_list, pdf_bytes)
             extracted_html_seen.update(set(extracted_html_list))
 
         # Looking for new links to visit
@@ -149,7 +151,7 @@ if __name__ == '__main__':
                                                    set(), {}, set())
     for cr in confession_pages.confession_pages:
         print(f'url: {cr}')
-        for paragraph in confession_pages.confession_pages[cr]:
+        for paragraph in confession_pages.confession_pages[cr][0]:
             print('<<<')
             for line in split_lines(paragraph):
                 print(line)

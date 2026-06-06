@@ -77,7 +77,7 @@ def get_text_with_right_encoding(response: Response) -> str:
     return text_auto
 
 
-def get_content_from_url(url: str) -> str | None:
+def get_content_from_url(url: str) -> tuple[str, bytes | None] | None:
     # Handle heavy pdf files
     if url.endswith('.pdf'):
         content_length = get_content_length(url)
@@ -107,9 +107,9 @@ def get_content_from_url(url: str) -> str | None:
         return None
 
     if is_pdf(r):
-        return extract_text_from_pdf_bytes(r.content)
+        return extract_text_from_pdf_bytes(r.content), r.content
 
-    return get_text_with_right_encoding(r)
+    return get_text_with_right_encoding(r), None
 
 
 def get_meta_refresh_tag_content(soup: BeautifulSoup) -> Optional[str]:

@@ -24,7 +24,7 @@ class Image(TimeStampMixin):
 
 
 class PdfRecognition(TimeStampMixin):
-    pdf_name = models.CharField(max_length=256)
+    pdf_url = models.URLField(max_length=300)
     pdf_sha256 = models.CharField(max_length=64, unique=True)
     llm_html = models.TextField(null=True, blank=True)
     llm_provider = models.CharField(choices=LLMProvider.choices(), null=True, blank=True)

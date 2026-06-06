@@ -21,9 +21,10 @@ def get_extracted_v2_html_list(html_content: str) -> list[str] | None:
 
 
 def get_fresh_extracted_html_list(url) -> list[str] | None:
-    html_content = get_content_from_url(url)
-    if html_content is None:
+    content = get_content_from_url(url)
+    if content is None:
         return None
+    html_content, _ = content
 
     return get_extracted_html_list(html_content)
 

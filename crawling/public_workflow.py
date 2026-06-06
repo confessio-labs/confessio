@@ -33,5 +33,5 @@ def crawling_redirects_to_other_url(url1: str, url2: str) -> bool:
 # DOWNLOAD #
 ############
 
-def crawling_get_content_from_url(url: str) -> str | None:
+def crawling_get_content_from_url(url: str) -> tuple[str, bytes | None] | None:
     return get_content_from_url(url)
