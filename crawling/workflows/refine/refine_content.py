@@ -104,16 +104,21 @@ def clear_table_formatting(element: BeautifulSoup):
         clear_formatting(el)
 
 
+def prettify_html(soup: BeautifulSoup):
+    prettified_html = soup.prettify()
+    return prettified_html.replace('&amp;amp;', '&amp;')  # Weird bug
+
+
 def rec_prettify(element: BeautifulSoup):
     last_prettified_html = None
-    prettified_html = element.prettify()
+    prettified_html = prettify_html(element)
 
     max_iterations = 100
 
     while last_prettified_html is None or prettified_html != last_prettified_html:
         prettified_bs4 = BeautifulSoup(prettified_html, 'html.parser')
         last_prettified_html = prettified_html
-        prettified_html = prettified_bs4.prettify()
+        prettified_html = prettify_html(prettified_bs4)
 
         max_iterations -= 1
         if max_iterations <= 0:

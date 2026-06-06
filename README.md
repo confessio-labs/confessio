@@ -97,7 +97,7 @@ A good dependency visualization tool is [tach](https://github.com/tach-org/tach)
 ## Quick start with mise (recommended)
 
 The project ships a [`mise`](https://mise.jdx.dev) config (`mise.toml`) that pins the tool versions
-(Python 3.13.9 + uv), loads `.env`, and defines task shortcuts. Once mise is
+(Python 3.13.11 + uv), loads `.env`, and defines task shortcuts. Once mise is
 [installed and activated](https://mise.jdx.dev/getting-started.html) in your shell:
 
 ```shell

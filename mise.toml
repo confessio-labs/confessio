@@ -1,5 +1,5 @@
 [tools]
-python = "3.13.9"   # matches `uv python pin 3.13.9` in README and `requires-python ~= 3.13.0`
+python = "3.13.11"   # matches `uv python pin 3.13.11` in README and `requires-python ~= 3.13.0`
 uv = "latest"       # matches Ansible install + CI's astral-sh/setup-uv
 
 [env]
