@@ -117,8 +117,11 @@ def rec_prettify(element: BeautifulSoup):
 
         max_iterations -= 1
         if max_iterations <= 0:
-            raise ValueError('too many prettify', element.prettify(), last_prettified_html,
-                             prettified_html)
+            print('too many prettify')
+            print(f'{element.prettify()=}')
+            print(f'{last_prettified_html=}')
+            print(f'{prettified_html=}')
+            raise ValueError('too many prettify')
 
     return prettified_html
 
