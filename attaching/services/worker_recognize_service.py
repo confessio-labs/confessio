@@ -1,12 +1,15 @@
-from attaching.models import Image
+from attaching.models import Image, PdfRecognition
 from attaching.services.image_service import get_image_html
 from attaching.services.upload_image_service import get_image_public_url
 from attaching.workflows.recognize.recognize_image_with_llm import (get_html_from_image, get_prompt,
                                                                     get_llm_model)
+from attaching.workflows.recognize.recognize_image_with_pdf import (get_html_from_pdf,
+                                                                    get_pdf_prompt,
+                                                                    get_pdf_llm_model)
 from core.utils.llm_utils import LLMProvider
 from crawling.public_workflow import crawling_get_extracted_html_list
 from scheduling.public_service import scheduling_create_pruning
-from scheduling.utils.hash_utils import hash_string_to_hex
+from scheduling.utils.hash_utils import hash_string_to_hex, hash_bytes_to_sha256_hex
 
 
 def recognize_image(image: Image):
@@ -31,6 +34,33 @@ def recognize_image(image: Image):
     image.llm_provider = llm_provider
     image.llm_model = llm_model
     image.save()
+
+
+def recognize_pdf(pdf_name: str, pdf_bytes: bytes) -> PdfRecognition:
+    pdf_sha256 = hash_bytes_to_sha256_hex(pdf_bytes)
+
+    existing = PdfRecognition.objects.filter(pdf_sha256=pdf_sha256).first()
+    if existing is not None:
+        print(f'Pdf {pdf_name} already recognized with LLM')
+        return existing
+
+    print(f'Recognizing pdf {pdf_name} with LLM')
+
+    prompt = get_pdf_prompt()
+    prompt_hash = hash_string_to_hex(prompt)
+    llm_provider = LLMProvider.OPENAI
+    llm_model = get_pdf_llm_model()
+    llm_html, llm_error_detail = get_html_from_pdf(pdf_bytes, prompt, llm_provider, llm_model)
+
+    return PdfRecognition(
+        pdf_name=pdf_name,
+        pdf_sha256=pdf_sha256,
+        llm_html=llm_html,
+        llm_error_detail=llm_error_detail,
+        prompt_hash=prompt_hash,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+    )
 
 
 def extract_image(image: Image):

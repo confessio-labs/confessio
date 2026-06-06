@@ -10,5 +10,9 @@ def hash_dict_to_hex(dict_to_hash: dict) -> str:
     return hash_string_to_hex(dict_string)
 
 
+def hash_bytes_to_sha256_hex(bytes_to_hash: bytes) -> str:
+    return hashlib.sha256(bytes_to_hash).hexdigest()
+
+
 if __name__ == '__main__':
     print(hash_string_to_hex('hello'))

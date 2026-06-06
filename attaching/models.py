@@ -21,3 +21,13 @@ class Image(TimeStampMixin):
     ip_address_hash = models.CharField(max_length=64, null=True, blank=True)
 
     history = HistoricalRecords()
+
+
+class PdfRecognition(TimeStampMixin):
+    pdf_name = models.CharField(max_length=256)
+    pdf_sha256 = models.CharField(max_length=64, unique=True)
+    llm_html = models.TextField(null=True, blank=True)
+    llm_provider = models.CharField(choices=LLMProvider.choices(), null=True, blank=True)
+    llm_model = models.CharField(max_length=100, null=True, blank=True)
+    prompt_hash = models.CharField(max_length=32, null=True, blank=True)
+    llm_error_detail = models.TextField(null=True, blank=True)
