@@ -29,6 +29,8 @@ class ChurchOut(Schema):
     wikidata_id: str | None
     trouverunemesse_id: UUID | None
     trouverunemesse_slug: str | None
+    annuairecatholique_id: UUID | None
+    annuairecatholique_business_id: str | None
     parish_uuid: UUID
     is_active: bool
     created_at: datetime
@@ -54,6 +56,8 @@ class ChurchOut(Schema):
             wikidata_id=church.wikidata_id,
             trouverunemesse_id=church.trouverunemesse_id,
             trouverunemesse_slug=church.trouverunemesse_slug,
+            annuairecatholique_id=church.annuairecatholique_id,
+            annuairecatholique_business_id=church.annuairecatholique_business_id,
             parish_uuid=church.parish_id,
             is_active=church.is_active,
             created_at=church.created_at,

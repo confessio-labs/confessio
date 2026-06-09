@@ -53,6 +53,7 @@ class ExternalSource(models.TextChoices):
     MESSESINFO = "messesinfo"
     LEHAVRE = "lehavre"
     TROUVERUNEMESSE = "trouverunemesse"
+    ANNUAIRECATHOLIQUE = "annuairecatholique"
 
 
 class ParishModeration(ModerationMixin):
@@ -68,7 +69,7 @@ class ParishModeration(ModerationMixin):
     history = HistoricalRecords()
     parish = models.ForeignKey('Parish', on_delete=models.CASCADE, related_name='moderations')
     category = models.CharField(max_length=16, choices=Category)
-    source = models.CharField(max_length=16, choices=ExternalSource)
+    source = models.CharField(max_length=20, choices=ExternalSource)
 
     name = models.CharField(max_length=100, null=True)
     website = models.ForeignKey('Website', on_delete=models.CASCADE,
@@ -147,7 +148,7 @@ class ChurchModeration(ModerationMixin):
     history = HistoricalRecords()
     church = models.ForeignKey('Church', on_delete=models.CASCADE, related_name='moderations')
     category = models.CharField(max_length=17, choices=Category)
-    source = models.CharField(max_length=16, choices=ExternalSource)
+    source = models.CharField(max_length=20, choices=ExternalSource)
 
     name = models.CharField(max_length=100, null=True)
     location = gis_models.PointField(geography=True, null=True)

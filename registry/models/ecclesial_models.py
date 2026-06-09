@@ -83,6 +83,9 @@ class Church(TimeStampMixin):
     trouverunemesse_id = models.UUIDField(null=True, unique=True, blank=True)
     trouverunemesse_slug = models.CharField(max_length=200, null=True, unique=True, blank=True)
     trouverunemesse_updated_at = models.DateTimeField(null=True, blank=True)
+    annuairecatholique_id = models.UUIDField(null=True, unique=True, blank=True)
+    annuairecatholique_business_id = models.CharField(max_length=50, null=True, blank=True)
+    annuairecatholique_updated_at = models.DateTimeField(null=True, blank=True)
     oclocher_id = models.CharField(max_length=32, null=True, unique=True, blank=True)
     parish = models.ForeignKey('Parish', on_delete=models.CASCADE,
                                related_name='churches')

@@ -9,8 +9,10 @@ from registry.utils.wikidata_utils import get_church_by_messesinfo_id
 
 
 def get_church_external_source(church: Church) -> ExternalSource:
-    if church.trouverunemesse_id:
-        return ExternalSource.TROUVERUNEMESSE
+    if church.annuairecatholique_id:
+        return ExternalSource.ANNUAIRECATHOLIQUE
+    elif church.trouverunemesse_id:
+        return ExternalSource.TROUVERUNEMESSE  # legacy, no longer written
     elif church.messesinfo_id:
         return ExternalSource.MESSESINFO
     else:
