@@ -3,6 +3,7 @@ import time
 from django.db.models import Max
 
 from core.management.abstract_command import AbstractCommand
+from core.utils.heartbeat_utils import ping_heartbeat
 from registry.models import Church
 from registry.services.sync_annuairecatholique_service import \
     sync_annuairecatholique_for_church, sync_annuairecatholique_location_and_city, \
@@ -21,6 +22,7 @@ class Command(AbstractCommand):
     def handle(self, *args, **options):
         if not options['all'] and not options['diocese']:
             self.handle_from_last_updated_at(timeout=options['timeout'])
+            ping_heartbeat("HEARTBEAT_ANNUAIRE_URL")
             return
 
         if options['diocese']:

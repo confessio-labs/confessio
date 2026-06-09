@@ -64,16 +64,21 @@
       hour: "23"
       minute: 0
       memory_max: "3200M"
+    - name: daily_sync_annuaire
+      command: "sync_annuairecatholique"
+      hour: "23"
+      minute: 5
+      memory_max: "3200M"
     - name: daily_nightly_fetching
       command: "nightly_fetching"
       weekday: "1,4,6"
       hour: "23"
-      minute: 15
+      minute: 10
       memory_max: "800M"
     - name: daily_website_popularity
       command: "update_website_popularity"
       hour: "23"
-      minute: 30
+      minute: 15
       memory_max: "800M"
 
 - name: Add cron to unlock dead tasks every minute
