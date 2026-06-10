@@ -250,6 +250,8 @@ def generate_and_print_guadeloupe_holiday():
 
 def generate_and_print_martinique_holiday():
     # https://www.data.gouv.fr/datasets/le-calendrier-scolaire/
+    # ou
+    # https://www.vacances-scolaires-gouv.com/outremer/martinique
     ics_url = 'https://fr.ftp.opendatasoft.com/openscol/fr-en-calendrier-scolaire/Martinique.ics'
     ics_content = get_ics_content_from_url(ics_url)
 
@@ -333,13 +335,17 @@ HOLIDAY_BY_ZONE = {
     'martinique': {2025: [(date(2025, 2, 22), date(2025, 3, 10)),
                           (date(2025, 4, 12), date(2025, 4, 28)),
                           (date(2025, 7, 5), date(2025, 9, 1)),
-                          (date(2025, 10, 18),
-                           date(2025, 11, 3)),
-                          (date(2025, 12, 20),
-                           date(2026, 1, 5))],
+                          (date(2025, 10, 18), date(2025, 11, 3)),
+                          (date(2025, 12, 20), date(2026, 1, 5)), ],
                    2026: [(date(2026, 2, 7), date(2026, 2, 23)),
-                          (date(2026, 3, 28),
-                           date(2026, 4, 13))]}
+                          (date(2026, 3, 28), date(2026, 4, 13)),
+                          (date(2026, 7, 4), date(2026, 9, 1)),
+                          (date(2026, 10, 20), date(2026, 11, 3)),
+                          (date(2026, 12, 19), date(2027, 1, 4)),],
+                   2027: [(date(2027, 2, 6), date(2027, 2, 22)),
+                          (date(2027, 3, 24), date(2027, 4, 1)),
+                          (date(2027, 4, 20), date(2027, 5, 3)),],
+                   }
 }
 
 
