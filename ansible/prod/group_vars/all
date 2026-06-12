@@ -9,7 +9,7 @@ deployer_user: ubuntu
 deployer_group: ubuntu
 
 # Github Code's Repo URL
-code_repository_url: git@github.com:etiennecallies/confessio.git
+code_repository_url: git@github.com:confessio-labs/confessio.git
 
 # App Directory
 app_dir: /home/{{ deployer_user }}/{{app_name}}
