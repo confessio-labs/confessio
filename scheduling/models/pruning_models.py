@@ -4,11 +4,10 @@ from pgvector.django import VectorField
 from simple_history.models import HistoricalRecords
 
 from core.models.base_models import TimeStampMixin
-from registry.models.base_moderation_models import ModerationMixin
 from registry.models import Diocese
-from scheduling.utils.hash_utils import hash_string_to_hex
-from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
+from registry.models.base_moderation_models import ModerationMixin
 from scheduling.workflows.pruning.extract.models import Action, Source
+from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 
 
 class Pruning(TimeStampMixin):
@@ -20,10 +19,6 @@ class Pruning(TimeStampMixin):
     human_indices = ArrayField(models.PositiveSmallIntegerField(), null=True)
 
     history = HistoricalRecords()
-
-    def save(self, *args, **kwargs):
-        self.extracted_html_hash = hash_string_to_hex(self.extracted_html)
-        super().save(*args, **kwargs)
 
     def get_pruned_indices(self):
         return self.human_indices if self.human_indices is not None else self.ml_indices

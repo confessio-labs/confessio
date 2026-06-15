@@ -7,6 +7,7 @@ from core.utils.log_utils import info
 from registry.models.base_moderation_models import ModerationStatus
 from scheduling.models.pruning_models import PruningModeration, Pruning, Sentence
 from scheduling.services.pruning.classify_sentence_service import classify_and_create_sentence
+from scheduling.utils.hash_utils import hash_string_to_hex
 from scheduling.workflows.pruning.extract.action_interfaces import BaseActionInterface
 from scheduling.workflows.pruning.extract.extract_content import \
     extract_paragraphs_lines_and_indices
@@ -212,16 +213,12 @@ def prune_pruning(pruning: Pruning) -> ():
         add_necessary_moderation_v2(pruning)
 
 
-def create_pruning(extracted_html: Optional[str]) -> Optional[Pruning]:
+def create_pruning(extracted_html: str | None) -> Pruning | None:
     if not extracted_html:
         return None
 
-    try:
-        pruning = Pruning.objects.get(extracted_html=extracted_html)
-    except Pruning.DoesNotExist:
-        pruning = Pruning(
-            extracted_html=extracted_html,
-        )
-        pruning.save()
-
+    pruning, _ = Pruning.objects.get_or_create(
+        extracted_html_hash=hash_string_to_hex(extracted_html),
+        defaults={"extracted_html": extracted_html},
+    )
     return pruning
