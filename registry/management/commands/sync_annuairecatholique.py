@@ -17,9 +17,16 @@ class Command(AbstractCommand):
     def add_arguments(self, parser):
         parser.add_argument('-d', '--diocese', help='diocese messesinfo_network_id to sync')
         parser.add_argument('-a', '--all', help='sync all churches', action='store_true')
+        parser.add_argument('-f', '--full-refresh',
+                            help='re-match every place, ignoring the high-water mark',
+                            action='store_true')
         parser.add_argument('-t', '--timeout', help='timeout in seconds', type=int, default=0)
 
     def handle(self, *args, **options):
+        if options['full_refresh']:
+            self.handle_from_last_updated_at(timeout=options['timeout'], full_refresh=True)
+            return
+
         if not options['all'] and not options['diocese']:
             self.handle_from_last_updated_at(timeout=options['timeout'])
             ping_heartbeat("HEARTBEAT_ANNUAIRE_URL")
@@ -63,11 +70,15 @@ class Command(AbstractCommand):
                      f'{nb_location_differs} with location differs, '
                      f'{nb_location_moderation} location moderations added.')
 
-    def handle_from_last_updated_at(self, timeout: int = 0):
-        max_updated_at = Church.objects\
-            .aggregate(Max('annuairecatholique_updated_at'))['annuairecatholique_updated_at__max']
-        self.info(f'Starting syncing with annuairecatholique API from last updated at: '
-                  f'{max_updated_at}')
+    def handle_from_last_updated_at(self, timeout: int = 0, full_refresh: bool = False):
+        if full_refresh:
+            max_updated_at = None
+            self.info('Starting FULL REFRESH: re-matching every annuairecatholique place')
+        else:
+            max_updated_at = Church.objects.aggregate(
+                Max('annuairecatholique_updated_at'))['annuairecatholique_updated_at__max']
+            self.info(f'Starting syncing with annuairecatholique API from last updated at: '
+                      f'{max_updated_at}')
 
         start_time = time.time()
 
