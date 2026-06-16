@@ -278,14 +278,18 @@ def validate_schedules_for_website(request, website_uuid=None):
 
     assert request.user is not None
 
-    scheduling_moderation = SchedulingModeration.objects.get(website=website)
-    if scheduling_moderation is not None:
+    try:
+        scheduling_moderation = SchedulingModeration.objects.get(website=website)
         if scheduling_moderation.status != ModerationStatus.VALIDATED:
             scheduling_moderation.validate(request.user)
-    crawling_moderation = CrawlingModeration.objects.get(website=website)
-    if crawling_moderation is not None:
+    except SchedulingModeration.DoesNotExist:
+        pass
+    try:
+        crawling_moderation = CrawlingModeration.objects.get(website=website)
         if crawling_moderation.status != ModerationStatus.VALIDATED:
             crawling_moderation.validate(request.user)
+    except CrawlingModeration.DoesNotExist:
+        pass
 
     validate_website_indexed_schedules(website, request.user)
     init_scheduling(website)
