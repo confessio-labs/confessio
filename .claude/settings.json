@@ -4,15 +4,10 @@
       "Read(.env)",
       "Read(.envrc)",
       "Read(**/.env*)",
-      "Read(.venv/**)",
-      "Read(**/venv/**)",
-      "Read(**/*.lock)",
       "Read(**/*.pyc)",
       "Read(**/__pycache__/**)",
       "Read(local_static/**)",
-      "Read(profiling_prof_files/**)",
-      "Read(**/fixtures/**)",
-      "Read(.python-version)"
+      "Read(profiling_prof_files/**)"
     ]
   }
 }

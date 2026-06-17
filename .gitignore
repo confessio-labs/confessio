@@ -13,7 +13,6 @@ env
 *.sqlite*
 
 .env
-.python-version
 
 local_static/
 profiling_prof_files/
