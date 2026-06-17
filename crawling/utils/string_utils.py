@@ -6,4 +6,4 @@ def remove_unsafe_chars(text: str) -> str:
     if not text:
         return text
 
-    return text.replace('\udce7', '')
+    return text.replace('\udce7', '').replace('\x00', '')

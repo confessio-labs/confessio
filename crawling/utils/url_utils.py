@@ -1,5 +1,7 @@
 from urllib.parse import urlparse, ParseResult
 
+from crawling.utils.string_utils import remove_unsafe_chars
+
 
 def get_domain(url):
     url_parsed = urlparse(url)
@@ -30,6 +32,7 @@ def replace_scheme_and_hostname(url_parsed: ParseResult, new_url: str) -> str:
 
 
 def get_clean_full_url(url, keep_trailing_slash: bool = False) -> str:
+    url = remove_unsafe_chars(url)
     url_parsed = urlparse(url)
 
     url_parsed = clean_parsed_url(url_parsed, keep_trailing_slash)

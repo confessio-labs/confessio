@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
-from httpx import HTTPError, Response
+from httpx import HTTPError, InvalidURL, Response
 
 from core.utils.log_utils import info
 from crawling.workflows.refine.pdf_utils import extract_text_from_pdf_bytes
@@ -35,7 +35,7 @@ def get_content_length(url):
         with httpx.Client() as client:
             r = client.get(url, headers=headers, timeout=TIMEOUT)
             r.raise_for_status()
-    except httpx.HTTPError as e:
+    except (httpx.HTTPError, InvalidURL) as e:
         info(e)
         return None
 
@@ -97,7 +97,7 @@ def get_content_from_url(url: str) -> tuple[str, bytes | None] | None:
     try:
         with httpx.Client() as client:
             r = client.get(url, headers=headers, timeout=TIMEOUT, follow_redirects=True)
-    except HTTPError as e:
+    except (HTTPError, InvalidURL) as e:
         info(e)
         return None
 
@@ -155,7 +155,7 @@ def get_url_aliases(url, already_seen: set | None = None
     try:
         with httpx.Client() as client:
             r = client.get(url, headers=headers, follow_redirects=False, timeout=TIMEOUT)
-    except HTTPError as e:
+    except (HTTPError, InvalidURL) as e:
         attempt_with_https = replace_http_with_https(url)
         if attempt_with_https:
             info(f'error with http, trying https: {e}')
