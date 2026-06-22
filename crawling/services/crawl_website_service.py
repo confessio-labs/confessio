@@ -1,5 +1,6 @@
 from attaching.public_service import attaching_recognize_pdf
 from core.utils.log_utils import info
+from core.utils.ram_utils import print_memory_usage
 from crawling.models import CrawlingModeration
 from crawling.services.crawling_moderation_service import upsert_crawling_moderation, \
     get_crawling_moderation_category
@@ -126,7 +127,9 @@ def crawl_website(
 
     crawling_result = do_crawl_website(website)
     # use LLM vision to refine pdf extraction
+    print_memory_usage('before recognize_pdf_in_results')
     crawling_result = recognize_pdf_in_results(crawling_result)
+    print_memory_usage('after recognize_pdf_in_results')
 
     process_extracted_html(website, crawling_result)
     process_extracted_widgets(website, crawling_result.widgets)
