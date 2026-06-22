@@ -44,7 +44,7 @@ def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
         print(f'Pdf {pdf_url} already recognized with LLM')
         return existing.llm_html
 
-    print(f'Recognizing pdf {pdf_url} with LLM')
+    print(f'Recognizing pdf {pdf_url} with LLM, size={len(pdf_bytes)}')
 
     prompt = get_pdf_prompt()
     prompt_hash = hash_string_to_hex(prompt)
