@@ -50,7 +50,8 @@ def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
     prompt_hash = hash_string_to_hex(prompt)
     llm_provider = LLMProvider.OPENAI
     llm_model = get_pdf_llm_model()
-    llm_html, llm_error_detail = get_html_from_pdf(pdf_bytes, prompt, llm_provider, llm_model)
+    llm_html, llm_error_detail, nb_pages = get_html_from_pdf(pdf_bytes, prompt,
+                                                             llm_provider, llm_model)
 
     pdf_recognition = PdfRecognition(
         pdf_url=pdf_url,
@@ -60,6 +61,8 @@ def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
         prompt_hash=prompt_hash,
         llm_provider=llm_provider,
         llm_model=llm_model,
+        pdf_size=len(pdf_bytes),
+        nb_pages=nb_pages,
     )
     pdf_recognition.save()
 

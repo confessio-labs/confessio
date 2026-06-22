@@ -19,24 +19,29 @@ def get_pdf_llm_model() -> str:
     return "gpt-4o-mini"
 
 
-def convert_pdf_to_images(pdf_bytes: bytes) -> list[bytes]:
-    """Convert each page of a PDF into a PNG image (rendered at 2x zoom for readability)."""
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+def convert_pdf_to_images(pdf_bytes: bytes) -> tuple[list[bytes], int]:
+    """Convert each page of a PDF into a PNG image (rendered at 1.5x zoom for readability)."""
     images = []
-    for page in doc:
-        pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2))
-        images.append(pix.tobytes("png"))
-    return images
+    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
+        nb_pages = doc.page_count
+        for page in doc:
+            pix = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5))
+            images.append(pix.tobytes("png"))
+            pix = None  # free the raw bitmap before rendering the next page
+    return images, nb_pages
 
 
 def get_html_from_pdf(pdf_bytes: bytes, prompt: str, llm_provider: LLMProvider,
-                      llm_model: str, max_attempts: int = 3) -> tuple[str | None, str | None]:
+                      llm_model: str, max_attempts: int = 3
+                      ) -> tuple[str | None, str | None, int]:
     assert llm_provider == LLMProvider.OPENAI
-    images = convert_pdf_to_images(pdf_bytes)
+    images, nb_pages = convert_pdf_to_images(pdf_bytes)
 
     content = [{"type": "input_text", "text": prompt}]
-    for image in images:
+    while images:
+        image = images.pop(0)
         b64 = base64.b64encode(image).decode("utf-8")
+        del image
         content.append({"type": "input_image", "image_url": f"data:image/png;base64,{b64}"})
 
     openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY_RECOGNIZE"))
@@ -53,7 +58,7 @@ def get_html_from_pdf(pdf_bytes: bytes, prompt: str, llm_provider: LLMProvider,
             temperature=0.0,
         )
 
-        return remove_triple_quotes(response.output_text), None
+        return remove_triple_quotes(response.output_text), None, nb_pages
     except BadRequestError as e:
         if 'Timeout while downloading' in str(e):
             if max_attempts > 0:
@@ -61,4 +66,4 @@ def get_html_from_pdf(pdf_bytes: bytes, prompt: str, llm_provider: LLMProvider,
                 return get_html_from_pdf(pdf_bytes, prompt, llm_provider, llm_model,
                                          max_attempts - 1)
         print(f"Error processing pdf: {e}")
-        return None, str(e)
+        return None, str(e), nb_pages

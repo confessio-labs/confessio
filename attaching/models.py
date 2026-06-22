@@ -31,3 +31,5 @@ class PdfRecognition(TimeStampMixin):
     llm_model = models.CharField(max_length=100, null=True, blank=True)
     prompt_hash = models.CharField(max_length=32, null=True, blank=True)
     llm_error_detail = models.TextField(null=True, blank=True)
+    pdf_size = models.PositiveIntegerField(null=True, blank=True)
+    nb_pages = models.PositiveIntegerField(null=True, blank=True)
