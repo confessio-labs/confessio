@@ -1,4 +1,3 @@
-import difflib
 import json
 
 from django.contrib.auth.decorators import login_required, permission_required
@@ -15,8 +14,7 @@ from scheduling.models import SchedulingModeration, ValidatedSchedulesModeration
 from scheduling.models.pruning_models import PruningModeration
 from scheduling.models.pruning_models import SentenceModeration
 from scheduling.services.merging.validated_schedules_service import \
-    validate_website_indexed_schedules, retrieve_validated_schedule
-from scheduling.services.merging.sourced_schedules_service import retrieve_scheduling_elements
+    validate_website_indexed_schedules, build_website_validated_schedules_comparison
 from scheduling.services.parsing.edit_parsing_service import set_llm_json_as_human_json, \
     on_parsing_human_validation, ParsingValidationError
 from scheduling.services.parsing.parsing_service import get_schedules_list_from_dict
@@ -28,8 +26,7 @@ from scheduling.services.pruning.edit_pruning_service import set_v2_indices_as_h
 from scheduling.services.pruning.prune_scraping_service import SentenceQualifyLineInterface, \
     MLSentenceQualifyLineInterface
 from scheduling.services.scheduling.scheduling_process_service import init_scheduling
-from scheduling.services.scheduling.scheduling_service import get_parsing_moderation_of_pruning, \
-    get_indexed_scheduling
+from scheduling.services.scheduling.scheduling_service import get_parsing_moderation_of_pruning
 from scheduling.workflows.pruning.extract.models import Source
 from scheduling.workflows.pruning.extract_v2.split_content import create_line_and_tag_v2
 
@@ -202,26 +199,11 @@ def moderate_validated_schedules(request, category, status, diocese_slug, modera
 
 def create_validated_schedules_moderation_context(
         moderation: ValidatedSchedulesModeration) -> dict:
-    scheduling = get_indexed_scheduling(moderation.website)
-    scheduling_elements = retrieve_scheduling_elements(scheduling)
-
-    validated_sourced_schedules_list = retrieve_validated_schedule(moderation.website)
-
-    indexed_str = scheduling_elements.sourced_schedules_list.model_dump_json(indent=2)
-    validated_str = validated_sourced_schedules_list.model_dump_json(indent=2)
-
-    diff = difflib.unified_diff(
-        validated_str.splitlines(),
-        indexed_str.splitlines(),
-        fromfile='validated',
-        tofile='indexed',
-        lineterm=''
-    )
-    printable_diff = '\n'.join(diff)
+    comparison = build_website_validated_schedules_comparison(moderation.website)
 
     return {
         'website': moderation.website,
-        'printable_diff': printable_diff,
+        'comparison': comparison,
     }
 
 

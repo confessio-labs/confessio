@@ -1,13 +1,69 @@
 {% extends 'layouts/moderation_card.html' %}
-{% load scheduling_tags %}
 
 {% block card %}
     {% include 'moderations/_header.html' with title_prefix='Validated Schedules' %}
 
     Website: {{ website.name }}<br>
     Link: <a href="{% url 'website_view' website.uuid %}" target="_blank">Go to website</a>
+    <br><br>
 
-    <pre>{{ printable_diff }}</pre><br>
+    {% if comparison is None %}
+        <p class="text-muted">Pas de planning validé ou indexé à comparer.</p>
+    {% else %}
+        {% for church in comparison.church_comparisons %}
+            <div class="card mb-3 {% if church.differs %}border-warning{% endif %}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="{% if church.differs %}fw-bold{% endif %}">{{ church.church_label }}</span>
+                    {% if church.differs %}
+                        <span class="badge bg-warning text-dark">DIFFERS</span>
+                    {% else %}
+                        <span class="badge bg-light text-muted">identique</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-muted small mb-1">Validé</div>
+                            {% for line in church.validated_lines %}
+                                <div class="{% if line.changed %}text-danger fw-bold{% endif %}">
+                                    {{ line.text }}</div>
+                            {% empty %}
+                                <div class="text-muted fst-italic">—</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small mb-1">Indexé</div>
+                            {% for line in church.indexed_lines %}
+                                <div class="{% if line.changed %}text-success fw-bold{% endif %}">
+                                    {{ line.text }}</div>
+                            {% empty %}
+                                <div class="text-muted fst-italic">—</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+
+        <table class="table table-sm w-auto mb-4">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th class="text-center">Validé</th>
+                    <th class="text-center">Indexé</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for flag in comparison.flag_comparisons %}
+                    <tr class="{% if flag.differs %}table-warning{% endif %}">
+                        <td>{{ flag.label }}</td>
+                        <td class="text-center">{% if flag.validated_on %}oui{% else %}non{% endif %}</td>
+                        <td class="text-center">{% if flag.indexed_on %}oui{% else %}non{% endif %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
 
     {% include 'moderations/_footer.html' %}
 {% endblock card %}

@@ -4,7 +4,10 @@ from django.db.models.functions import Now
 from registry.models import Website
 from scheduling.models import ValidatedSchedules
 from scheduling.public_model import SourcedSchedulesList, SourcedScheduleItem, ParsingSource
+from scheduling.services.merging.sourced_schedules_service import retrieve_scheduling_elements
 from scheduling.services.scheduling.scheduling_service import get_indexed_scheduling
+from scheduling.workflows.merging.compare_explanations import ValidatedSchedulesComparison, \
+    build_validated_schedules_comparison as build_comparison
 from scheduling.workflows.parsing.schedules import ScheduleItem
 
 
@@ -78,3 +81,26 @@ def check_schedules_match(website: Website,
 
     return get_schedule_items(validated_sourced_schedules_list) == \
         get_schedule_items(sourced_schedules_list)
+
+
+###############################################
+# Compare ValidatedSchedules church by church #
+###############################################
+
+def build_website_validated_schedules_comparison(
+        website: Website) -> ValidatedSchedulesComparison | None:
+    scheduling = get_indexed_scheduling(website)
+    if scheduling is None:
+        return None
+
+    scheduling_elements = retrieve_scheduling_elements(scheduling)
+
+    validated_sourced_schedules_list = retrieve_validated_schedule(website)
+    if validated_sourced_schedules_list is None:
+        return None
+
+    return build_comparison(
+        validated_sourced_schedules_list,
+        scheduling_elements.sourced_schedules_list,
+        scheduling_elements.church_by_id,
+    )
