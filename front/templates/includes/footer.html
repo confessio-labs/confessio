@@ -1,16 +1,17 @@
 {% load static %}
 {% load i18n %}
 
-<footer class="footer pt-5 pb-5 bg-secondary text-white">
+<footer class="footer pt-5 pb-5 bg-secondary">
   <div class="container">
-      <div class="row mb-2">
+      {% include 'includes/loi_fin_de_vie.html' %}
+      <div class="row mb-2 text-white">
           <div class="col-md-12">
               <div class="d-flex text-center justify-content-center align-items-center" role="contentinfo">
                   <p class="fw-normal mb-0">Un projet généreusement encouragé par :</p>
               </div>
           </div>
       </div>
-      <div class="row mb-3">
+      <div class="row mb-3 text-white">
           <div class="col col-5 col-md-3 mx-auto">
               <div class="mb-3">
                   <a href="https://hozana.org/">
@@ -19,7 +20,7 @@
               </div>
           </div>
       </div>
-      <div class="row">
+      <div class="row text-white">
           <div class="col-md-12 text-center">
               <div>{% trans 'footerAboutUs' %}</div>
               <div><a href="{% url 'dioceses_list' %}">Liste des diocèses</a> • <a href="{% url 'contact' %}">{% trans 'contactUs' %}</a></div>
@@ -34,7 +35,7 @@
 {#              </div>#}
 {#          </div>#}
 {#      </div>#}
-      <div class="row mt-3">
+      <div class="row mt-3 text-white">
           <div class="col-md-12">
               <div class="d-flex text-center justify-content-center align-items-center" role="contentinfo">
                   <p class="fw-normal mb-0">
@@ -44,7 +45,7 @@
               </div>
           </div>
       </div>
-      <div class="row mb-3">
+      <div class="row mb-3 text-white">
           <div class="col-md-12">
               <div class="d-flex text-center justify-content-center align-items-center" role="contentinfo">
                   <p class="fw-normal mb-0 d-inline-flex align-items-center gap-1">
@@ -56,7 +57,7 @@
               </div>
           </div>
       </div>
-      <div class="row">
+      <div class="row text-white">
           <div class="col mb-md-0">
               <div class="d-flex text-center justify-content-center align-items-center" role="contentinfo">
                   <p class="fw-normal font-small mb-0">Code open-source disponible sur

@@ -139,3 +139,14 @@ def get_moderation_stats(diocese: Diocese | None):
         OClocherOrganizationModeration.get_stats_by_category(diocese),
         OClocherMatchingModeration.get_stats_by_category(diocese),
     ], [])
+
+
+@register.simple_tag
+def countdown_july_15():
+    today = date.today()
+
+    target = date(today.year, 7, 15)
+    if today > target:
+        target = date(today.year + 1, 7, 15)
+
+    return f"J-{(target - today).days}"
