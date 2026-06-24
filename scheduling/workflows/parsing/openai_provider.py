@@ -41,6 +41,9 @@ class OpenAILLMClient(LLMClientInterface):
 
         return schedules_list, None
 
+    async def aclose(self) -> None:
+        await self.client.close()
+
     def get_provider(self) -> LLMProvider:
         return LLMProvider.OPENAI
 

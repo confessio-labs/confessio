@@ -1,7 +1,7 @@
-import asyncio
 import re
 from dataclasses import dataclass
 
+from core.utils.async_utils import run_and_close
 from core.utils.log_utils import info
 from registry.models import Church
 from registry.models.base_moderation_models import ModerationStatus
@@ -216,11 +216,13 @@ def parse_parsing_preparation(parsing_preparation: ParsingPreparation) -> Parsin
         schedules_list, llm_error_detail = None, "Truncated html too long"
     else:
         info(f'parsing with hash {parsing_preparation.truncated_html_hash}')
-        schedules_list, llm_error_detail = asyncio.run(
+        llm_client = parsing_preparation.llm_client
+        schedules_list, llm_error_detail = run_and_close(
             parse_with_llm(truncated_html,
                            parsing_preparation.church_desc_by_id,
                            parsing_preparation.prompt_template,
-                           parsing_preparation.llm_client)
+                           llm_client),
+            llm_client.aclose,
         )
 
     return save_parsing(parsing_preparation, schedules_list, llm_error_detail)

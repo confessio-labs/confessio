@@ -12,6 +12,10 @@ class LLMClientInterface:
                               temperature: float) -> tuple[Optional[SchedulesList], Optional[str]]:
         pass
 
+    async def aclose(self) -> None:
+        """Release any underlying network resources. Default: no-op."""
+        pass
+
     @abstractmethod
     def get_provider(self) -> LLMProvider:
         pass

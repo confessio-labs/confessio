@@ -5,6 +5,7 @@ from openai import AsyncOpenAI
 from tqdm import tqdm
 
 from core.management.abstract_command import AbstractCommand
+from core.utils.async_utils import run_and_close
 from registry.models import ChurchTrouverUneMesse, ChurchTrouverUneMesseLLMName
 from scheduling.utils.hash_utils import hash_string_to_hex
 from registry.services.church_llm_name_service import get_prompt_template_for_name, \
@@ -95,4 +96,4 @@ def trouverunemesse_compute_churches_llm_name(prompt_template: str | None = None
 
     chunks = [not_computed_churches[i:i + 20]
               for i in range(0, len(not_computed_churches), 20)]
-    asyncio.run(compute_in_parallel(chunks, prompt_template, client))
+    run_and_close(compute_in_parallel(chunks, prompt_template, client), client.close)

@@ -7,6 +7,7 @@ from openai import AsyncOpenAI, BadRequestError
 from pydantic import ValidationError, BaseModel
 from tqdm import tqdm
 
+from core.utils.async_utils import run_and_close
 from registry.models import Church
 from registry.models.one_shot_models import ChurchLLMName
 from scheduling.utils.hash_utils import hash_string_to_hex
@@ -191,4 +192,4 @@ def compute_churches_llm_name(prompt_template: str | None = None, max_churches: 
 
     chunks = [not_computed_churches[i:i + BATCH_SIZE]
               for i in range(0, len(not_computed_churches), BATCH_SIZE)]
-    asyncio.run(compute_in_parallel(chunks, prompt_template, client))
+    run_and_close(compute_in_parallel(chunks, prompt_template, client), client.close)
