@@ -1,0 +1,24 @@
+[
+  {
+    "method": "multitask-camembert-large",
+    "target": "temporal",
+    "accuracy": 0.9254302103250478,
+    "macro_f1": 0.9218947496576758,
+    "per_class_f1": {
+      "none": 0.9116022099447514,
+      "sched": 0.9580246913580247,
+      "spec": 0.8960573476702509
+    }
+  },
+  {
+    "method": "multitask-camembert-large",
+    "target": "confession",
+    "accuracy": 0.8565965583173997,
+    "macro_f1": 0.8599645400491737,
+    "per_class_f1": {
+      "event": 0.8740740740740741,
+      "neutral": 0.8615984405458089,
+      "other": 0.8442211055276382
+    }
+  }
+]
