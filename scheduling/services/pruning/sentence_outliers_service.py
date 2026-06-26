@@ -1,4 +1,4 @@
-from registry.models import Sentence, SentenceModeration
+from scheduling.models.pruning_models import Sentence, SentenceModeration
 from registry.models.base_moderation_models import ModerationStatus
 from scheduling.workflows.pruning.extract.models import Action
 

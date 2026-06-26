@@ -1,5 +1,5 @@
 from core.management.abstract_command import AbstractCommand
-from registry.models import Sentence
+from scheduling.models.pruning_models import Sentence
 
 
 class Command(AbstractCommand):
