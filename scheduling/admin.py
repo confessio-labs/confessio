@@ -6,13 +6,10 @@ from scheduling.models.pruning_models import Classifier, Encoder, Sentence
 
 @admin.register(Encoder)
 class EncoderAdmin(ModelAdmin):
-    list_display = ["uuid", "status", "base_model", "created_at",
-                    "accuracy_temporal", "accuracy_confession", "test_size"]
+    list_display = ["uuid", "status", "base_model", "created_at"]
     ordering = ["-created_at"]
-    fields = ["status", "base_model", "hf_repo_id", "hf_revision", "dimensions",
-              "accuracy_temporal", "accuracy_confession", "test_size", "notes"]
-    readonly_fields = ["base_model", "hf_repo_id", "hf_revision", "dimensions",
-                       "accuracy_temporal", "accuracy_confession", "test_size"]
+    fields = ["status", "base_model", "hf_repo_id", "hf_revision", "dimensions", "notes"]
+    readonly_fields = ["base_model", "hf_repo_id", "hf_revision", "dimensions"]
 
 
 @admin.register(Classifier)

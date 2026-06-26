@@ -21,9 +21,10 @@ class Command(AbstractCommand):
         self.info(f'Registering encoder from {options["repo_id"]}'
                   f'{"@" + options["revision"] if options["revision"] else ""}...')
         encoder = create_encoder_from_hf(options['repo_id'], options['revision'])
-        self.info(f'Created DRAFT encoder {encoder.uuid}: '
-                  f'temporal={encoder.accuracy_temporal:.4f} '
-                  f'confession={encoder.accuracy_confession:.4f} (test_size={encoder.test_size}).')
+        heads = {c.target: c for c in encoder.classifiers.all()}
+        accuracies = ', '.join(f'{target}={head.accuracy:.4f} (test_size={head.test_size})'
+                               for target, head in sorted(heads.items()))
+        self.info(f'Created DRAFT encoder {encoder.uuid} with heads: {accuracies}.')
 
         promoted, message = promote_encoder(encoder, force=options['force'])
         if promoted:

@@ -178,9 +178,6 @@ def create_encoder_from_hf(repo_id: str, revision: str | None = None) -> Encoder
         hf_repo_id=repo_id,
         hf_revision=revision,
         dimensions=meta['dimensions'],
-        accuracy_temporal=meta['accuracy_temporal'],
-        accuracy_confession=meta['accuracy_confession'],
-        test_size=meta['test_size'],
     )
     encoder.save()
 
@@ -200,19 +197,31 @@ def create_encoder_from_hf(repo_id: str, revision: str | None = None) -> Encoder
     return encoder
 
 
+def _head_for(encoder: Encoder, target: Classifier.Target) -> Classifier | None:
+    """The head Classifier of `encoder` for `target`: its PROD head if the encoder is live, else the
+    latest (a freshly-registered DRAFT encoder whose heads aren't promoted yet)."""
+    qs = Classifier.objects.filter(encoder=encoder, target=target)
+    return qs.filter(status=Classifier.Status.PROD).order_by('-created_at').first() \
+        or qs.order_by('-created_at').first()
+
+
 def is_encoder_promotable(encoder: Encoder, current: Encoder) -> tuple[bool, str]:
-    """Promote if significantly better on >=1 target and not significantly worse on the other."""
+    """Promote if significantly better on >=1 target and not significantly worse on the other.
+    Per-task accuracy is read from each encoder's linked head Classifier."""
     verdicts = []
     sig_better, sig_worse = False, False
-    for task, field in [('temporal', 'accuracy_temporal'), ('confession', 'accuracy_confession')]:
-        new_acc, old_acc = getattr(encoder, field), getattr(current, field)
-        significant = is_significantly_different(new_acc, old_acc, encoder.test_size,
-                                                 current.test_size)
-        verdicts.append(f"{task}: {old_acc:.4f} -> {new_acc:.4f}"
+    for target in (Classifier.Target.TEMPORAL, Classifier.Target.CONFESSION):
+        new_head, old_head = _head_for(encoder, target), _head_for(current, target)
+        if new_head is None or old_head is None:
+            verdicts.append(f"{target}: missing head")
+            continue
+        significant = is_significantly_different(new_head.accuracy, old_head.accuracy,
+                                                 new_head.test_size, old_head.test_size)
+        verdicts.append(f"{target}: {old_head.accuracy:.4f} -> {new_head.accuracy:.4f}"
                         f"{' (significant)' if significant else ''}")
-        if significant and new_acc > old_acc:
+        if significant and new_head.accuracy > old_head.accuracy:
             sig_better = True
-        if significant and new_acc < old_acc:
+        if significant and new_head.accuracy < old_head.accuracy:
             sig_worse = True
     return (sig_better and not sig_worse), " | ".join(verdicts)
 

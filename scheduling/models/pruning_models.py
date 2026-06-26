@@ -35,12 +35,14 @@ class Sentence(TimeStampMixin):
     prunings = models.ManyToManyField('Pruning', related_name='sentences')
     updated_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True)
     updated_on_pruning = models.ForeignKey('Pruning', on_delete=models.SET_NULL, null=True)
-    # v1 (action) uses the frozen sentence-transformer embedding
+    # v1 (action) uses the frozen sentence-transformer embedding (legacy)
     transformer_name = models.CharField(max_length=100)
     embedding = VectorField(dimensions=768)
     # v2 (temporal/confession) uses the fine-tuned Encoder embedding
+    # TODO set not null (once every sentence is embedded by an Encoder)
     encoder = models.ForeignKey('Encoder', on_delete=models.SET_NULL,
                                 related_name='sentences', null=True)
+    # TODO set not null (once every sentence is re-embedded by the current Encoder)
     encoder_embedding = VectorField(dimensions=1024, null=True)
     # v1
     action = models.CharField(max_length=5, choices=Action.choices())
@@ -76,11 +78,9 @@ class Encoder(TimeStampMixin):
     hf_revision = models.CharField(max_length=100, null=True)  # commit sha to pin the weights
     dimensions = models.PositiveSmallIntegerField()  # embedding size, e.g. 1024
 
-    # Held-out accuracy of the jointly-trained heads, used for promotion significance test.
-    accuracy_temporal = models.FloatField(null=True)
-    accuracy_confession = models.FloatField(null=True)
-    test_size = models.PositiveSmallIntegerField(null=True)
-
+    # Per-task accuracy lives on the head Classifiers (related_name='classifiers'), not here:
+    # an accuracy is the performance of an (encoder, head) pair, and the promotion gate reads it
+    # from the linked heads.
     notes = models.TextField(null=True, blank=True)
     history = HistoricalRecords()
 

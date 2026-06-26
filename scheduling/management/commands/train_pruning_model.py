@@ -70,13 +70,7 @@ class Command(AbstractCommand):
             self.info(f'{count} sentences with label {label}')
 
         self.info(f'Training model for target {target}...')
-        try:
-            classifier = train_classifier(sentence_dataset, target)
-        except ValueError as exc:
-            if automatic:
-                self.warning(f'Skipping {target}: {exc}')
-                return
-            raise
+        classifier = train_classifier(sentence_dataset, target)
         self.success(f'Successfully trained model with accuracy {classifier.accuracy}, '
                      f'with test size {classifier.test_size} for target {target}')
 
