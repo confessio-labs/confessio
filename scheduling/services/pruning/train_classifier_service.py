@@ -1,3 +1,4 @@
+import torch  # noqa: F401  load torch before sklearn/scipy (macOS duplicate-OpenMP segfault guard)
 from django.db.models import Q
 from sklearn.model_selection import train_test_split
 
@@ -5,6 +6,7 @@ from scheduling.models.pruning_models import Classifier, Sentence
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 from scheduling.workflows.pruning.extract.models import Source, Action
 from scheduling.workflows.pruning.train_and_predict import TensorFlowModel, evaluate
+from scheduling.workflows.pruning.encoder import TorchHeadModel
 from scheduling.services.pruning.classifier_target_service import get_target_enum
 from scheduling.utils.enum_utils import StringEnum
 
@@ -93,33 +95,37 @@ def train_classifier(sentence_dataset: list[Sentence], target: Classifier.Target
     if not sentence_dataset:
         raise ValueError("No sentence dataset to train classifier")
 
+    # Action (v1) keeps the frozen sentence-transformer + Keras MLP; temporal/confession (v2)
+    # train a torch head on the PROD encoder's stored embedding.
+    if target == Classifier.Target.ACTION:
+        return _train_transformer_classifier(sentence_dataset, target)
+    return _train_encoder_head_classifier(sentence_dataset, target)
+
+
+def _split_train_eval(embeddings, labels, model) -> tuple[float, int]:
+    test_size = get_test_size(len(embeddings))
+    print(f"Dataset size: {len(embeddings)}, test size: {test_size}")
+    embeddings_train, embeddings_test, labels_train, labels_test = \
+        train_test_split(embeddings, labels, test_size=test_size)
+    model.fit(embeddings_train, labels_train)
+    accuracy = evaluate(model, embeddings_test, labels_test)
+    return accuracy, test_size
+
+
+def _train_transformer_classifier(sentence_dataset: list[Sentence],
+                                  target: Classifier.Target) -> Classifier:
     first_transformer_name = sentence_dataset[0].transformer_name
     assert all([s.transformer_name == first_transformer_name for s in sentence_dataset]), \
         "All sentences must have the same transformer"
 
-    # Get embeddings and labels
     embeddings = [sentence.embedding for sentence in sentence_dataset]
     labels = [extract_label(sentence, target) for sentence in sentence_dataset]
 
-    # Split dataset
-    test_size = get_test_size(len(sentence_dataset))
-    print(f"Dataset size: {len(sentence_dataset)}, test size: {test_size}")
-    embeddings_train, embeddings_test, \
-        labels_train, labels_test, \
-        = train_test_split(embeddings, labels, test_size=test_size,
-                           # random_state=41
-                           )
-
-    # Train model
     target_enum = get_target_enum(target)
     different_labels = target_enum.list_items()
     model = TensorFlowModel[target_enum](different_labels)
-    model.fit(embeddings_train, labels_train)
+    accuracy, test_size = _split_train_eval(embeddings, labels, model)
 
-    # Evaluate model
-    accuracy = evaluate(model, embeddings_test, labels_test)
-
-    # Save classifier
     classifier = Classifier(
         transformer_name=first_transformer_name,
         pickle=model.to_pickle(),
@@ -130,5 +136,42 @@ def train_classifier(sentence_dataset: list[Sentence], target: Classifier.Target
         test_size=test_size,
     )
     classifier.save()
+    return classifier
 
+
+def _train_encoder_head_classifier(sentence_dataset: list[Sentence],
+                                   target: Classifier.Target) -> Classifier:
+    from scheduling.services.pruning.encoder_service import get_prod_encoder_model
+    encoder = get_prod_encoder_model()
+
+    # Train only on labeled sentences already embedded by the current PROD encoder. Right after an
+    # encoder promotion the rest are still on the old encoder until reclassify_sentences re-embeds
+    # them; until then the heads carried over from training stay in place.
+    current = [s for s in sentence_dataset
+               if s.encoder_id == encoder.uuid and s.encoder_embedding is not None]
+    if len(current) < MIN_DATASET_SIZE:
+        raise ValueError(
+            f"Only {len(current)}/{len(sentence_dataset)} labeled sentences are embedded by the "
+            f"current PROD encoder (need {MIN_DATASET_SIZE}). Run reclassify_sentences to "
+            f"re-embed, then retrain.")
+
+    embeddings = [sentence.encoder_embedding for sentence in current]
+    labels = [extract_label(sentence, target) for sentence in current]
+
+    target_enum = get_target_enum(target)
+    different_labels = target_enum.list_items()
+    model = TorchHeadModel[target_enum](different_labels)
+    accuracy, test_size = _split_train_eval(embeddings, labels, model)
+
+    classifier = Classifier(
+        transformer_name=encoder.base_model,
+        encoder=encoder,
+        pickle=model.to_pickle(),
+        status=Classifier.Status.DRAFT,
+        target=target,
+        different_labels=different_labels,
+        accuracy=accuracy,
+        test_size=test_size,
+    )
+    classifier.save()
     return classifier

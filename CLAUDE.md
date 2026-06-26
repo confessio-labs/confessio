@@ -48,6 +48,36 @@ python manage.py compilemessages
 # or both: mise run translations
 ```
 
+### V2 encoder (developer-only, manual)
+
+The V2 temporal/confession classifiers run on a fine-tuned camembert-large `Encoder`
+(sentence → 1024-d embedding) shared by per-target heads (`Classifier`). The encoder is trained
+in **dev** and promoted on **prod** by hand (it needs ~5-6 GB, too heavy for the nightly cron);
+the heads are retrained nightly on the **stored** embedding by `train_pruning_model --automatic`
+(no camembert load). Requires `HF_TOKEN` (write access to the private HF repo).
+
+Dev/prod split: `train_encoder` runs in dev on a prod-DB dump and writes only to HF (no DB);
+`promote_encoder` runs on prod (or locally to test) and registers the encoder from HF into the DB.
+
+```bash
+# 1. (DEV) Fine-tune encoder + heads on the local prod-dump; push body + tokenizer + meta.json
+#    (with the head weights) to the HF repo. NO database writes.
+python manage.py train_encoder            # --repo-id confessio-labs/pruning-v2-encoder
+
+# 1b. If the push failed (training is staged locally), retry without retraining:
+python manage.py push_encoder             # --repo-id ...
+
+# 2. (PROD) Register from HF into THIS DB and flip PROD: creates the Encoder + the two heads,
+#    significance-checks vs the current PROD encoder, sets PROD. Does NOT re-embed.
+python manage.py promote_encoder --repo-id confessio-labs/pruning-v2-encoder --revision <sha>
+#    (-f to force; restart inference processes afterwards)
+```
+
+Re-embedding is **lazy**: when the encoder changes, each sentence's `encoder_embedding` is
+recomputed on-the-fly the next time it's classified, and persisted in bulk by the nightly
+`reclassify_sentences`. Action (V1) is unaffected and keeps its frozen sentence-transformer
+embedding.
+
 ## Architecture
 
 Modular Django monorepo with 7 apps. Each app has its own models, views, services, and management commands.

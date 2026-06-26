@@ -6,9 +6,11 @@ from scheduling.models.pruning_models import Classifier, Sentence, Pruning
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 from scheduling.workflows.pruning.extract.models import Source, Action
 from scheduling.workflows.pruning.train_and_predict import TensorFlowModel
-from scheduling.workflows.pruning.transform_sentence import get_transformer, TransformerInterface, \
-    TRANSFORMER_NAME
+from scheduling.workflows.pruning.encoder import TorchHeadModel
+from scheduling.workflows.pruning.transform_sentence import get_transformer, TRANSFORMER_NAME
 from scheduling.services.pruning.classifier_target_service import get_target_enum
+from scheduling.services.pruning.encoder_service import (ENCODER_TARGETS, get_prod_encoder,
+                                                         get_prod_encoder_model)
 from scheduling.services.pruning.train_classifier_service import set_label
 from scheduling.utils.enum_utils import StringEnum
 
@@ -26,19 +28,25 @@ def get_classifier(target: Classifier.Target
             if _classifier.get(target, None) is None:
                 print(f'Loading classifier for target {target}...')
                 try:
-                    _classifier[target] = Classifier.objects \
+                    classifier = Classifier.objects \
                         .filter(status=Classifier.Status.PROD, target=target) \
                         .latest('updated_at')
                 except Classifier.DoesNotExist:
                     raise ValueError(f"No classifier in production for target {target}")
 
-                assert _classifier[target].transformer_name == TRANSFORMER_NAME, \
-                    "Classifier and transformer are not compatible"
+                if target in ENCODER_TARGETS:
+                    # compatibility = trained on the current PROD encoder (DB row only, no HF load)
+                    assert classifier.encoder_id == get_prod_encoder_model().uuid, \
+                        "Classifier and PROD encoder are not compatible"
+                else:
+                    assert classifier.transformer_name == TRANSFORMER_NAME, \
+                        "Classifier and transformer are not compatible"
+                _classifier[target] = classifier
 
     return _classifier[target]
 
 
-def get_model(classifier: Classifier) -> TensorFlowModel:
+def get_model(classifier: Classifier):
     global _model
 
     target = Classifier.Target(classifier.target)
@@ -49,7 +57,10 @@ def get_model(classifier: Classifier) -> TensorFlowModel:
                 different_labels = target_enum.list_items()
                 assert classifier.different_labels == different_labels, \
                     "Classifier and model are not compatible"
-                tmp_model = TensorFlowModel[target_enum](different_labels)
+                if classifier.encoder_id is None:
+                    tmp_model = TensorFlowModel[target_enum](different_labels)
+                else:
+                    tmp_model = TorchHeadModel[target_enum](different_labels)
                 tmp_model.from_pickle(classifier.pickle)
                 _model[target] = tmp_model
 
@@ -57,19 +68,23 @@ def get_model(classifier: Classifier) -> TensorFlowModel:
 
 
 def classify_line(stringified_line: str, target: Classifier.Target
-                  ) -> tuple[StringEnum, Classifier, list, TransformerInterface]:
-    # 1. Get transformer
-    transformer = get_transformer()
-    embedding = transformer.transform(stringified_line)
+                  ) -> tuple[StringEnum, Classifier, list, object]:
+    # 1. Embed the line (sentence-transformer for action, fine-tuned encoder for v2)
+    if target in ENCODER_TARGETS:
+        _, embedder = get_prod_encoder()
+    else:
+        embedder = get_transformer()
+    embedding = embedder.embed(stringified_line) if target in ENCODER_TARGETS \
+        else embedder.transform(stringified_line)
 
-    # 2. Get classifier
+    # 2. Get classifier + model
     classifier = get_classifier(target)
     model = get_model(classifier)
 
     # 3. Predict label
     label = model.predict([embedding])[0]
 
-    return label, classifier, embedding, transformer
+    return label, classifier, embedding, embedder
 
 
 def classify_existing_sentence(sentence: Sentence, target: Classifier.Target
@@ -81,23 +96,43 @@ def classify_existing_sentence(sentence: Sentence, target: Classifier.Target
 
 def classify_existing_sentences(sentences: list[Sentence], target: Classifier.Target
                                 ) -> tuple[list[StringEnum], Classifier]:
-    # 1. Get transformer
-    transformer = get_transformer()
-    embeddings = []
-    for sentence in sentences:
-        if sentence.transformer_name != transformer.get_name():
-            embeddings.append(transformer.transform(sentence.line))
-        else:
-            embeddings.append(sentence.embedding)
+    # 1. Collect embeddings, reusing the stored one when still produced by the current encoder.
+    if target in ENCODER_TARGETS:
+        embeddings = _encoder_embeddings(sentences)
+    else:
+        transformer = get_transformer()
+        embeddings = [sentence.embedding if sentence.transformer_name == transformer.get_name()
+                      else transformer.transform(sentence.line) for sentence in sentences]
 
-    # 2. Get classifier
+    # 2. Get classifier + model
     classifier = get_classifier(target)
     model = get_model(classifier)
 
-    # 3. Predict label
+    # 3. Predict labels
     labels = model.predict(embeddings)
 
     return labels, classifier
+
+
+def _encoder_embeddings(sentences: list[Sentence]) -> list:
+    """Reuse each sentence's stored encoder_embedding; recompute (loading the encoder from HF) for
+    any sentence not embedded by the current PROD encoder. A recomputed embedding is written back
+    onto the sentence object so that callers which save it (reclassify_sentences, get_ml_label)
+    persist the re-embedding lazily; pure inference just uses it transiently."""
+    prod_encoder = get_prod_encoder_model()
+    finetuned = None
+    embeddings = []
+    for sentence in sentences:
+        if sentence.encoder_id == prod_encoder.uuid and sentence.encoder_embedding is not None:
+            embeddings.append(sentence.encoder_embedding)
+        else:
+            if finetuned is None:
+                _, finetuned = get_prod_encoder()
+            embedding = finetuned.embed(sentence.line)
+            sentence.encoder = prod_encoder
+            sentence.encoder_embedding = embedding
+            embeddings.append(embedding)
+    return embeddings
 
 
 def get_ml_label(sentence: Sentence, target: Classifier.Target) -> StringEnum:
@@ -143,11 +178,13 @@ def get_sentences_with_wrong_classifier(target: Classifier.Target) -> list[Sente
 
 def classify_and_create_sentence(stringified_line: str,
                                  pruning: Pruning) -> Sentence:
-    # Classify line
+    # v1 action: sentence-transformer embedding + action label
     action, classifier, embedding, transformer = classify_line(stringified_line,
                                                                Classifier.Target.ACTION)
+    # v2: fine-tuned encoder embedding (shared by temporal + confession)
+    prod_encoder, finetuned = get_prod_encoder()
+    encoder_embedding = finetuned.embed(stringified_line)
 
-    # Init sentence with v1 labels
     sentence = Sentence(
         line=stringified_line,
         action=action,
@@ -157,9 +194,11 @@ def classify_and_create_sentence(stringified_line: str,
         classifier=classifier,
         embedding=embedding,
         transformer_name=transformer.get_name(),
+        encoder=prod_encoder,
+        encoder_embedding=encoder_embedding,
     )
 
-    # V2 labels
+    # V2 labels (reuse the just-computed encoder_embedding stored on the sentence)
     ml_temporal, temporal_classifier = classify_existing_sentence(sentence,
                                                                   Classifier.Target.TEMPORAL)
     set_label(sentence, ml_temporal, temporal_classifier)

@@ -26,3 +26,6 @@ profiling_prof_files/
 # mise
 mise.local.toml
 .mise.local.toml
+
+# Locally-saved fine-tuned encoder weights (pushed to HF)
+.encoder_weights/
