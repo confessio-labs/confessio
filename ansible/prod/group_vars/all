@@ -104,3 +104,6 @@ mailgun_webhook_signing_key: "{{ lookup('ansible.builtin.env', 'MAILGUN_WEBHOOK_
 jawg_api_key1: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY1') }}"
 jawg_api_key2: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY2') }}"
 jawg_api_key3: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY3') }}"
+
+# Hugging Face
+hf_token: "{{ lookup('ansible.builtin.env', 'HF_TOKEN') }}"
