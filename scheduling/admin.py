@@ -1,7 +1,15 @@
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
 
-from scheduling.models.pruning_models import Classifier, Sentence
+from scheduling.models.pruning_models import Classifier, Encoder, Sentence
+
+
+@admin.register(Encoder)
+class EncoderAdmin(ModelAdmin):
+    list_display = ["uuid", "status", "base_model", "created_at"]
+    ordering = ["-created_at"]
+    fields = ["status", "base_model", "hf_repo_id", "hf_revision", "dimensions", "notes"]
+    readonly_fields = ["base_model", "hf_repo_id", "hf_revision", "dimensions"]
 
 
 @admin.register(Classifier)

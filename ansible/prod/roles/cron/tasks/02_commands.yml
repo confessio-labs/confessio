@@ -24,21 +24,23 @@
       hour: "0"
       minute: 45
       memory_max: "3200M"
+    # V2 reclassify/outliers load the fine-tuned camembert-large encoder (~1.3 GB) to re-embed
+    # stale sentences the night after an encoder promotion -> higher cap than the 3.2 GB default.
     - name: daily_reclassify_temporal
       command: "reclassify_sentences -t temporal"
       hour: "0"
       minute: 48
-      memory_max: "3200M"
+      memory_max: "6000M"
     - name: daily_reclassify_confession
       command: "reclassify_sentences -t confession"
       hour: "0"
       minute: 51
-      memory_max: "3200M"
+      memory_max: "6000M"
     - name: daily_find_sentence_outliers
       command: "find_sentence_outliers -t confession"
       hour: "0"
       minute: 54
-      memory_max: "3200M"
+      memory_max: "6000M"
     - name: daily_crawl_websites
       command: "crawl_websites -t 78900 --no-recent"
       hour: "1"

@@ -35,8 +35,15 @@ class Sentence(TimeStampMixin):
     prunings = models.ManyToManyField('Pruning', related_name='sentences')
     updated_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True)
     updated_on_pruning = models.ForeignKey('Pruning', on_delete=models.SET_NULL, null=True)
+    # v1 (action) uses the frozen sentence-transformer embedding (legacy)
     transformer_name = models.CharField(max_length=100)
     embedding = VectorField(dimensions=768)
+    # v2 (temporal/confession) uses the fine-tuned Encoder embedding
+    # TODO set not null (once every sentence is embedded by an Encoder)
+    encoder = models.ForeignKey('Encoder', on_delete=models.SET_NULL,
+                                related_name='sentences', null=True)
+    # TODO set not null (once every sentence is re-embedded by the current Encoder)
+    encoder_embedding = VectorField(dimensions=1024, null=True)
     # v1
     action = models.CharField(max_length=5, choices=Action.choices())
     source = models.CharField(max_length=5, choices=Source.choices())
@@ -56,6 +63,28 @@ class Sentence(TimeStampMixin):
     history = HistoricalRecords()
 
 
+class Encoder(TimeStampMixin):
+    """A fine-tuned sentence encoder (camembert-large) producing the embedding consumed by the
+    V2 temporal/confession heads (Classifier). Weights live in a private Hugging Face repo.
+    Trained and promoted only via developer commands (train_encoder / promote_encoder)."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        PROD = "prod"
+
+    status = models.CharField(max_length=5, choices=Status)
+    base_model = models.CharField(max_length=100)  # e.g. "camembert/camembert-large"
+    hf_repo_id = models.CharField(max_length=200)  # private HF repo holding the fine-tuned weights
+    hf_revision = models.CharField(max_length=100, null=True)  # commit sha to pin the weights
+    dimensions = models.PositiveSmallIntegerField()  # embedding size, e.g. 1024
+
+    # Per-task accuracy lives on the head Classifiers (related_name='classifiers'), not here:
+    # an accuracy is the performance of an (encoder, head) pair, and the promotion gate reads it
+    # from the linked heads.
+    notes = models.TextField(null=True, blank=True)
+    history = HistoricalRecords()
+
+
 class Classifier(TimeStampMixin):
     class Status(models.TextChoices):
         DRAFT = "draft"
@@ -69,6 +98,10 @@ class Classifier(TimeStampMixin):
         CONFESSION = "confession"
 
     transformer_name = models.CharField(max_length=100)
+    # v2 heads (temporal/confession) reference the Encoder that produces their input embedding;
+    # null for v1 action heads, which keep the frozen sentence-transformer (transformer_name).
+    encoder = models.ForeignKey('Encoder', on_delete=models.SET_NULL,
+                                related_name='classifiers', null=True)
     status = models.CharField(max_length=5, choices=Status)
     target = models.CharField(max_length=10, choices=Target)
     different_labels = models.JSONField()
