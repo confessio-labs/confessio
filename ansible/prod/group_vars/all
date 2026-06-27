@@ -112,9 +112,6 @@ front_app_name: confessio-front
 front_app_dir: /home/{{ deployer_user }}/{{ front_app_name }}
 front_repo_url: https://github.com/darkpitoune/confessio-front.git
 front_git_version: main
-# The front is now served under confessio.fr (coliving in the Django vhost). The temp host
-# below is retired and only referenced by the front_install cleanup tasks.
-front_server_host: temp.confessio.fr
 front_port: 3000
 node_major: 22
 # Baked into the build (NEXT_PUBLIC_SITE_URL): drives metadataBase, sitemap.xml and JSON-LD.
