@@ -4,6 +4,7 @@
 - import_tasks: 01_server.yml
 - import_tasks: 02_postgres.yml
 - import_tasks: 03_nginx.yml
+  tags: nginx
 - import_tasks: 04_gunicorn.yml
 - import_tasks: 05_systemd.yml
 - import_tasks: 06_opentelemetry.yml

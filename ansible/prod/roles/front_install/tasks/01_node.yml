@@ -1,0 +1,38 @@
+##
+# Install Node {{ node_major }} (NodeSource) and pnpm (corepack)
+##
+- name: Download NodeSource setup script for Node {{ node_major }}
+  get_url:
+    url: "https://deb.nodesource.com/setup_{{ node_major }}.x"
+    dest: /tmp/nodesource_setup.sh
+    mode: "0755"
+  become: true
+
+- name: Run NodeSource setup script
+  command: bash /tmp/nodesource_setup.sh
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+  become: true
+
+- name: Install Node.js {{ node_major }}
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Enable corepack (system-wide pnpm/yarn shims)
+  command: corepack enable
+  args:
+    creates: /usr/bin/pnpm
+  become: true
+
+# Pin pnpm 10 for the deploy user: writes corepack's lastKnownGood for {{ deployer_user }}
+# (must run as that user, NOT root). COREPACK_ENABLE_DOWNLOAD_PROMPT=0 stops corepack from
+# blocking on its interactive "this project has no packageManager field" prompt under Ansible.
+- name: Activate pnpm 10 for the deploy user
+  command: corepack prepare pnpm@10 --activate
+  become: false
+  environment:
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  changed_when: false

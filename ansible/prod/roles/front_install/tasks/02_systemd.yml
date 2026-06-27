@@ -1,0 +1,24 @@
+##
+# Set up the systemd service running the Next.js process (node {{ node_major }})
+##
+- name: Write the front start wrapper script
+  template:
+    src: front_start
+    dest: "{{ deploy_dir }}/front_start"
+    mode: "0755"
+  become: true
+
+- name: Write a systemd service file for the front
+  template:
+    src: confessio-front.service
+    dest: /etc/systemd/system/confessio-front.service
+  become: true
+
+# Enable + daemon-reload only. We do NOT start it here: on a fresh host the build does not exist
+# yet -> front_deploy builds and (re)starts the service via its own handler.
+- name: Enable the front service (started later by front_deploy)
+  ansible.builtin.systemd:
+    name: confessio-front
+    enabled: yes
+    daemon_reload: yes
+  become: true

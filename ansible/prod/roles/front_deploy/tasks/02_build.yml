@@ -1,0 +1,19 @@
+##
+# Install dependencies and build the Next.js app
+##
+- name: Install front dependencies (frozen lockfile)
+  command:
+    cmd: pnpm install --frozen-lockfile
+    chdir: "{{ front_app_dir }}"
+  environment:
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+- name: Build the Next.js app
+  command:
+    cmd: pnpm build
+    chdir: "{{ front_app_dir }}"
+  environment:
+    NODE_ENV: production
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  notify:
+    - restart confessio-front

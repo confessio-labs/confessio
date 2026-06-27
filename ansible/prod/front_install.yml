@@ -1,0 +1,8 @@
+##
+# This playbook installs the Next.js front stack (Node, nginx vhost, TLS, systemd, cron)
+##
+- name: install Next.js front stack
+  hosts: all
+  user: ubuntu
+  roles:
+    - front_install

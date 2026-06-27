@@ -1,0 +1,18 @@
+#!/bin/sh
+
+[Unit]
+Description=Confessio Next.js front (node {{ node_major }})
+After=network.target
+
+[Service]
+User={{ deployer_user }}
+Group={{ deployer_group }}
+WorkingDirectory={{ front_app_dir }}
+ExecStart=/bin/bash {{ deploy_dir }}/front_start
+Restart=always
+KillSignal=SIGINT
+TimeoutStopSec=10
+MemoryMax=1024M
+
+[Install]
+WantedBy=multi-user.target
