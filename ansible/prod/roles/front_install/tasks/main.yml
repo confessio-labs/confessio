@@ -2,6 +2,6 @@
 # Configure the server for the Next.js front
 ##
 - import_tasks: 01_node.yml
-- import_tasks: 02_nginx.yml
+- import_tasks: 02_retire_temp.yml
 - import_tasks: 03_systemd.yml
 - import_tasks: 04_cron.yml

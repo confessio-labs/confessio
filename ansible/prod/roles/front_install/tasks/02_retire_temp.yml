@@ -1,0 +1,37 @@
+##
+# Retire the temp.confessio.fr vhost: the front is now served under confessio.fr
+# (coliving in the Django vhost). This removes the temp vhost + its cert-renewal cron.
+# The cert files under /etc/letsencrypt/live/{{ front_server_host }} are left in place
+# (harmless, unused); remove manually with `sudo certbot delete --cert-name {{ front_server_host }}`.
+##
+- name: Disable the temp front https vhost
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/{{ front_app_name }}
+    state: absent
+  become: true
+  notify:
+    - restart nginx
+
+- name: Disable the temp front http vhost
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/{{ front_app_name }}-http
+    state: absent
+  become: true
+  notify:
+    - restart nginx
+
+- name: Remove the temp front vhost configs
+  ansible.builtin.file:
+    path: "/etc/nginx/sites-available/{{ item }}"
+    state: absent
+  loop:
+    - "{{ front_app_name }}"
+    - "{{ front_app_name }}-http"
+  become: true
+  notify:
+    - restart nginx
+
+- name: Remove the temp cert-renewal cron
+  ansible.builtin.cron:
+    name: letsencrypt_renewal_front
+    state: absent

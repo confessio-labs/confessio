@@ -78,6 +78,15 @@
 ##
 # Configure nginx config for https
 ##
+- name: Install the Next.js front reverse-proxy snippet (used by the confessio.fr vhost)
+  ansible.builtin.template:
+    src: confessio-front-proxy.conf
+    dest: /etc/nginx/snippets/{{ app_name }}-front-proxy.conf
+    mode: "0644"
+  become: true
+  notify:
+    - restart nginx
+
 - name: Create the Nginx configuration file
   ansible.builtin.template: src=confessio.conf
             dest=/etc/nginx/sites-available/{{ app_name }}
