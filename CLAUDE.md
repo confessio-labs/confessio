@@ -52,9 +52,13 @@ python manage.py compilemessages
 
 The V2 temporal/confession classifiers run on a fine-tuned camembert-large `Encoder`
 (sentence → 1024-d embedding) shared by per-target heads (`Classifier`). The encoder is trained
-in **dev** and promoted on **prod** by hand (it needs ~5-6 GB, too heavy for the nightly cron);
-the heads are retrained nightly on the **stored** embedding by `train_pruning_model --automatic`
-(no camembert load). Requires `HF_TOKEN` (write access to the private HF repo).
+in **dev** and promoted on **prod** by hand (it needs ~5-6 GB, too heavy for the nightly cron).
+The two V2 heads are trained **only** jointly with the encoder (`train_encoder`) and registered by
+`promote_encoder` — there is **no** nightly V2 head retrain: the encoder is label-fine-tuned on
+those sentences, so retraining/evaluating a head alone on the stored embeddings leaks (the embedding
+already encodes the label). Nightly only retrains the V1 `action` head (`train_action_model`, frozen
+sentence-transformer, no leakage) and runs `reclassify_sentences` (re-embed/relabel) +
+`find_sentence_outliers`. Requires `HF_TOKEN` (write access to the private HF repo).
 
 Dev/prod split: `train_encoder` runs in dev on a prod-DB dump and writes only to HF (no DB);
 `promote_encoder` runs on prod (or locally to test) and registers the encoder from HF into the DB.

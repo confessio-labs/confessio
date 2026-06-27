@@ -207,7 +207,9 @@ def _head_for(encoder: Encoder, target: Classifier.Target) -> Classifier | None:
 
 def is_encoder_promotable(encoder: Encoder, current: Encoder) -> tuple[bool, str]:
     """Promote if significantly better on >=1 target and not significantly worse on the other.
-    Per-task accuracy is read from each encoder's linked head Classifier."""
+    Per-task accuracy is read from each encoder's linked head Classifier. V2 heads are only ever
+    set PROD by promote_encoder (no nightly retrain), so a PROD head's accuracy is the honest
+    held-out joint-training number -> this compares honest-vs-honest."""
     verdicts = []
     sig_better, sig_worse = False, False
     for target in (Classifier.Target.TEMPORAL, Classifier.Target.CONFESSION):

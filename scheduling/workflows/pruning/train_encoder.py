@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split  # noqa: E402
 
 from scheduling.workflows.pruning.encoder import Head, MAX_LENGTH  # noqa: E402
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention  # noqa: E402
+from scheduling.utils.stat_utils import get_test_size  # noqa: E402
 
 # task -> ordered label list (must match Classifier.different_labels for that target)
 TASK_LABELS = {
@@ -54,7 +55,7 @@ def train_multitask(lines: list[str], labels_by_task: dict,
                     base_model: str = 'camembert/camembert-large',
                     epochs: int = 5, lr: float = 1e-5, batch_size: int = 4,
                     grad_accum: int = 2, warmup_ratio: float = 0.1,
-                    max_length: int = MAX_LENGTH, test_frac: float = 0.2, seed: int = 42):
+                    max_length: int = MAX_LENGTH, seed: int = 42):
     """Returns (model, tokenizer, metrics) where metrics has accuracy_temporal,
     accuracy_confession, test_size. `labels_by_task[t]` is a list of label strings aligned with
     `lines`."""
@@ -62,10 +63,12 @@ def train_multitask(lines: list[str], labels_by_task: dict,
     torch.manual_seed(seed)
     torch.set_num_threads(int(os.environ.get("TORCH_THREADS", "8")))
 
-    # one stratified split shared by both heads (stratify on confession, the imbalanced task)
+    # one stratified split shared by both heads (stratify on confession, the imbalanced task);
+    # same stepped held-out size as the V1 head training (get_test_size) for a consistent test_size
     idx = list(range(len(lines)))
+    test_size = get_test_size(len(lines))
     train_idx, test_idx = train_test_split(
-        idx, test_size=test_frac, random_state=seed, stratify=labels_by_task['confession'])
+        idx, test_size=test_size, random_state=seed, stratify=labels_by_task['confession'])
 
     tokenizer = AutoTokenizer.from_pretrained(base_model)
     model = MultiTaskEncoder(base_model)

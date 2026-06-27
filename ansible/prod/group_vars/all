@@ -81,7 +81,6 @@ trouverunemesse_password: "{{ lookup('ansible.builtin.env', 'TROUVERUNEMESSE_PAS
 # Heartbeats
 heartbeat_nightly_fetching_url: "{{ lookup('ansible.builtin.env', 'HEARTBEAT_NIGHTLY_FETCHING_URL') }}"
 heartbeat_check_data_url: "{{ lookup('ansible.builtin.env', 'HEARTBEAT_CHECK_DATA_URL') }}"
-heartbeat_train_pruning_url: "{{ lookup('ansible.builtin.env', 'HEARTBEAT_TRAIN_PRUNING_URL') }}"
 heartbeat_annuaire_url: "{{ lookup('ansible.builtin.env', 'HEARTBEAT_ANNUAIRE_URL') }}"
 
 # Discord Webhooks
