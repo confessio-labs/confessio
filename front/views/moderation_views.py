@@ -1,7 +1,17 @@
 from django.contrib.auth.decorators import login_required, permission_required
+from django.shortcuts import render
 
 from core.views import get_moderate_response
 from front.models import ReportModeration
+from front.services.moderation_stats_service import get_moderation_stats_by_diocese
+
+
+@login_required
+@permission_required("scheduling.change_sentence")
+def moderation_home(request):
+    return render(request, 'pages/moderation_home.html', {
+        'dioceses_with_stats': get_moderation_stats_by_diocese(),
+    })
 
 
 @login_required

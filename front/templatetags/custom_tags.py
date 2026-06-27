@@ -4,17 +4,12 @@ from typing import Optional
 from django.template.defaulttags import register
 from django.urls import reverse
 
-from crawling.models import CrawlingModeration
-from fetching.models import OClocherOrganizationModeration, OClocherMatchingModeration
-from front.models import ReportModeration
 from front.services.card.website_events_service import WebsiteEvents
 from front.services.card.website_schedules_service import WebsiteSchedules
-from registry.models import WebsiteModeration, ChurchModeration, ParishModeration, \
-    ModerationMixin, Diocese, Website
+from registry.models import ModerationMixin, Website
 from registry.models.base_moderation_models import ModerationStatus
-from scheduling.models import ParsingModeration, SchedulingModeration, \
-    ValidatedSchedulesModeration, ValidatedSchedules
-from scheduling.models.pruning_models import Pruning, PruningModeration, SentenceModeration
+from scheduling.models import ValidatedSchedules
+from scheduling.models.pruning_models import Pruning, PruningModeration
 from scheduling.public_model import BaseSource
 from scheduling.utils.list_utils import enumerate_with_and
 
@@ -116,29 +111,6 @@ def get_unvalidated_pruning_moderation(pruning: Pruning) -> Optional[PruningMode
         ).get()
     except PruningModeration.DoesNotExist:
         return None
-
-
-@register.simple_tag
-def get_dioceses() -> list[Diocese | None]:
-    return [None] + list(Diocese.objects.all())
-
-
-@register.filter
-def get_moderation_stats(diocese: Diocese | None):
-    return sum([
-        WebsiteModeration.get_stats_by_category(diocese),
-        ParishModeration.get_stats_by_category(diocese),
-        ChurchModeration.get_stats_by_category(diocese),
-        PruningModeration.get_stats_by_category(diocese),
-        SentenceModeration.get_stats_by_category(diocese),
-        ParsingModeration.get_stats_by_category(diocese),
-        ReportModeration.get_stats_by_category(diocese),
-        CrawlingModeration.get_stats_by_category(diocese),
-        SchedulingModeration.get_stats_by_category(diocese),
-        ValidatedSchedulesModeration.get_stats_by_category(diocese),
-        OClocherOrganizationModeration.get_stats_by_category(diocese),
-        OClocherMatchingModeration.get_stats_by_category(diocese),
-    ], [])
 
 
 @register.simple_tag

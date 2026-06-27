@@ -1,0 +1,17 @@
+{% extends 'layouts/single_card.html' %}
+{% load custom_tags %}
+{% load i18n %}
+
+{% block card %}
+    <h1>{% trans 'moderationMenu' %}</h1>
+    {% for diocese, moderation_stats in dioceses_with_stats %}
+        <h4 class="mt-4">{% if diocese %}{{ diocese.slug }}{% else %}Autre{% endif %}</h4>
+        <ul class="list-style-none">
+            {% for moderation_stat in moderation_stats %}
+                <li><a href="{{ moderation_stat|get_item:'url' }}"><span style="color: {{ moderation_stat|get_item:'color' }}">{{ moderation_stat|get_item:'resource' }} {{ moderation_stat|get_item:'category' }}</span>{% if moderation_stat|get_item:'status' == 'bug' %} <span class="badge badge-danger m-1">Bug</span>{% endif %} {{ moderation_stat|get_item:'total' }}</a></li>
+            {% endfor %}
+        </ul>
+    {% empty %}
+        <p class="mt-4">Aucune modération en attente. 🎉</p>
+    {% endfor %}
+{% endblock card %}

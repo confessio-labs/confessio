@@ -57,26 +57,8 @@
                         </li>
                     {% endif %}
                     {% if request.user.is_authenticated and perms.scheduling.change_sentence %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="moderationNavbarDropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            {% trans 'moderationMenu' %}
-                            <i class="fas fa-angle-down nav-link-arrow ml-2"></i>
-                            </a>
-                            <div class="dropdown-menu" aria-labelledby="moderationNavbarDropdown">
-                                <ul class="list-style-none">
-                                    {% get_dioceses as dioceses %}
-                                    {% for diocese in dioceses %}
-                                        <li class="p-lg-2"><strong>
-                                            {% if diocese %}{{ diocese.slug }}{% else %}Autre{% endif %}
-                                        </strong></li>
-                                        {% with diocese|get_moderation_stats as moderation_stats %}
-                                            {% for moderation_stat in moderation_stats %}
-                                                <li><a class="dropdown-item" href="{{ moderation_stat|get_item:'url' }}"><span style="color: {{ moderation_stat|get_item:'color' }}">{{ moderation_stat|get_item:'resource' }} {{ moderation_stat|get_item:'category' }}</span>{% if moderation_stat|get_item:'status' == 'bug' %} <span class="badge badge-danger m-1">Bug</span>{% endif %} {{ moderation_stat|get_item:'total' }}</a></li>
-                                            {% endfor %}
-                                        {% endwith %}
-                                    {% endfor %}
-                                </ul>
-                            </div>
+                        <li class="nav-item">
+                            <a href="{% url 'moderation_home' %}" class="nav-link">{% trans 'moderationMenu' %}</a>
                         </li>
                     {% endif %}
                 </ul>

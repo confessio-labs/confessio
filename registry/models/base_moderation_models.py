@@ -59,30 +59,13 @@ class ModerationMixin(TimeStampMixin):
         }
 
     @classmethod
-    def get_stats_by_category(cls, diocese: Diocese | None):
-        stats = []
-        objects_filter = cls.objects.filter(
+    def get_stats_by_diocese_and_category(cls):
+        return cls.objects.filter(
             status__in=[ModerationStatus.TO_VALIDATE, ModerationStatus.BUG],
+        ).values('diocese', 'category').annotate(
+            total_count=Count('category'),
+            bug_count=Count('uuid', filter=Q(status=ModerationStatus.BUG)),
         )
-        if diocese:
-            objects_filter = objects_filter.filter(diocese=diocese)
-        query_stats = objects_filter.all()\
-            .values('category')\
-            .annotate(total_count=Count('category'),
-                      bug_count=Count('uuid',
-                                      filter=Q(status=ModerationStatus.BUG)))
-        for stat in query_stats:
-            if stat['bug_count']:
-                stats.append(cls.get_category_stat(
-                    stat, status=ModerationStatus.BUG,
-                    diocese=diocese, count=stat['bug_count']))
-            if stat['total_count'] - stat['bug_count']:
-                stats.append(cls.get_category_stat(
-                    stat, status=ModerationStatus.TO_VALIDATE,
-                    diocese=diocese,
-                    count=stat['total_count'] - stat['bug_count']))
-
-        return stats
 
     def save(self, *args, **kwargs):
         if not self.status:
