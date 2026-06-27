@@ -6,11 +6,9 @@ from scheduling.models.pruning_models import Classifier, Sentence
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 from scheduling.workflows.pruning.extract.models import Source, Action
 from scheduling.workflows.pruning.train_and_predict import TensorFlowModel, evaluate
-from scheduling.workflows.pruning.encoder import TorchHeadModel
 from scheduling.services.pruning.classifier_target_service import get_target_enum
 from scheduling.utils.enum_utils import StringEnum
-
-MIN_DATASET_SIZE = 300
+from scheduling.utils.stat_utils import MIN_DATASET_SIZE, get_test_size
 
 
 def build_sentence_dataset(target: Classifier.Target) -> list[Sentence]:
@@ -80,26 +78,19 @@ def set_label(sentence: Sentence, label: StringEnum, classifier: Classifier) -> 
     raise NotImplementedError(f'Target {classifier.target} is not supported for label setting')
 
 
-def get_test_size(dataset_size: int) -> int:
-    assert dataset_size >= MIN_DATASET_SIZE
-
-    third_size = dataset_size // 3
-    test_size = 100
-    while 2 * test_size < third_size:
-        test_size *= 2
-
-    return test_size
-
-
 def train_classifier(sentence_dataset: list[Sentence], target: Classifier.Target) -> Classifier:
     if not sentence_dataset:
         raise ValueError("No sentence dataset to train classifier")
 
-    # Action (v1) keeps the frozen sentence-transformer + Keras MLP; temporal/confession (v2)
-    # train a torch head on the PROD encoder's stored embedding.
+    # Action (v1) keeps the frozen sentence-transformer + Keras MLP. V2 temporal/confession heads
+    # are trained ONLY jointly with the encoder (train_encoder) and registered by promote_encoder;
+    # retraining a V2 head alone on the stored embeddings leaks (the encoder was label-fine-tuned on
+    # those sentences), so it is disabled here.
     if target == Classifier.Target.ACTION:
         return _train_transformer_classifier(sentence_dataset, target)
-    return _train_encoder_head_classifier(sentence_dataset, target)
+    raise NotImplementedError(
+        "V2 heads are trained jointly with the encoder via train_encoder; standalone head "
+        "retraining is disabled (representation leakage).")
 
 
 def _split_train_eval(embeddings, labels, model) -> tuple[float, int]:
@@ -128,44 +119,6 @@ def _train_transformer_classifier(sentence_dataset: list[Sentence],
 
     classifier = Classifier(
         transformer_name=first_transformer_name,
-        pickle=model.to_pickle(),
-        status=Classifier.Status.DRAFT,
-        target=target,
-        different_labels=different_labels,
-        accuracy=accuracy,
-        test_size=test_size,
-    )
-    classifier.save()
-    return classifier
-
-
-def _train_encoder_head_classifier(sentence_dataset: list[Sentence],
-                                   target: Classifier.Target) -> Classifier:
-    from scheduling.services.pruning.encoder_service import get_prod_encoder_model
-    encoder = get_prod_encoder_model()
-
-    # Train only on labeled sentences already embedded by the current PROD encoder. Right after an
-    # encoder promotion the rest are still on the old encoder until reclassify_sentences re-embeds
-    # them; until then the heads carried over from training stay in place.
-    current = [s for s in sentence_dataset
-               if s.encoder_id == encoder.uuid and s.encoder_embedding is not None]
-    if len(current) < MIN_DATASET_SIZE:
-        raise ValueError(
-            f"Only {len(current)}/{len(sentence_dataset)} labeled sentences are embedded by the "
-            f"current PROD encoder (need {MIN_DATASET_SIZE}). Run reclassify_sentences to "
-            f"re-embed, then retrain.")
-
-    embeddings = [sentence.encoder_embedding for sentence in current]
-    labels = [extract_label(sentence, target) for sentence in current]
-
-    target_enum = get_target_enum(target)
-    different_labels = target_enum.list_items()
-    model = TorchHeadModel[target_enum](different_labels)
-    accuracy, test_size = _split_train_eval(embeddings, labels, model)
-
-    classifier = Classifier(
-        transformer_name=encoder.base_model,
-        encoder=encoder,
         pickle=model.to_pickle(),
         status=Classifier.Status.DRAFT,
         target=target,

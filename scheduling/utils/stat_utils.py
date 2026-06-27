@@ -1,5 +1,22 @@
 from scipy import stats
 
+# Minimum number of labeled sentences required to train/evaluate a classifier head.
+MIN_DATASET_SIZE = 300
+
+
+def get_test_size(dataset_size: int) -> int:
+    """Stepped held-out test size (100, 200, 400, 800, ...), the largest 100*2^k still under a
+    third of the dataset. Shared by the V1 head training and the joint V2 encoder fine-tune so both
+    report a consistent held-out size."""
+    assert dataset_size >= MIN_DATASET_SIZE
+
+    third_size = dataset_size // 3
+    test_size = 100
+    while 2 * test_size < third_size:
+        test_size *= 2
+
+    return test_size
+
 
 def is_significantly_different(accuracy1, accuracy2, n1, n2):
     if n1 == 0 or n2 == 0:
