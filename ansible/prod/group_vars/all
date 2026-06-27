@@ -106,3 +106,16 @@ jawg_api_key3: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY3') }}"
 
 # Hugging Face
 hf_token: "{{ lookup('ansible.builtin.env', 'HF_TOKEN') }}"
+
+# Front (Next.js) app
+front_app_name: confessio-front
+front_app_dir: /home/{{ deployer_user }}/{{ front_app_name }}
+front_repo_url: https://github.com/darkpitoune/confessio-front.git
+front_git_version: main
+front_server_host: temp.confessio.fr
+front_port: 3000
+node_major: 22
+
+# Front secrets (provided via the local .env that prod.sh sources)
+map_tiler_api_key: "{{ lookup('ansible.builtin.env', 'NEXT_PUBLIC_MAP_TILER_API_KEY') }}"
+cron_secret: "{{ lookup('ansible.builtin.env', 'CRON_SECRET') }}"

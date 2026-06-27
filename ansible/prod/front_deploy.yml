@@ -1,0 +1,8 @@
+##
+# This playbook deploys the most recent front code (git pull + build + restart)
+##
+- name: deploy Next.js front with most recent code
+  hosts: all
+  user: ubuntu
+  roles:
+    - front_deploy

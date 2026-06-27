@@ -1,0 +1,22 @@
+##
+# Clone/pull the front repo and write its env file
+##
+- name: Clone or pull the latest front code
+  git:
+    repo: "{{ front_repo_url }}"
+    dest: "{{ front_app_dir }}"
+    version: "{{ front_git_version }}"
+    accept_hostkey: yes
+  become: no
+  notify:
+    - restart confessio-front
+
+# Written before the build so NEXT_PUBLIC_MAP_TILER_API_KEY is baked into the client bundle,
+# and read again at runtime by front_start (CRON_SECRET).
+- name: Create the front .env.local file
+  template:
+    src: env.local.j2
+    dest: "{{ front_app_dir }}/.env.local"
+  become: no
+  notify:
+    - restart confessio-front

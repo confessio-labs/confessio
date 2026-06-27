@@ -1,0 +1,5 @@
+##
+# Update front code and build
+##
+- import_tasks: 01_git.yml
+- import_tasks: 02_build.yml

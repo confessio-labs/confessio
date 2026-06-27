@@ -1,0 +1,3 @@
+- name: restart confessio-front
+  systemd: name=confessio-front state=restarted enabled=yes daemon_reload=yes
+  become: yes

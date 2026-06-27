@@ -1,0 +1,60 @@
+##
+# Configure nginx vhost + TLS for the front (temp.confessio.fr)
+# Reuses /var/www/letsencrypt and /etc/nginx/dhparams.pem created by the base install.
+##
+
+# HTTP vhost first: needed so the ACME challenge for {{ front_server_host }} is served on :80.
+- name: Install nginx http site for front letsencrypt requests
+  template:
+    src: confessio-front-http.conf
+    dest: /etc/nginx/sites-available/{{ front_app_name }}-http
+  become: true
+  notify:
+    - restart nginx
+
+- name: Ensure that the front http site is enabled
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/{{ front_app_name }}-http
+    dest: /etc/nginx/sites-enabled/{{ front_app_name }}-http
+    state: link
+  become: true
+
+- name: Ensure Nginx service is restarted (front http vhost live before certbot)
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+    enabled: true
+  become: true
+
+- name: Create letsencrypt certificate for the front
+  shell: certbot certonly -n --webroot -w /var/www/letsencrypt -m {{ letsencrypt_email }} --agree-tos -d {{ front_server_host }}
+  args:
+    creates: /etc/letsencrypt/live/{{ front_server_host }}
+  notify:
+    - restart nginx
+  become: true
+
+- name: Add letsencrypt cronjob for front cert renewal
+  cron:
+    name: letsencrypt_renewal_front
+    special_time: weekly
+    job: sudo certbot certonly -n --webroot -w /var/www/letsencrypt -m {{ letsencrypt_email }} --agree-tos -d {{ front_server_host }} && sudo service nginx reload
+
+##
+# HTTPS vhost (references the cert created above)
+##
+- name: Create the front Nginx configuration file
+  ansible.builtin.template:
+    src: confessio-front.conf
+    dest: /etc/nginx/sites-available/{{ front_app_name }}
+    mode: "0644"
+  become: true
+  notify:
+    - restart nginx
+
+- name: Ensure that the front application site is enabled
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/{{ front_app_name }}
+    dest: /etc/nginx/sites-enabled/{{ front_app_name }}
+    state: link
+  become: true

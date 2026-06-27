@@ -1,0 +1,9 @@
+##
+# Daily ISR revalidation (matches the Vercel cron in vercel.json, 01:00)
+##
+- name: Add daily ISR revalidation cron for the front
+  cron:
+    name: front_revalidate_dioceses
+    hour: "8"
+    minute: "0"
+    job: "curl -fsS -H 'Authorization: Bearer {{ cron_secret }}' https://{{ front_server_host }}/api/revalidate-dioceses > /dev/null"
