@@ -36,7 +36,7 @@ def remove_sentence_not_validated_moderation(sentence: Sentence):
 #################
 
 def add_sentence_v2_moderation(sentence: Sentence):
-    category = SentenceModeration.Category.CONFESSION_OUTLIER
+    category = SentenceModeration.Category.V2_OUTLIER
 
     # check if moderation already exists
     if SentenceModeration.objects.filter(sentence=sentence, category=category).exists():
@@ -51,5 +51,5 @@ def add_sentence_v2_moderation(sentence: Sentence):
 
 
 def remove_sentence_not_validated_v2_moderation(sentence: Sentence):
-    category = SentenceModeration.Category.CONFESSION_OUTLIER
+    category = SentenceModeration.Category.V2_OUTLIER
     SentenceModeration.objects.filter(sentence=sentence, category=category).delete()

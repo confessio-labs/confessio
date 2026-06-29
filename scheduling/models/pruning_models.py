@@ -136,7 +136,7 @@ class PruningModeration(ModerationMixin):
 class SentenceModeration(ModerationMixin):
     class Category(models.TextChoices):
         ML_MISMATCH = "ml_mismatch"
-        CONFESSION_OUTLIER = "confession_outlier"
+        V2_OUTLIER = "v2_outlier"
 
     resource = 'sentence'
     diocese = models.ForeignKey('registry.Diocese', on_delete=models.CASCADE,

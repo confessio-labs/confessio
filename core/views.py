@@ -25,7 +25,7 @@ def get_moderation_url(moderation: ModerationMixin):
 def redirect_to_moderation(moderation: ModerationMixin, category: str, resource: str,
                            status: str, diocese_slug: str):
     if moderation is None:
-        return redirect('index')
+        return redirect('moderation_home')
     else:
         return redirect(f'moderate_one_' + resource,
                         category=category,
