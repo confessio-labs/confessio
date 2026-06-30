@@ -55,6 +55,19 @@ DATABASES = {
     },
 }
 
+# Read-only connection used by the admin copilot's SQL tool (front app). See core.settings.
+COPILOT_DB_USERNAME = os.getenv('PROD_COPILOT_DB_USERNAME', None)
+if COPILOT_DB_USERNAME:
+    DATABASES['copilot_readonly'] = {
+        'ENGINE': DB_ENGINE,
+        'NAME': DB_NAME,
+        'USER': COPILOT_DB_USERNAME,
+        'PASSWORD': os.getenv('PROD_COPILOT_DB_PASS'),
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
+        'TEST': {'MIRROR': 'default'},
+    }
+
 # Email
 LOGIN_REDIRECT_URL = '/'
 DEFAULT_FROM_EMAIL = f"no-reply@{os.environ.get('SERVER_HOST')}"

@@ -131,6 +131,22 @@ if DB_ENGINE and DB_NAME and DB_USERNAME:
             'PORT': DB_PORT,
         },
     }
+    # Read-only connection used by the admin copilot's SQL tool (front app). Same database,
+    # but a dedicated Postgres role (`confessio_copilot`) with SELECT-only grants +
+    # statement_timeout. Never run migrations on this alias.
+    COPILOT_DB_USERNAME = os.getenv('COPILOT_DB_USERNAME', None)
+    if COPILOT_DB_USERNAME:
+        DATABASES['copilot_readonly'] = {
+            'ENGINE': DB_ENGINE,
+            'NAME': DB_NAME,
+            'USER': COPILOT_DB_USERNAME,
+            'PASSWORD': os.getenv('COPILOT_DB_PASS'),
+            'HOST': DB_HOST,
+            'PORT': DB_PORT,
+            # Same physical database as `default`; the test runner must not create a separate
+            # test DB for it (the read-only role can't), so mirror default's connection in tests.
+            'TEST': {'MIRROR': 'default'},
+        }
 else:
     DATABASES = {
         'default': {

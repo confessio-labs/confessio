@@ -4,3 +4,9 @@ from registry.models import Website
 
 def crawling_crawl_website(website: Website):
     worker_crawl_website(str(website.uuid), None)
+
+
+def crawling_get_content_from_url(url: str) -> tuple[str, bytes | None] | None:
+    """Fetch a page's text (and optional PDF bytes). Returns None on timeout / 4xx / 5xx."""
+    from crawling.workflows.download.download_content import get_content_from_url
+    return get_content_from_url(url)

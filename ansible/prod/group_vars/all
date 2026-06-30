@@ -20,6 +20,10 @@ db_password: "{{ lookup('ansible.builtin.env', 'PROD_DB_PASSWORD') }}"
 db_name: "{{ app_name }}"
 db_user: "{{ app_name }}"
 
+# Read-only DB role for the admin copilot SQL tool (SELECT only)
+copilot_db_user: "{{ app_name }}_copilot"
+copilot_db_password: "{{ lookup('ansible.builtin.env', 'PROD_COPILOT_DB_PASSWORD') }}"
+
 # Django secret
 secret_key: "{{ lookup('ansible.builtin.env', 'PROD_SECRET_KEY') }}"
 ip_hash_salt: "{{ lookup('ansible.builtin.env', 'PROD_IP_HASH_SALT') }}"
@@ -67,6 +71,7 @@ whitelisted_user1: "{{ lookup('ansible.builtin.env', 'WHITELISTED_USER1') }}"
 # API keys
 openai_api_key: "{{ lookup('ansible.builtin.env', 'PROD_OPENAI_API_KEY') }}"
 openai_api_key_recognize: "{{ lookup('ansible.builtin.env', 'PROD_OPENAI_API_KEY_RECOGNIZE') }}"
+openai_api_key_copilot: "{{ lookup('ansible.builtin.env', 'PROD_OPENAI_API_KEY_COPILOT') }}"
 
 # Google API creds
 google_api_key: "{{ lookup('ansible.builtin.env', 'PROD_GOOGLE_API_KEY') }}"

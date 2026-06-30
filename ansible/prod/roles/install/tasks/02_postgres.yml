@@ -24,9 +24,10 @@
 
 - name: Install required packages
   apt:
+    # postgresql-contrib-18 is now a virtual package provided by postgresql-18 (the contrib
+    # modules ship inside the main server package), so it must not be listed/version-pinned here.
     name:
       - postgresql-18
-      - postgresql-contrib-18
       - postgresql-18-postgis-3
       - postgresql-18-pgvector
     state: latest
@@ -89,6 +90,76 @@
     db: "{{ db_name }}"
   become: true
   become_user: postgres
+
+- name: install unaccent extension
+  postgresql_ext:
+    name: unaccent
+    db: "{{ db_name }}"
+  become: true
+  become_user: postgres
+
+# Read-only role for the admin copilot SQL tool. SELECT-only; the role is the real safety
+# barrier behind the copilot's raw-SQL tool.
+- name: Configure the read-only copilot postgresql role
+  postgresql_user:
+    name: "{{ copilot_db_user }}"
+    password: "{{ copilot_db_password }}"
+    role_attr_flags: NOSUPERUSER,NOCREATEDB,NOCREATEROLE
+  become_user: postgres
+  become: true
+
+- name: Grant CONNECT on the database to the copilot role
+  postgresql_privs:
+    db: "{{ db_name }}"
+    type: database
+    objs: "{{ db_name }}"
+    roles: "{{ copilot_db_user }}"
+    privs: CONNECT
+  become_user: postgres
+  become: true
+
+- name: Grant USAGE on schema public to the copilot role
+  postgresql_privs:
+    db: "{{ db_name }}"
+    type: schema
+    objs: public
+    roles: "{{ copilot_db_user }}"
+    privs: USAGE
+  become_user: postgres
+  become: true
+
+- name: Grant SELECT on all existing tables to the copilot role
+  postgresql_privs:
+    db: "{{ db_name }}"
+    type: table
+    schema: public
+    objs: ALL_IN_SCHEMA
+    roles: "{{ copilot_db_user }}"
+    privs: SELECT
+  become_user: postgres
+  become: true
+
+- name: Grant SELECT on future tables (default privileges) to the copilot role
+  postgresql_privs:
+    db: "{{ db_name }}"
+    type: default_privs
+    schema: public
+    objs: TABLES
+    roles: "{{ copilot_db_user }}"
+    target_roles: "{{ db_user }}"
+    privs: SELECT
+  become_user: postgres
+  become: true
+
+- name: Enforce read-only + statement_timeout defaults on the copilot role
+  community.postgresql.postgresql_query:
+    db: "{{ db_name }}"
+    query: "{{ item }}"
+  loop:
+    - "ALTER ROLE {{ copilot_db_user }} SET statement_timeout = '10s'"
+    - "ALTER ROLE {{ copilot_db_user }} SET default_transaction_read_only = on"
+  become_user: postgres
+  become: true
 
 - name: copy pg_hba.conf
   template:

@@ -1,0 +1,85 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block stylesheets %}
+    <link type="text/css" rel="stylesheet" href="{% static 'css/copilot.css' %}">
+{% endblock stylesheets %}
+
+{% block content %}
+<main>
+<!-- Dark header band so the (absolute, white-text) navbar is readable and content clears it -->
+<section class="section-header bg-primary pt-7 pt-lg-8 pb-4">
+  <div class="container">
+    <h2 class="text-white mb-0">Copilot</h2>
+    <p class="text-white mb-0" style="opacity:.7;">Assistant d'administration</p>
+  </div>
+</section>
+<section class="section pt-4 pb-6">
+  <div class="container-fluid">
+    <div class="row copilot-layout"
+         data-status="{% if discussion %}{{ discussion.status }}{% else %}idle{% endif %}"
+         data-url-new="{% url 'copilot_new' %}"
+         {% if discussion %}
+         data-discussion-uuid="{{ discussion.uuid }}"
+         data-url-message="{% url 'copilot_message' discussion.uuid %}"
+         data-url-approve="{% url 'copilot_approve' discussion.uuid %}"
+         data-url-items="{% url 'copilot_items' discussion.uuid %}"
+         {% endif %}>
+
+      <!-- Sidebar: past discussions -->
+      <div class="col-12 col-md-3 copilot-sidebar">
+        <a href="{% url 'copilot' %}" class="btn btn-primary btn-sm w-100 mb-3">
+          <i class="fas fa-plus"></i> Nouvelle discussion
+        </a>
+        <ul class="list-style-none copilot-discussions">
+          {% for d in discussions %}
+            <li class="copilot-discussion-link {% if discussion and d.uuid == discussion.uuid %}is-active{% endif %}">
+              <a href="{% url 'copilot_view' d.uuid %}">
+                {{ d.title|default:'(sans titre)'|truncatechars:60 }}
+              </a>
+            </li>
+          {% empty %}
+            <li class="text-muted">Aucune discussion pour l'instant.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Main: conversation -->
+      <div class="col-12 col-md-9 copilot-main">
+        <div id="copilot-error" class="alert alert-danger {% if not discussion or not discussion.error_message %}d-none{% endif %}">
+          {{ discussion.error_message }}
+        </div>
+
+        <div id="copilot-messages" class="copilot-messages">
+          {% if discussion %}
+            {% include 'partials/copilot_items.html' with items=items %}
+          {% else %}
+            <div class="copilot-empty text-center text-muted">
+              <p class="mt-5">Décris un problème (paroisse, église, horaires, crawl…) pour démarrer.</p>
+            </div>
+          {% endif %}
+        </div>
+
+        <div id="copilot-typing" class="copilot-typing d-none">
+          <span class="spinner-border spinner-border-sm"></span> Le copilote réfléchit…
+        </div>
+
+        <form id="copilot-form" class="copilot-input">
+          {% csrf_token %}
+          <textarea id="copilot-text" class="form-control" rows="2"
+                    placeholder="Écris ton message…"></textarea>
+          <button type="submit" id="copilot-send" class="btn btn-primary">Envoyer</button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</section>
+</main>
+{% endblock content %}
+
+{% block javascripts %}
+    {% include 'includes/scripts.html' %}
+    <script src="{% static 'js/base.js' %}"></script>
+    <script src="{% static 'js/copilot0.js' %}"></script>
+{% endblock javascripts %}
