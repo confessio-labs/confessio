@@ -1,0 +1,50 @@
+{% load copilot_tags %}
+{% for item in items %}
+    <div class="copilot-item copilot-item--{{ item.item_type }}" data-position="{{ item.position }}"
+         data-item-uuid="{{ item.uuid }}">
+        {% if item.item_type == 'user_message' %}
+            <div class="copilot-bubble copilot-bubble--user">{{ item.text|linebreaksbr }}</div>
+
+        {% elif item.item_type == 'agent_message' %}
+            <div class="copilot-bubble copilot-bubble--agent">{{ item.text|linebreaksbr }}</div>
+
+        {% elif item.item_type == 'autonomous_tool_call' %}
+            <details class="copilot-tool">
+                <summary><i class="fas fa-wrench"></i> {{ item.tool_name }}</summary>
+                {% if item.tool_args %}
+                    <div class="copilot-tool-label">Arguments</div>
+                    <pre class="copilot-pre">{{ item.tool_args|to_pretty_json }}</pre>
+                {% endif %}
+                <div class="copilot-tool-label">Résultat</div>
+                <pre class="copilot-pre">{{ item.tool_result|to_pretty_json }}</pre>
+            </details>
+
+        {% elif item.item_type == 'proposed_tool_call' %}
+            <div class="copilot-proposed">
+                <div class="copilot-proposed-head">
+                    <i class="fas fa-bolt"></i> Action proposée : <strong>{{ item.tool_name }}</strong>
+                    {% if item.approval_status == 'approved' %}
+                        <span class="badge badge-success">Validée</span>
+                    {% elif item.approval_status == 'rejected' %}
+                        <span class="badge badge-secondary">Refusée</span>
+                    {% endif %}
+                </div>
+                {% if item.tool_args %}
+                    <pre class="copilot-pre">{{ item.tool_args|to_pretty_json }}</pre>
+                {% endif %}
+                {% if item.tool_result %}
+                    <div class="copilot-tool-label">Résultat</div>
+                    <pre class="copilot-pre">{{ item.tool_result|to_pretty_json }}</pre>
+                {% endif %}
+                {% if item.approval_status == 'pending' %}
+                    <div class="copilot-proposed-actions">
+                        <button class="btn btn-sm btn-success copilot-approve"
+                                data-item-uuid="{{ item.uuid }}" data-decision="approve">Valider</button>
+                        <button class="btn btn-sm btn-outline-secondary copilot-approve"
+                                data-item-uuid="{{ item.uuid }}" data-decision="reject">Refuser</button>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+{% endfor %}

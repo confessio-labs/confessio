@@ -44,6 +44,14 @@ urlpatterns = [
         template_name='accounts/password_reset_complete.html'
     ), name='password_reset_complete'),
 
+    # copilot (admin)
+    path('copilot', views.copilot, name='copilot'),
+    path('copilot/new', views.copilot_new, name='copilot_new'),
+    path('copilot/<uuid:discussion_uuid>', views.copilot, name='copilot_view'),
+    path('copilot/<uuid:discussion_uuid>/message', views.copilot_message, name='copilot_message'),
+    path('copilot/<uuid:discussion_uuid>/approve', views.copilot_approve, name='copilot_approve'),
+    path('copilot/<uuid:discussion_uuid>/items', views.copilot_items, name='copilot_items'),
+
     # moderation
     path('moderate', views.moderation_home, name='moderation_home'),
     path('moderate/report/<category>/<str:status>/<str:diocese_slug>',
