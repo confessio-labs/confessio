@@ -79,6 +79,8 @@
     <link type="text/css" rel="stylesheet" href="{% static 'css/pixel.css' %}">
     <link type="text/css" rel="stylesheet" href="{% static 'css/index1.css' %}">
 
+    {% block stylesheets %}{% endblock stylesheets %}
+
     {% if page_website %}
         <link href="https://unpkg.com/filepond/dist/filepond.min.css" rel="stylesheet" />
         <link href="https://unpkg.com/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css" rel="stylesheet" />

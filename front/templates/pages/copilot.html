@@ -1,6 +1,10 @@
 {% extends 'layouts/base.html' %}
 {% load static %}
 
+{% block stylesheets %}
+    <link type="text/css" rel="stylesheet" href="{% static 'css/copilot.css' %}">
+{% endblock stylesheets %}
+
 {% block content %}
 <main>
 <!-- Dark header band so the (absolute, white-text) navbar is readable and content clears it -->
@@ -72,32 +76,6 @@
   </div>
 </section>
 </main>
-
-<style>
-  .copilot-layout { min-height: 70vh; }
-  .copilot-sidebar { border-right: 1px solid #eee; }
-  .copilot-discussions { padding: 0; }
-  .copilot-discussion-link a { display: block; padding: .4rem .6rem; border-radius: .4rem;
-    color: #333; text-decoration: none; font-size: .9rem; }
-  .copilot-discussion-link.is-active a, .copilot-discussion-link a:hover { background: #f0f3f7; }
-  .copilot-main { display: flex; flex-direction: column; }
-  .copilot-messages { flex: 1 1 auto; overflow-y: auto; max-height: 65vh; padding: .5rem; }
-  .copilot-item { margin-bottom: .75rem; }
-  .copilot-bubble { display: inline-block; padding: .6rem .9rem; border-radius: .9rem;
-    max-width: 80%; white-space: normal; }
-  .copilot-bubble--user { background: #2d6cdf; color: #fff; float: right; clear: both; }
-  .copilot-bubble--agent { background: #f0f3f7; color: #222; float: left; clear: both; }
-  .copilot-item--user_message, .copilot-item--agent_message { overflow: hidden; }
-  .copilot-tool, .copilot-proposed { clear: both; background: #fafbfc; border: 1px solid #e6e9ee;
-    border-radius: .5rem; padding: .5rem .7rem; font-size: .85rem; }
-  .copilot-proposed { border-color: #f0c36d; background: #fff9ec; }
-  .copilot-tool-label { font-weight: 600; margin-top: .4rem; }
-  .copilot-pre { background: #0f172a0a; padding: .5rem; border-radius: .4rem; overflow-x: auto;
-    margin: .3rem 0; white-space: pre-wrap; word-break: break-word; }
-  .copilot-proposed-actions { margin-top: .5rem; display: flex; gap: .5rem; }
-  .copilot-input { display: flex; gap: .5rem; margin-top: .5rem; align-items: flex-end; }
-  .copilot-typing { color: #888; font-size: .85rem; padding: .3rem .5rem; }
-</style>
 {% endblock content %}
 
 {% block javascripts %}
