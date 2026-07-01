@@ -216,6 +216,7 @@ if os.getenv('GEOS_LIBRARY_PATH'):
     GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
 
 # Dbbackup
+DBBACKUP_DATABASES = ['default']
 STORAGES = {
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
