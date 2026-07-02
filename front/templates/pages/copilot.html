@@ -8,13 +8,9 @@
 {% block content %}
 <main>
 <!-- Dark header band so the (absolute, white-text) navbar is readable and content clears it -->
-<section class="section-header bg-primary pt-7 pt-lg-8 pb-4">
-  <div class="container">
-    <h2 class="text-white mb-0">Copilot</h2>
-    <p class="text-white mb-0" style="opacity:.7;">Assistant d'administration</p>
-  </div>
+<section class="section-header bg-primary pt-6 pb-1">
 </section>
-<section class="section pt-4 pb-6">
+<section class="section pt-3 pb-3">
   <div class="container-fluid">
     <div class="row copilot-layout"
          data-status="{% if discussion %}{{ discussion.status }}{% else %}idle{% endif %}"
@@ -28,6 +24,10 @@
 
       <!-- Sidebar: past discussions -->
       <div class="col-12 col-md-3 copilot-sidebar">
+        <div class="d-flex align-items-baseline gap-2 mb-3">
+            <h2 class="mb-0">Copilot</h2>
+            <p class="mb-0 opacity-75">Assistant d'administration</p>
+        </div>
         <a href="{% url 'copilot' %}" class="btn btn-primary btn-sm w-100 mb-3">
           <i class="fas fa-plus"></i> Nouvelle discussion
         </a>

@@ -10,7 +10,7 @@
 
         {% elif item.item_type == 'autonomous_tool_call' %}
             <details class="copilot-tool">
-                <summary><i class="fas fa-wrench"></i> {{ item.tool_name }}</summary>
+                <summary><i class="fas fa-wrench"></i> {{ item.tool_name|tool_label }}</summary>
                 {% if item.tool_args %}
                     <div class="copilot-tool-label">Arguments</div>
                     <pre class="copilot-pre">{{ item.tool_args|to_pretty_json }}</pre>
@@ -22,7 +22,7 @@
         {% elif item.item_type == 'proposed_tool_call' %}
             <div class="copilot-proposed">
                 <div class="copilot-proposed-head">
-                    <i class="fas fa-bolt"></i> Action proposée : <strong>{{ item.tool_name }}</strong>
+                    <i class="fas fa-bolt"></i> Action proposée : <strong>{{ item.tool_name|tool_label }}</strong>
                     {% if item.approval_status == 'approved' %}
                         <span class="badge badge-success">Validée</span>
                     {% elif item.approval_status == 'rejected' %}
