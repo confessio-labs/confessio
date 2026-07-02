@@ -121,10 +121,17 @@ def do_crawl_website(website: Website) -> CrawlingResult:
 def crawl_website(
         website: Website,
 ) -> tuple[CrawlingModeration.Category, CrawlingResult]:
-    # check if website has parish
-    if not website.parishes.exists() or not website.get_churches():
+    # A website with no parish at all is an orphan: delete it.
+    if not website.parishes.exists():
         website.delete()
-        info('website has no parish or no churches, deleting it')
+        info('website has no parish, deleting it')
+        return CrawlingModeration.Category.NO_RESPONSE, CrawlingResult()
+
+    # A website whose parishes have no churches yet (e.g. mid bulk-sync) must NOT be deleted:
+    # Parish.website is on_delete=CASCADE, so deleting would wipe the parish and its churches.
+    # Skip crawling without deleting; churches get attached in the church-sync phase / next sync.
+    if not website.get_churches():
+        info('website has no churches, skipping crawl')
         return CrawlingModeration.Category.NO_RESPONSE, CrawlingResult()
 
     crawling_result = do_crawl_website(website)
