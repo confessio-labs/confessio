@@ -60,6 +60,8 @@ Règles :
 ci-dessous ; utilise les vrais noms de tables/colonnes. Les clés primaires sont des UUID.
 - Quand tu as identifié le Website concerné, propose `assign_website` pour le rattacher à la \
 discussion.
+- Créer une église (`add_church`) exige une position : récupère latitude/longitude via \
+`google_maps_search` avant de proposer l'action.
 - Les requêtes HTTP (visite de site) peuvent échouer (timeout, 4xx, 5xx) : adapte-toi, n'insiste \
 pas inutilement.
 - Sois concis et concret. Ne propose une action de modification qu'avec des valeurs précises.\
@@ -160,10 +162,11 @@ async def assign_website(ctx: RunContext[CopilotDeps], website_uuid: str) -> dic
 
 @agent.tool(requires_approval=True)
 async def add_church(ctx: RunContext[CopilotDeps], parish_uuid: str, name: str,
+                     latitude: float, longitude: float,
                      city: str | None = None, zipcode: str | None = None,
-                     address: str | None = None, latitude: float | None = None,
-                     longitude: float | None = None) -> dict:
-    """Create a new church under a parish."""
+                     address: str | None = None) -> dict:
+    """Create a new church under a parish. A church MUST be geolocated: latitude/longitude
+    are required (use google_maps_search first to obtain them)."""
     return await sync_to_async(_record_proposed)(
         ctx.deps.discussion_uuid, ctx.tool_call_id, tools.do_add_church,
         parish_uuid, name, city, zipcode, address, latitude, longitude)

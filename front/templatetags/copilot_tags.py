@@ -1,6 +1,10 @@
 import json
 
 from django import template
+from django.contrib.gis.geos import Point
+from django.template.loader import render_to_string
+
+from front.services.search.map_service import get_map_with_single_location
 
 register = template.Library()
 
@@ -41,3 +45,20 @@ def to_pretty_json(value):
         return json.dumps(value, indent=2, ensure_ascii=False)
     except (TypeError, ValueError):
         return str(value)
+
+
+@register.filter
+def position_map(tool_args):
+    """Render a Leaflet/OSM mini-map for a proposed tool whose args carry latitude/longitude.
+
+    Returns '' when the coordinates are absent (e.g. an update_church without a position change),
+    so the template can render it unconditionally.
+    """
+    if not isinstance(tool_args, dict):
+        return ''
+    latitude, longitude = tool_args.get('latitude'), tool_args.get('longitude')
+    if latitude is None or longitude is None:
+        return ''
+    folium_map = get_map_with_single_location(Point(longitude, latitude, srid=4326))
+    return render_to_string('displays/location_display.html',
+                            {'map_html': folium_map._repr_html_()})

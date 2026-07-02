@@ -32,6 +32,11 @@
                 {% if item.tool_args %}
                     <pre class="copilot-pre">{{ item.tool_args|to_pretty_json }}</pre>
                 {% endif %}
+                {% if item.tool_name == 'add_church' or item.tool_name == 'update_church' %}
+                    {% with map_html=item.tool_args|position_map %}
+                        {% if map_html %}<div class="copilot-map">{{ map_html }}</div>{% endif %}
+                    {% endwith %}
+                {% endif %}
                 {% if item.tool_result %}
                     <div class="copilot-tool-label">Résultat</div>
                     <pre class="copilot-pre">{{ item.tool_result|to_pretty_json }}</pre>

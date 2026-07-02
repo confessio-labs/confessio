@@ -51,6 +51,8 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+.copilot-map { max-width: 480px; margin: .5rem 0; }
+.copilot-map iframe { border-radius: .4rem; }
 .copilot-proposed-actions { margin-top: .5rem; display: flex; gap: .5rem; }
 .copilot-input { display: flex; gap: .5rem; margin-top: .5rem; align-items: flex-end; }
 .copilot-typing { color: #888; font-size: .85rem; padding: .3rem .5rem; }
