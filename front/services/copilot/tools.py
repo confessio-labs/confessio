@@ -8,7 +8,6 @@ import datetime
 import decimal
 import os
 import uuid as uuid_lib
-from urllib.parse import quote
 
 import requests
 from django.contrib.gis.geos import Point
@@ -113,31 +112,39 @@ def google_search(query: str) -> dict:
 
 
 def google_maps_search(query: str) -> dict:
-    """Google Maps Places text search. Returns {results:[{name, address, location}]} or {error}."""
+    """Google Maps Places (New) text search. Returns
+    {results:[{name, address, location, place_id}]} or {error}."""
     api_key = os.getenv('GOOGLE_MAPS_API_KEY')
     if not api_key:
         return {'error': 'GOOGLE_MAPS_API_KEY is not configured.'}
-    url = ('https://maps.googleapis.com/maps/api/place/textsearch/json'
-           f'?query={quote(query)}&key={api_key}')
     try:
-        response = requests.get(url, timeout=20)
+        response = requests.post(
+            'https://places.googleapis.com/v1/places:searchText',
+            headers={
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': api_key,
+                'X-Goog-FieldMask': ('places.displayName,places.formattedAddress,'
+                                     'places.location,places.id'),
+            },
+            json={'textQuery': query, 'languageCode': 'fr', 'regionCode': 'FR'},
+            timeout=20,
+        )
         data = response.json()
     except Exception as e:  # noqa: BLE001
         return {'error': f'{type(e).__name__}: {e}'}
 
-    status = data.get('status')
-    if status not in ('OK', 'ZERO_RESULTS'):
-        detail = data.get('error_message', '')
-        return {'error': f'Google Maps API status: {status}. {detail}'.strip()}
+    if response.status_code != 200:
+        detail = (data.get('error') or {}).get('message', '') if isinstance(data, dict) else ''
+        return {'error': f'Google Maps API HTTP {response.status_code}. {detail}'.strip()}
 
     results = []
-    for item in (data.get('results') or [])[:10]:
-        loc = item.get('geometry', {}).get('location', {})
+    for item in (data.get('places') or [])[:10]:
+        loc = item.get('location') or {}
         results.append({
-            'name': item.get('name'),
-            'address': item.get('formatted_address'),
-            'location': {'lat': loc.get('lat'), 'lng': loc.get('lng')},
-            'place_id': item.get('place_id'),
+            'name': (item.get('displayName') or {}).get('text'),
+            'address': item.get('formattedAddress'),
+            'location': {'lat': loc.get('latitude'), 'lng': loc.get('longitude')},
+            'place_id': item.get('id'),
         })
     return {'results': results}
 
@@ -164,8 +171,9 @@ def do_add_church(parish_uuid: str, name: str, city: str | None = None,
                   zipcode: str | None = None, address: str | None = None,
                   latitude: float | None = None, longitude: float | None = None) -> dict:
     parish = _get(Parish, 'parish', uuid=parish_uuid)
-    location = Point(longitude, latitude, srid=4326) \
-        if latitude is not None and longitude is not None else None
+    if latitude is None or longitude is None:
+        raise ValueError('Une nouvelle église doit avoir une position (latitude/longitude).')
+    location = Point(longitude, latitude, srid=4326)
     church = Church.objects.create(
         name=name, parish=parish, city=city, zipcode=zipcode, address=address, location=location)
     return {'created_church_uuid': str(church.uuid), 'name': church.name}
