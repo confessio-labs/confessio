@@ -4,7 +4,7 @@ from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseNotFound, JsonResponse, HttpResponseBadRequest, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.utils.translation import gettext
 
 from attaching.public_service import attaching_upload_image, \
@@ -148,6 +148,7 @@ def render_map(request, center,
         'hour_min': time_filter.hour_min or '',
         'hour_max': time_filter.hour_max or '',
         'action_path': request.path,
+        'noindex': request.resolver_match.url_name == 'index',
         'hidden_inputs': hidden_inputs,
         'page_website': page_website,
         'success_message': success_message,
@@ -208,6 +209,12 @@ def extract_temporal_filters(request) -> TimeFilter:
         hour_max=extract_int('hourMax', request, 24 * 60 - 1),
         legacy_search=True,
     )
+
+
+def home(request):
+    # In production, `/` is served by the Next.js front via the reverse proxy;
+    # this redirect is the dev/fallback behaviour.
+    return redirect('index')
 
 
 def index(request, diocese_slug=None, website_uuid: str = None, is_around_me: bool = False):

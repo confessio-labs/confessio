@@ -7,7 +7,8 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     # index
-    path('', views.index, name='index'),
+    path('', views.home, name='home'),
+    path('index', views.index, name='index'),
     path('autocomplete', views.autocomplete, name='autocomplete'),
     path('website_events/<uuid:website_uuid>', views.partial_website_events,
          name='website_events'),
