@@ -10,6 +10,7 @@ from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.tools import ToolDenied
 
 from core.utils.async_utils import run_and_close
+from crawling.utils.string_utils import remove_unsafe_chars
 from front.models import CopilotDiscussion, CopilotDiscussionItem
 from front.services.copilot.agent import CopilotDeps, agent, build_provider_and_model
 from front.services.copilot.items import add_item
@@ -55,7 +56,8 @@ def _execute(discussion_uuid, user_prompt, deferred_tool_results=None) -> None:
         result = run_and_close(_coro(), provider.client.close)
     except Exception as e:  # noqa: BLE001
         CopilotDiscussion.objects.filter(uuid=discussion_uuid).update(
-            status=Status.ERROR, error_message=f'{type(e).__name__}: {e}')
+            status=Status.ERROR,
+            error_message=remove_unsafe_chars(f'{type(e).__name__}: {e}'))
         raise
 
     _finalize(discussion, result)

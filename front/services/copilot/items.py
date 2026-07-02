@@ -2,6 +2,7 @@
 approval state machine; the agent's own memory is CopilotDiscussion.pydantic_messages."""
 from django.db.models import Max
 
+from crawling.utils.string_utils import strip_null_bytes
 from front.models import CopilotDiscussion, CopilotDiscussionItem
 
 
@@ -15,7 +16,7 @@ def add_item(discussion: CopilotDiscussion, item_type: str, **fields) -> Copilot
         discussion=discussion,
         position=_next_position(discussion),
         item_type=item_type,
-        **fields,
+        **{key: strip_null_bytes(value) for key, value in fields.items()},
     )
 
 
@@ -36,4 +37,4 @@ def record_proposed_execution(discussion: CopilotDiscussion, tool_call_id: str,
     (discussion.items
      .filter(tool_call_id=tool_call_id,
              item_type=CopilotDiscussionItem.ItemType.PROPOSED_TOOL_CALL)
-     .update(tool_result=tool_result))
+     .update(tool_result=strip_null_bytes(tool_result)))
