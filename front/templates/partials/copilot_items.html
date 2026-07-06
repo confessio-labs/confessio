@@ -27,6 +27,8 @@
                         <span class="badge badge-success">Validée</span>
                     {% elif item.approval_status == 'rejected' %}
                         <span class="badge badge-secondary">Refusée</span>
+                    {% elif item.approval_status == 'failure' %}
+                        <span class="badge badge-danger">Échec</span>
                     {% endif %}
                 </div>
                 {% if item.tool_args %}

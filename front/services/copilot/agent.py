@@ -145,10 +145,19 @@ async def google_maps_search(ctx: RunContext[CopilotDeps], query: str) -> dict:
 # --------------------------------------------------------------------------- #
 
 def _record_proposed(discussion_uuid: str, tool_call_id: str, logic, *logic_args):
-    """Run a mutating logic fn (after approval) and store its result on the proposed item."""
-    result = logic(*logic_args)
+    """Run a mutating logic fn (after approval) and store its result on the proposed item.
+
+    On failure, return an error result (never raise) so PydanticAI resolves the tool call and the
+    message history stays consistent; the item is flipped to FAILURE.
+    """
+    try:
+        result = logic(*logic_args)
+        failed = False
+    except Exception as e:  # noqa: BLE001
+        result = {'error': f'{type(e).__name__}: {e}'}
+        failed = True
     discussion = CopilotDiscussion.objects.get(uuid=discussion_uuid)
-    record_proposed_execution(discussion, tool_call_id, result)
+    record_proposed_execution(discussion, tool_call_id, result, failed=failed)
     return result
 
 

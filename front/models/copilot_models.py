@@ -36,6 +36,7 @@ class CopilotDiscussionItem(TimeStampMixin):
         PENDING = "pending"
         APPROVED = "approved"
         REJECTED = "rejected"
+        FAILURE = "failure"
 
     discussion = models.ForeignKey(CopilotDiscussion, on_delete=models.CASCADE,
                                    related_name='items')

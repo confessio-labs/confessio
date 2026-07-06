@@ -32,9 +32,15 @@ def add_autonomous_tool_item(discussion: CopilotDiscussion, tool_name: str,
 
 
 def record_proposed_execution(discussion: CopilotDiscussion, tool_call_id: str,
-                              tool_result) -> None:
-    """Fill in the result of a proposed tool that just executed after approval."""
+                              tool_result, *, failed: bool = False) -> None:
+    """Fill in the result of a proposed tool that just executed after approval.
+
+    If it failed, also flip the item to FAILURE (it was APPROVED).
+    """
+    fields = {'tool_result': strip_null_bytes(tool_result)}
+    if failed:
+        fields['approval_status'] = CopilotDiscussionItem.ApprovalStatus.FAILURE
     (discussion.items
      .filter(tool_call_id=tool_call_id,
              item_type=CopilotDiscussionItem.ItemType.PROPOSED_TOOL_CALL)
-     .update(tool_result=strip_null_bytes(tool_result)))
+     .update(**fields))
