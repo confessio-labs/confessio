@@ -42,6 +42,14 @@
 }
 .copilot-proposed { border-color: #f0c36d; background: #fff9ec; }
 .copilot-tool-label { font-weight: 600; margin-top: .4rem; }
+.copilot-args {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .1rem .6rem;
+  margin: .4rem 0;
+}
+.copilot-args dt { font-weight: 600; color: #6c757d; }
+.copilot-args dd { margin: 0; word-break: break-word; }
 .copilot-pre {
   background: #0f172a0a;
   padding: .5rem;

@@ -31,9 +31,16 @@
                         <span class="badge badge-danger">Échec</span>
                     {% endif %}
                 </div>
-                {% if item.tool_args %}
-                    <pre class="copilot-pre">{{ item.tool_args|to_pretty_json }}</pre>
-                {% endif %}
+                {% with rows=item.tool_args|humanize_tool_args %}
+                    {% if rows %}
+                        <dl class="copilot-args">
+                            {% for row in rows %}
+                                <dt>{{ row.label }}</dt>
+                                <dd>{{ row.value }}</dd>
+                            {% endfor %}
+                        </dl>
+                    {% endif %}
+                {% endwith %}
                 {% if item.tool_name == 'add_church' or item.tool_name == 'update_church' %}
                     {% with map_html=item.tool_args|position_map %}
                         {% if map_html %}<div class="copilot-map">{{ map_html }}</div>{% endif %}
