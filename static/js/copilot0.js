@@ -119,10 +119,19 @@ $(function () {
         var itemUuid = $btn.data("item-uuid");
         var decision = $btn.data("decision");
         $btn.closest(".copilot-proposed-actions").find("button").prop("disabled", true);
-        post(urls.approve, { item_uuid: itemUuid, decision: decision }).done(function () {
+        post(urls.approve, { item_uuid: itemUuid, decision: decision }).done(function (resp) {
+            // Reflect the decision on this item (badge, buttons removed).
+            if (resp.item_html) {
+                $messages.find(".copilot-item[data-item-uuid='" + itemUuid + "']")
+                    .replaceWith(resp.item_html);
+            }
             lastPosition = computeLastPosition();
-            startPolling();
-            pollOnce();
+            // Other proposed actions in the same batch may still need a decision; the agent only
+            // resumes once they are all handled, so only poll when the run has actually resumed.
+            if (!resp.pending) {
+                startPolling();
+                pollOnce();
+            }
         }).fail(function () {
             $btn.closest(".copilot-proposed-actions").find("button").prop("disabled", false);
             alert("Échec de la validation.");

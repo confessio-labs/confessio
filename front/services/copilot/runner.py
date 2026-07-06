@@ -14,7 +14,8 @@ from crawling.utils.string_utils import remove_unsafe_chars
 from front.models import CopilotDiscussion, CopilotDiscussionItem
 from front.services.copilot.agent import CopilotDeps, agent, build_provider_and_model
 from front.services.copilot.items import add_item
-from front.services.copilot.serialization import dump_messages, load_messages
+from front.services.copilot.serialization import (deferred_tool_call_ids, dump_messages,
+                                                  load_messages)
 
 Status = CopilotDiscussion.Status
 ItemType = CopilotDiscussionItem.ItemType
@@ -25,13 +26,26 @@ def run_agent_turn(discussion_uuid: str, user_text: str) -> None:
     _execute(discussion_uuid, user_prompt=user_text)
 
 
-def resume_after_approval(discussion_uuid: str, tool_call_id: str, approved: bool) -> None:
-    if approved:
-        results = DeferredToolResults(approvals={tool_call_id: True})
-    else:
-        results = DeferredToolResults(approvals={
-            tool_call_id: ToolDenied(message="L'admin a refusé cette action.")})
-    _execute(discussion_uuid, user_prompt=None, deferred_tool_results=results)
+def resume_after_approval(discussion_uuid: str) -> None:
+    """Resume the run now that every proposed tool call in the pending batch has been decided.
+
+    PydanticAI requires results for ALL deferred tool calls at once, so we gather each decision
+    from the items (approved → execute, anything else → deny) and resume a single time.
+    """
+    discussion = CopilotDiscussion.objects.get(uuid=discussion_uuid)
+    deferred_ids = deferred_tool_call_ids(load_messages(discussion.pydantic_messages))
+    decisions = {
+        item.tool_call_id: item.approval_status
+        for item in discussion.items.filter(
+            item_type=ItemType.PROPOSED_TOOL_CALL, tool_call_id__in=deferred_ids)
+    }
+    denied = ToolDenied(message="L'admin a refusé cette action.")
+    approvals = {
+        call_id: (True if decisions.get(call_id) == ApprovalStatus.APPROVED else denied)
+        for call_id in deferred_ids
+    }
+    _execute(discussion_uuid, user_prompt=None,
+             deferred_tool_results=DeferredToolResults(approvals=approvals))
 
 
 def _execute(discussion_uuid, user_prompt, deferred_tool_results=None) -> None:

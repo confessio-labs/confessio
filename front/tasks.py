@@ -12,6 +12,6 @@ def worker_run_copilot_turn(discussion_uuid: str, user_text: str):
 
 
 @background(queue='main', schedule=TaskSchedule(priority=2))
-def worker_resume_copilot_turn(discussion_uuid: str, tool_call_id: str, approved: bool):
+def worker_resume_copilot_turn(discussion_uuid: str):
     from front.services.copilot.runner import resume_after_approval
-    resume_after_approval(discussion_uuid, tool_call_id, approved)
+    resume_after_approval(discussion_uuid)

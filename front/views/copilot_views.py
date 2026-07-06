@@ -79,9 +79,21 @@ def copilot_approve(request, discussion_uuid):
     approved = request.POST.get('decision') == 'approve'
     item.approval_status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
     item.save(update_fields=['approval_status', 'updated_at'])
-    CopilotDiscussion.objects.filter(uuid=discussion.uuid).update(status=Status.RUNNING)
-    worker_resume_copilot_turn(str(discussion.uuid), item.tool_call_id, approved)
-    return JsonResponse({'ok': True})
+
+    # The agent can propose several tools at once; PydanticAI requires results for ALL of them on
+    # resume. So only resume once every proposed tool call in the batch has been decided. The
+    # status flip is conditional (AWAITING_APPROVAL -> RUNNING) so concurrent decisions can't
+    # trigger the resume twice.
+    still_pending = discussion.items.filter(
+        item_type=ItemType.PROPOSED_TOOL_CALL, approval_status=ApprovalStatus.PENDING).exists()
+    if not still_pending:
+        flipped = CopilotDiscussion.objects.filter(
+            uuid=discussion.uuid, status=Status.AWAITING_APPROVAL).update(status=Status.RUNNING)
+        if flipped:
+            worker_resume_copilot_turn(str(discussion.uuid))
+
+    item_html = render_to_string('partials/copilot_items.html', {'items': [item]})
+    return JsonResponse({'ok': True, 'pending': still_pending, 'item_html': item_html})
 
 
 @login_required
