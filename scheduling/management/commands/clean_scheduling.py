@@ -7,7 +7,7 @@ from core.management.abstract_cleaning_command import AbstractCleaningCommand
 from registry.models.base_moderation_models import ModerationStatus
 from scheduling.models import Log as SchedulingLog
 from scheduling.models import ParsingModeration, Parsing
-from scheduling.models import PruningParsing
+from scheduling.models import PruningParsing, ScrapingPruning, ImagePruning
 from scheduling.models.pruning_models import Pruning, Sentence, Classifier
 from scheduling.services.scheduling.scheduling_service import get_websites_of_parsing
 
@@ -46,7 +46,7 @@ class Command(AbstractCleaningCommand):
         counter = self.delete_objects(orphan_prunings)
         self.success(f'Done removing {counter} orphan prunings')
 
-        self.clean_history(Pruning, Pruning.history.model)
+        self.clean_pruning_history()
 
         # Sentences
         self.info('Starting removing orphan sentences')
@@ -77,6 +77,20 @@ class Command(AbstractCleaningCommand):
             created_at__lt=timezone.now() - timedelta(days=3)).all()
         counter = self.delete_objects(old_logs)
         self.success(f'Done removing {counter} old scheduling logs')
+
+    def clean_pruning_history(self):
+        self.info('Starting cleaning Pruning history items')
+        history_model = Pruning.history.model
+        query = history_model.objects.filter(
+            ~Q(uuid__in=Pruning.objects.values_list('uuid', flat=True)),
+        ).exclude(
+            Q(history_id__in=ScrapingPruning.objects.values('pruning_history_id'))
+            | Q(history_id__in=ImagePruning.objects.values('pruning_history_id'))
+            | Q(history_id__in=PruningParsing.objects.values('pruning_history_id'))
+        )
+        counter = query.count()
+        query.delete()
+        self.success(f'Done removing {counter} orphan Pruning history items')
 
     @staticmethod
     def clean_parsing_moderations() -> int:
