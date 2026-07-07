@@ -1,10 +1,11 @@
+import json
 import os
 import unittest
 from datetime import date
 
 from crawling.workflows.crawl.extract_widgets import detect_google_calendar_urls
-from crawling.workflows.download.google_calendar import is_google_calendar_url, get_ics_urls, \
-    render_ics_to_html
+from crawling.workflows.download.google_calendar import is_google_calendar_url, \
+    get_calendar_src_ids, render_events_to_html
 
 EMBED_URL = ('https://calendar.google.com/calendar/embed'
              '?src=notredamedurocher%40gmail.com&ctz=Europe%2FParis')
@@ -19,25 +20,17 @@ class TestGoogleCalendar(unittest.TestCase):
         self.assertFalse(is_google_calendar_url('https://www.paroisse-biarritz.fr/'))
         self.assertFalse(is_google_calendar_url('https://www.google.com/calendar'))
 
-    def test_get_ics_urls(self):
-        self.assertEqual(
-            get_ics_urls(EMBED_URL),
-            ['https://calendar.google.com/calendar/ical/'
-             'notredamedurocher%40gmail.com/public/basic.ics'],
-        )
+    def test_get_calendar_src_ids(self):
+        self.assertEqual(get_calendar_src_ids(EMBED_URL), ['notredamedurocher@gmail.com'])
 
-    def test_get_ics_urls_multiple_src(self):
+    def test_get_calendar_src_ids_multiple(self):
         url = ('https://calendar.google.com/calendar/embed'
                '?src=one%40gmail.com&src=two%40group.calendar.google.com')
-        self.assertEqual(
-            get_ics_urls(url),
-            ['https://calendar.google.com/calendar/ical/one%40gmail.com/public/basic.ics',
-             'https://calendar.google.com/calendar/ical/'
-             'two%40group.calendar.google.com/public/basic.ics'],
-        )
+        self.assertEqual(get_calendar_src_ids(url),
+                         ['one@gmail.com', 'two@group.calendar.google.com'])
 
-    def test_get_ics_urls_no_src(self):
-        self.assertEqual(get_ics_urls('https://calendar.google.com/calendar/embed'), [])
+    def test_get_calendar_src_ids_none(self):
+        self.assertEqual(get_calendar_src_ids('https://calendar.google.com/calendar/embed'), [])
 
     def test_detect_google_calendar_urls_iframe_and_anchor(self):
         html = f'''<html><body>
@@ -51,12 +44,13 @@ class TestGoogleCalendar(unittest.TestCase):
         html = '<html><body><a href="/horaires">Horaires</a></body></html>'
         self.assertEqual(detect_google_calendar_urls(html), set())
 
-    def test_render_ics_to_html(self):
+    def test_render_events_to_html(self):
         tests_dir = os.path.dirname(os.path.realpath(__file__))
-        with open(f'{tests_dir}/fixtures/google_calendar/sample.ics') as f:
-            ics_content = f.read()
+        with open(f'{tests_dir}/fixtures/google_calendar/events.json') as f:
+            data = json.load(f)
 
-        result = render_ics_to_html(ics_content, reference_date=date(2026, 3, 1))
+        result = render_events_to_html(data['summary'], data['items'],
+                                       reference_date=date(2026, 3, 1))
         expected = (
             '<h2>Paroisse Test</h2>\n'
             '<p>Confessions — tous les samedis à 17h00 — Saint-Martin</p>\n'
@@ -66,8 +60,8 @@ class TestGoogleCalendar(unittest.TestCase):
         )
         self.assertEqual(result, expected)
 
-    def test_render_ics_to_html_invalid(self):
-        self.assertEqual(render_ics_to_html('not an ics file'), '')
+    def test_render_events_to_html_empty(self):
+        self.assertEqual(render_events_to_html('Paroisse Test', []), '')
 
 
 if __name__ == '__main__':
