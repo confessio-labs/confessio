@@ -3,6 +3,8 @@ import re
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 
+from crawling.workflows.download.google_calendar import is_google_calendar_url
+
 
 class OClocherWidget(BaseModel):
     organization_id: str
@@ -66,3 +68,24 @@ def extract_contact_widgets(html: str) -> list[ContactWidget]:
 
 def extract_widgets(html: str) -> list[BaseWidget]:
     return extract_oclocher_widgets(html) + extract_contact_widgets(html)
+
+
+def detect_google_calendar_urls(html: str) -> set[str]:
+    """Find embedded public Google Calendar URLs (cross-domain <iframe>/<a>) on a page."""
+    try:
+        soup = BeautifulSoup(html, 'html.parser')
+    except Exception as e:
+        print(e)
+        return set()
+
+    urls = set()
+    for iframe in soup.find_all('iframe'):
+        src = iframe.get('src')
+        if src and is_google_calendar_url(src):
+            urls.add(src.strip())
+    for link in soup.find_all('a', href=True):
+        href = link['href']
+        if is_google_calendar_url(href):
+            urls.add(href.strip())
+
+    return urls
