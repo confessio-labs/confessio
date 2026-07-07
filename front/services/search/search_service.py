@@ -16,7 +16,7 @@ from registry.models import Church, Website, Diocese
 from scheduling.models import IndexEvent
 from scheduling.utils.date_utils import time_from_minutes
 
-MAX_CHURCHES_IN_RESULTS = 50
+MAX_CHURCHES_IN_RESULTS = 40
 MAX_WEBSITES_IN_RESULTS = 10
 DEFAULT_SEARCH_BOX = [41.787, 51.754, -9.162, 15.183]  # min_lat, max_lat, min_lng, max_lng
 
