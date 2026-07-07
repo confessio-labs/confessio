@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 from httpx import HTTPError, InvalidURL, Response
 
 from core.utils.log_utils import info
+from crawling.workflows.download.google_calendar import is_google_calendar_url, \
+    get_google_calendar_html
 from crawling.workflows.refine.pdf_utils import extract_text_from_pdf_bytes
 from crawling.utils.url_utils import get_domain, are_similar_urls, replace_scheme_and_hostname, \
     replace_http_with_https
@@ -78,6 +80,12 @@ def get_text_with_right_encoding(response: Response) -> str:
 
 
 def get_content_from_url(url: str) -> tuple[str, bytes | None] | None:
+    # Google Calendar embeds are JavaScript shells with no event data; fetch their public
+    # iCalendar feed instead and render it to HTML for the regular pruning/parsing pipeline.
+    if is_google_calendar_url(url):
+        html = get_google_calendar_html(url)
+        return (html, None) if html else None
+
     # Handle heavy pdf files
     if url.endswith('.pdf'):
         content_length = get_content_length(url)

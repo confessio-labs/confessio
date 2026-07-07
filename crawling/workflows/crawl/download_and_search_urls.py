@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 from core.utils.ram_utils import print_memory_usage
 from crawling.utils.url_utils import get_clean_full_url, get_path, get_full_path
 from crawling.workflows.crawl.extract_links import parse_content_links, remove_http_https_duplicate
-from crawling.workflows.crawl.extract_widgets import extract_widgets, BaseWidget
+from crawling.workflows.crawl.extract_widgets import extract_widgets, BaseWidget, \
+    detect_google_calendar_urls
 from crawling.workflows.download.download_content import get_content_from_url, get_url_aliases, \
     DOWNLOAD_TIMEOUT
 from crawling.workflows.scrape.download_refine_and_extract import get_extracted_html_list
@@ -121,6 +122,12 @@ def search_for_confession_pages(home_url, aliases_domains: set[str],
         if widgets:
             print(f'found {len(widgets)} widgets for {link}: {widgets}')
             all_widgets.extend(widgets)
+
+        # Google Calendar embeds live on a different host and are not <a> links, so they are
+        # never discovered by parse_content_links; detect and enqueue them explicitly.
+        for calendar_url in detect_google_calendar_urls(html_content):
+            if calendar_url not in visited_links:
+                links_to_visit.add(calendar_url)
 
         for new_link in new_links:
             if new_link not in visited_links:
