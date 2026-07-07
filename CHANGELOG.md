@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-07
+
+### Changed
+
+- Deploy as a Docker container instead of Vercel: add a multi-stage
+  `Dockerfile` (Next.js standalone output) and a `docker-compose.yml` with a
+  cron sidecar that replaces the Vercel cron, hitting
+  `/api/revalidate-dioceses` daily at 01:00. Removed `vercel.json`.
+
 ## [1.0.1] - 2026-07-07
 
 ### Changed

@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/revalidate-dioceses",
-      "schedule": "0 1 * * *"
-    }
-  ]
-}
