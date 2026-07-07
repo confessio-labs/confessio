@@ -147,7 +147,7 @@ sudo -u postgres psql -c "ALTER ROLE confessio SUPERUSER;"
 # Drop and recreate database
 sudo -u postgres psql postgres -c "DROP DATABASE confessio;" && sudo -u postgres psql postgres -c "CREATE DATABASE confessio;" && sudo -u postgres psql postgres -c "ALTER DATABASE confessio OWNER TO confessio;"
 # This will restore last backup
-. /home/ubuntu/confessio/.env; /home/ubuntu/confessio/.venv/bin/python3.13 /home/ubuntu/confessio/manage.py dbrestore --uncompress
+. /home/ubuntu/confessio/.env; /home/ubuntu/confessio/.venv/bin/python3.13 /home/ubuntu/confessio/manage.py dbrestore --uncompress --database default
 # Revoke superuser access
 sudo -u postgres psql -c "ALTER ROLE confessio NOSUPERUSER;"
 ```

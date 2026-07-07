@@ -176,7 +176,7 @@ $ python manage.py createsuperuser
 
 This will download and load the latest prod database dump in local. Your psql user must be superadmin.
 ```bash
-$ python manage.py dbrestore --uncompress
+$ python manage.py dbrestore --uncompress --database default
 ```
 
 ## Start the app
