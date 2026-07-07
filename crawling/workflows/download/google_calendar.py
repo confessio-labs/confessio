@@ -1,19 +1,22 @@
+import os
 import re
 from datetime import date, datetime, timedelta
 from urllib.parse import urlparse, parse_qs, quote
 from zoneinfo import ZoneInfo
 
 import httpx
-from icalendar import Calendar
+from icalendar.prop import vRecur
 
 from core.utils.log_utils import info
 from crawling.utils.url_utils import get_domain
 
 GOOGLE_CALENDAR_HOST = 'calendar.google.com'
 
-# Public iCalendar feed of a Google Calendar, e.g.
-# https://calendar.google.com/calendar/ical/xxx%40gmail.com/public/basic.ics
-ICS_URL_TEMPLATE = 'https://' + GOOGLE_CALENDAR_HOST + '/calendar/ical/{src}/public/basic.ics'
+# Google Calendar API v3. Unlike the ICS host (calendar.google.com), this endpoint is quota-keyed
+# by API key rather than gated by IP reputation, so a flagged server IP is not blocked by the
+# /sorry anti-bot wall. Requires a (free) API key in GOOGLE_API_KEY; the calendar must be public.
+GOOGLE_CALENDAR_API_URL = 'https://www.googleapis.com/calendar/v3/calendars/{calendar_id}/events'
+MAX_PAGES = 20
 
 # One-off events are inherently dated; we only render those happening soon to keep the output
 # (and therefore the resulting Pruning) reasonably stable across crawls. Recurring events carry
@@ -52,45 +55,84 @@ def get_calendar_src_ids(url: str) -> list[str]:
     return parse_qs(urlparse(url).query).get('src', [])
 
 
-def get_ics_urls(url: str) -> list[str]:
-    # quote re-encodes the calendar id so '@' becomes '%40' in the ical path
-    return [ICS_URL_TEMPLATE.format(src=quote(src, safe='')) for src in get_calendar_src_ids(url)]
+###############
+# FETCH EVENTS #
+###############
+
+def get_api_key() -> str | None:
+    return os.getenv('GOOGLE_API_KEY')
 
 
-#############
-# FETCH ICS #
-#############
+def fetch_calendar_events(calendar_id: str) -> tuple[str, list[dict]] | None:
+    """Fetch a public calendar's events via the Calendar API v3. Returns (name, events) or None.
 
-def fetch_ics(ics_url: str) -> str | None:
+    Uses singleEvents=false so recurring events keep their RRULE (rendered as stable, date-free
+    recurrence text) instead of being expanded into dated instances.
+    """
+    api_key = get_api_key()
+    if not api_key:
+        info('GOOGLE_API_KEY is not set, cannot fetch google calendar events')
+        return None
+
     # Lazy import to avoid a circular import (download_content imports this module)
     from crawling.workflows.download.download_content import get_headers, TIMEOUT
 
-    info(f'getting ics content from url {ics_url}')
-    try:
-        with httpx.Client() as client:
-            r = client.get(ics_url, headers=get_headers(), timeout=TIMEOUT, follow_redirects=True)
-    except (httpx.HTTPError, httpx.InvalidURL) as e:
-        info(e)
-        return None
+    api_url = GOOGLE_CALENDAR_API_URL.format(calendar_id=quote(calendar_id, safe=''))
+    params = {
+        'key': api_key,
+        'singleEvents': 'false',
+        'showDeleted': 'false',
+        'maxResults': 2500,
+    }
 
-    if r.status_code != 200:
-        info(f'got status code {r.status_code} for ics url {ics_url}')
-        return None
+    calendar_name = ''
+    events: list[dict] = []
+    page_token = None
+    for _ in range(MAX_PAGES):
+        if page_token:
+            params['pageToken'] = page_token
 
-    return r.text
+        info(f'getting google calendar events for {calendar_id}')
+        try:
+            with httpx.Client() as client:
+                r = client.get(api_url, params=params, headers=get_headers(), timeout=TIMEOUT)
+        except (httpx.HTTPError, httpx.InvalidURL) as e:
+            info(e)
+            return None
+
+        if r.status_code != 200:
+            info(f'got status code {r.status_code} for google calendar {calendar_id}: '
+                 f'{r.text[:200]}')
+            return None
+
+        data = r.json()
+        calendar_name = data.get('summary', calendar_name)
+        events.extend(data.get('items', []))
+
+        page_token = data.get('nextPageToken')
+        if not page_token:
+            break
+    else:
+        info(f'reached max {MAX_PAGES} pages for google calendar {calendar_id}, '
+             f'events may be truncated')
+
+    return calendar_name, events
 
 
 def get_google_calendar_html(url: str) -> str | None:
-    ics_urls = get_ics_urls(url)
-    if not ics_urls:
+    src_ids = get_calendar_src_ids(url)
+    if not src_ids:
         return None
 
+    reference_date = datetime.now(PARIS_TZ).date()
+
     html_parts = []
-    for ics_url in ics_urls:
-        ics_content = fetch_ics(ics_url)
-        if ics_content is None:
+    for src_id in src_ids:
+        result = fetch_calendar_events(src_id)
+        if result is None:
             continue
-        html = render_ics_to_html(ics_content)
+        calendar_name, events = result
+        html = render_events_to_html(calendar_name, events, reference_date)
         if html:
             html_parts.append(html)
 
@@ -120,7 +162,7 @@ def day_name(value: date) -> str:
     return DAY_NAMES[WEEKDAY_CODES[value.weekday()]]
 
 
-def parse_byday(entry: str) -> tuple[int | None, str | None]:
+def parse_byday(entry) -> tuple[int | None, str | None]:
     # 'SA' -> (None, 'SA'); '3TH' -> (3, 'TH'); '-1SU' -> (-1, 'SU')
     match = re.fullmatch(r'([+-]?\d+)?([A-Z]{2})', str(entry))
     if not match:
@@ -181,13 +223,32 @@ def render_one_off(start) -> str:
             f'{event_date.year}{render_time(start)}')
 
 
-def render_event(event, reference_date: date) -> str | None:
-    dtstart = event.get('DTSTART')
-    if dtstart is None:
+def parse_event_start(start: dict | None):
+    if not start:
         return None
-    start = to_paris(dtstart.dt)
+    if start.get('dateTime'):
+        return to_paris(datetime.fromisoformat(start['dateTime']))
+    if start.get('date'):
+        return date.fromisoformat(start['date'])
+    return None
 
-    rrule = event.get('RRULE')
+
+def get_rrule(event: dict) -> vRecur | None:
+    for line in event.get('recurrence') or []:
+        if str(line).upper().startswith('RRULE:'):
+            return vRecur.from_ical(str(line)[len('RRULE:'):])
+    return None
+
+
+def render_event(event: dict, reference_date: date) -> str | None:
+    if event.get('status') == 'cancelled':
+        return None
+
+    start = parse_event_start(event.get('start'))
+    if start is None:
+        return None
+
+    rrule = get_rrule(event)
     if rrule:
         until = _first(rrule.get('UNTIL'))
         if until is not None:
@@ -205,24 +266,19 @@ def render_event(event, reference_date: date) -> str | None:
     if when is None:
         return None
 
-    summary = str(event.get('SUMMARY', '')).strip()
-    location = str(event.get('LOCATION', '')).strip()
+    summary = (event.get('summary') or '').strip()
+    location = (event.get('location') or '').strip()
     parts = [p for p in [summary, when, location] if p]
     return ' — '.join(parts)
 
 
-def render_ics_to_html(ics_content: str, reference_date: date | None = None) -> str:
+def render_events_to_html(calendar_name: str, events: list[dict],
+                          reference_date: date | None = None) -> str:
     if reference_date is None:
         reference_date = datetime.now(PARIS_TZ).date()
 
-    try:
-        calendar = Calendar.from_ical(ics_content)
-    except Exception as e:
-        info(e)
-        return ''
-
     lines = []
-    for event in calendar.walk('VEVENT'):
+    for event in events:
         rendered = render_event(event, reference_date)
         if rendered:
             lines.append(f'<p>{rendered}</p>')
@@ -230,8 +286,8 @@ def render_ics_to_html(ics_content: str, reference_date: date | None = None) -> 
     if not lines:
         return ''
 
-    calendar_name = str(calendar.get('X-WR-CALNAME', '')).strip()
-    header = f'<h2>{calendar_name}</h2>\n' if calendar_name else ''
+    name = (calendar_name or '').strip()
+    header = f'<h2>{name}</h2>\n' if name else ''
     return header + '\n'.join(lines)
 
 

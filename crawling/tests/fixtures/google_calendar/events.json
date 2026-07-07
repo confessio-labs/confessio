@@ -1,0 +1,48 @@
+{
+  "kind": "calendar#events",
+  "summary": "Paroisse Test",
+  "timeZone": "Europe/Paris",
+  "items": [
+    {
+      "status": "confirmed",
+      "summary": "Confessions",
+      "location": "Saint-Martin",
+      "start": {"dateTime": "2024-01-06T17:00:00+01:00", "timeZone": "Europe/Paris"},
+      "end": {"dateTime": "2024-01-06T18:00:00+01:00", "timeZone": "Europe/Paris"},
+      "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=SA"]
+    },
+    {
+      "status": "confirmed",
+      "summary": "Groupe de louange",
+      "start": {"dateTime": "2024-01-18T20:00:00+01:00", "timeZone": "Europe/Paris"},
+      "recurrence": ["RRULE:FREQ=MONTHLY;BYDAY=3TH"]
+    },
+    {
+      "status": "confirmed",
+      "summary": "Oraison",
+      "start": {"dateTime": "2024-01-02T07:00:00+01:00", "timeZone": "Europe/Paris"},
+      "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=TU,WE,TH,FR"]
+    },
+    {
+      "status": "confirmed",
+      "summary": "Vieux mariage",
+      "start": {"dateTime": "2013-05-11T14:00:00+02:00", "timeZone": "Europe/Paris"}
+    },
+    {
+      "status": "confirmed",
+      "summary": "Confessions avant Paques",
+      "start": {"dateTime": "2026-03-20T09:30:00+01:00", "timeZone": "Europe/Paris"}
+    },
+    {
+      "status": "confirmed",
+      "summary": "Recurrence terminee",
+      "start": {"dateTime": "2020-01-01T10:00:00+01:00", "timeZone": "Europe/Paris"},
+      "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20201231T100000Z"]
+    },
+    {
+      "status": "cancelled",
+      "summary": "Annulé",
+      "start": {"dateTime": "2026-03-10T10:00:00+01:00", "timeZone": "Europe/Paris"}
+    }
+  ]
+}
