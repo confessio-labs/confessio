@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-07
+
+### Changed
+
+- Date filter rail: tapping the already-selected day chip now clears the
+  filter back to "Toutes les dates".
+- Results sheet heading now reflects the selected date ("Horaires de
+  confession aujourd'hui" / "demain" / "mardi 4 août") instead of the fixed
+  "proches de vous"; falls back to "Horaires de confession" when no date is
+  selected.
+- Map marker pins for confessions 7+ days out now show a numeric date
+  ("02/09") instead of a month name ("2 septembre") for clarity.
+
 ## [1.0.0] - 2026-07-03
 
 ### Added

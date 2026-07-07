@@ -73,7 +73,7 @@ const DateFilterRail = () => {
               ref={active ? activeRef : undefined}
               type="button"
               aria-pressed={active}
-              onClick={() => setDate(new Date(key))}
+              onClick={() => setDate(active ? null : new Date(key))}
               className={chipClass(active)}
             >
               {i === 0 ? (

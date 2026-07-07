@@ -130,7 +130,7 @@ export const getFrenchTimeString = (dateString: string) => {
  *   - today: the time
  *   - tomorrow: "Demain"
  *   - 2–6 days: the French weekday + day (e.g. "Sam. 15")
- *   - 7+ days: the date (e.g. "14 juil.")
+ *   - 7+ days: the date as DD/MM (e.g. "02/09")
  * Returns null when there is no upcoming confession.
  */
 export const getChurchMarkerLabel = (
@@ -159,10 +159,9 @@ export const getChurchMarkerLabel = (
     });
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
-  return eventDate.toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-  });
+  const dd = String(eventDate.getDate()).padStart(2, "0");
+  const mm = String(eventDate.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
 };
 
 /**
