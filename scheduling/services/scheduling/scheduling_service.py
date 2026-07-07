@@ -48,7 +48,10 @@ def get_scheduling_sources(scheduling: Scheduling | None) -> SchedulingSources:
         parsing_history_id = pruning_parsing.parsing_history_id
         historical_parsing = Parsing.history.get(history_id=parsing_history_id)
         parsing = historical_parsing.instance
-        all_parsings.append(parsing)
+        # A parsing can be linked to several prunings; keep it once so downstream consumers
+        # (source numbering, category source lists, schedule extraction) don't see duplicates.
+        if parsing not in all_parsings:
+            all_parsings.append(parsing)
 
     all_oclocher_locations = []
     for scheduling_oclocher_location in scheduling.historical_oclocher_locations.all():
