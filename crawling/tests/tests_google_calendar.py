@@ -3,7 +3,7 @@ import os
 import unittest
 from datetime import date
 
-from crawling.workflows.crawl.extract_widgets import detect_google_calendar_urls
+from crawling.workflows.crawl.extract_widgets import detect_google_calendar_urls, parse_html
 from crawling.workflows.download.google_calendar import is_google_calendar_url, \
     get_calendar_src_ids, render_events_to_html
 
@@ -43,18 +43,18 @@ class TestGoogleCalendar(unittest.TestCase):
             <a href="{EMBED_URL}">Voir l'agenda</a>
             <a href="https://www.facebook.com/page">Facebook</a>
         </body></html>'''
-        self.assertEqual(detect_google_calendar_urls(html), {EMBED_URL})
+        self.assertEqual(detect_google_calendar_urls(parse_html(html)), {EMBED_URL})
 
     def test_detect_google_calendar_urls_none(self):
         html = '<html><body><a href="/horaires">Horaires</a></body></html>'
-        self.assertEqual(detect_google_calendar_urls(html), set())
+        self.assertEqual(detect_google_calendar_urls(parse_html(html)), set())
 
     def test_detect_google_calendar_urls_malformed_href(self):
         # A malformed href on the page must not crash the whole crawl.
         html = ('<html><body>'
                 '<a href="http://[saint-du-jour date=false messe=true texte=true]">x</a>'
                 '</body></html>')
-        self.assertEqual(detect_google_calendar_urls(html), set())
+        self.assertEqual(detect_google_calendar_urls(parse_html(html)), set())
 
     def test_render_events_to_html(self):
         tests_dir = os.path.dirname(os.path.realpath(__file__))

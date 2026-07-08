@@ -17,13 +17,15 @@ class ContactWidget(BaseModel, frozen=True):
 BaseWidget = OClocherWidget | ContactWidget
 
 
-def extract_oclocher_widgets(html: str) -> list[OClocherWidget]:
+def parse_html(html: str) -> BeautifulSoup | None:
     try:
-        soup = BeautifulSoup(html, 'html.parser')
+        return BeautifulSoup(html, 'html.parser')
     except Exception as e:
         print(e)
-        return []
+        return None
 
+
+def extract_oclocher_widgets(soup: BeautifulSoup) -> list[OClocherWidget]:
     widgets = []
 
     for iframes in soup.find_all('iframe'):
@@ -40,13 +42,7 @@ def extract_oclocher_widgets(html: str) -> list[OClocherWidget]:
     return widgets
 
 
-def extract_contact_widgets(html: str) -> list[ContactWidget]:
-    try:
-        soup = BeautifulSoup(html, 'html.parser')
-    except Exception as e:
-        print(e)
-        return []
-
+def extract_contact_widgets(soup: BeautifulSoup) -> list[ContactWidget]:
     widgets = []
 
     # look for mailto links in the page and extract the email addresses
@@ -66,18 +62,12 @@ def extract_contact_widgets(html: str) -> list[ContactWidget]:
     return list(set(widgets))  # remove duplicates
 
 
-def extract_widgets(html: str) -> list[BaseWidget]:
-    return extract_oclocher_widgets(html) + extract_contact_widgets(html)
+def extract_widgets(soup: BeautifulSoup) -> list[BaseWidget]:
+    return extract_oclocher_widgets(soup) + extract_contact_widgets(soup)
 
 
-def detect_google_calendar_urls(html: str) -> set[str]:
+def detect_google_calendar_urls(soup: BeautifulSoup) -> set[str]:
     """Find embedded public Google Calendar URLs (cross-domain <iframe>/<a>) on a page."""
-    try:
-        soup = BeautifulSoup(html, 'html.parser')
-    except Exception as e:
-        print(e)
-        return set()
-
     urls = set()
     for iframe in soup.find_all('iframe'):
         src = iframe.get('src')
