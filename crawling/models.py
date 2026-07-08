@@ -2,11 +2,12 @@ from django.db import models
 from simple_history.models import HistoricalRecords
 
 from core.models.base_models import TimeStampMixin
+from crawling.utils.url_utils import MAX_URL_LENGTH
 from registry.models import ModerationMixin
 
 
 class Scraping(TimeStampMixin):
-    url = models.URLField(max_length=300)
+    url = models.URLField(max_length=MAX_URL_LENGTH)
     website = models.ForeignKey('registry.Website', on_delete=models.CASCADE,
                                 related_name='scrapings')
     prunings = models.ManyToManyField('scheduling.Pruning', related_name='scrapings')
@@ -20,7 +21,7 @@ class Scraping(TimeStampMixin):
 class WebsiteForbiddenPath(TimeStampMixin):
     website = models.ForeignKey('registry.Website', on_delete=models.CASCADE,
                                 related_name='forbidden_paths')
-    path = models.CharField(max_length=300)
+    path = models.CharField(max_length=MAX_URL_LENGTH)
 
     class Meta:
         unique_together = ('website', 'path')

@@ -9,7 +9,7 @@ from crawling.workflows.download.download_content import get_url_redirection
 from scheduling.utils.string_search import has_any_of_words
 from crawling.utils.string_utils import remove_unsafe_chars
 from crawling.utils.url_utils import is_internal_link, get_clean_full_url, \
-    replace_scheme_and_hostname, get_path
+    replace_scheme_and_hostname, get_path, MAX_URL_LENGTH
 
 CONFESSIONS_OR_SCHEDULES_MENTIONS = [
     'confession',
@@ -209,7 +209,7 @@ def get_links(element: el, home_url: str, aliases_domains: set[str],
         full_url = get_clean_full_url(full_url, keep_trailing_slash=True)
         url_parsed = urlparse(full_url)
 
-        if len(full_url) > 300:
+        if len(full_url) > MAX_URL_LENGTH:
             # We ignore links that are too long
             continue
 

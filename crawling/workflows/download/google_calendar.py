@@ -8,7 +8,7 @@ import httpx
 from icalendar.prop import vRecur
 
 from core.utils.log_utils import info
-from crawling.utils.url_utils import get_domain
+from crawling.utils.url_utils import get_domain, MAX_URL_LENGTH
 
 GOOGLE_CALENDAR_HOST = 'calendar.google.com'
 
@@ -47,6 +47,9 @@ FRENCH_MONTHS = [
 ############
 
 def is_google_calendar_url(url: str) -> bool:
+    if len(url) > MAX_URL_LENGTH:
+        return False
+
     # Raw hrefs/iframe srcs from arbitrary pages can be malformed (e.g. a bracketed WordPress
     # shortcode), and urlparse raises ValueError on those. Treat anything unparseable as "not a
     # calendar" — mirrors the guard in get_links (extract_links.py).

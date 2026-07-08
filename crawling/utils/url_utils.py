@@ -3,6 +3,9 @@ from urllib.parse import urlparse, ParseResult
 from crawling.utils.string_utils import remove_unsafe_chars
 
 
+MAX_URL_LENGTH = 512
+
+
 def get_domain(url):
     url_parsed = urlparse(url)
 
