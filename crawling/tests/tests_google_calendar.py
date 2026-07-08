@@ -20,6 +20,11 @@ class TestGoogleCalendar(unittest.TestCase):
         self.assertFalse(is_google_calendar_url('https://www.paroisse-biarritz.fr/'))
         self.assertFalse(is_google_calendar_url('https://www.google.com/calendar'))
 
+    def test_is_google_calendar_url_malformed(self):
+        # urlparse raises ValueError on a bracketed-but-invalid netloc; must not crawl-crash.
+        self.assertFalse(
+            is_google_calendar_url('http://[saint-du-jour date=false messe=true texte=true]'))
+
     def test_get_calendar_src_ids(self):
         self.assertEqual(get_calendar_src_ids(EMBED_URL), ['notredamedurocher@gmail.com'])
 
@@ -42,6 +47,13 @@ class TestGoogleCalendar(unittest.TestCase):
 
     def test_detect_google_calendar_urls_none(self):
         html = '<html><body><a href="/horaires">Horaires</a></body></html>'
+        self.assertEqual(detect_google_calendar_urls(html), set())
+
+    def test_detect_google_calendar_urls_malformed_href(self):
+        # A malformed href on the page must not crash the whole crawl.
+        html = ('<html><body>'
+                '<a href="http://[saint-du-jour date=false messe=true texte=true]">x</a>'
+                '</body></html>')
         self.assertEqual(detect_google_calendar_urls(html), set())
 
     def test_render_events_to_html(self):

@@ -47,7 +47,13 @@ FRENCH_MONTHS = [
 ############
 
 def is_google_calendar_url(url: str) -> bool:
-    return get_domain(url) == GOOGLE_CALENDAR_HOST
+    # Raw hrefs/iframe srcs from arbitrary pages can be malformed (e.g. a bracketed WordPress
+    # shortcode), and urlparse raises ValueError on those. Treat anything unparseable as "not a
+    # calendar" — mirrors the guard in get_links (extract_links.py).
+    try:
+        return get_domain(url) == GOOGLE_CALENDAR_HOST
+    except ValueError:
+        return False
 
 
 def get_calendar_src_ids(url: str) -> list[str]:
