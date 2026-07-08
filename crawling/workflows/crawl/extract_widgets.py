@@ -25,12 +25,6 @@ def parse_html(html: str) -> BeautifulSoup | None:
         return None
 
 
-def _as_soup(html_or_soup: str | BeautifulSoup) -> BeautifulSoup | None:
-    if isinstance(html_or_soup, BeautifulSoup):
-        return html_or_soup
-    return parse_html(html_or_soup)
-
-
 def extract_oclocher_widgets(soup: BeautifulSoup) -> list[OClocherWidget]:
     widgets = []
 
@@ -68,19 +62,12 @@ def extract_contact_widgets(soup: BeautifulSoup) -> list[ContactWidget]:
     return list(set(widgets))  # remove duplicates
 
 
-def extract_widgets(html_or_soup: str | BeautifulSoup) -> list[BaseWidget]:
-    soup = _as_soup(html_or_soup)
-    if soup is None:
-        return []
+def extract_widgets(soup: BeautifulSoup) -> list[BaseWidget]:
     return extract_oclocher_widgets(soup) + extract_contact_widgets(soup)
 
 
-def detect_google_calendar_urls(html_or_soup: str | BeautifulSoup) -> set[str]:
+def detect_google_calendar_urls(soup: BeautifulSoup) -> set[str]:
     """Find embedded public Google Calendar URLs (cross-domain <iframe>/<a>) on a page."""
-    soup = _as_soup(html_or_soup)
-    if soup is None:
-        return set()
-
     urls = set()
     for iframe in soup.find_all('iframe'):
         src = iframe.get('src')

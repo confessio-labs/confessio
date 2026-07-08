@@ -4,7 +4,7 @@ import unittest
 
 from pydantic import TypeAdapter
 
-from crawling.workflows.crawl.extract_widgets import BaseWidget, extract_widgets
+from crawling.workflows.crawl.extract_widgets import BaseWidget, extract_widgets, parse_html
 
 
 class TestExtractLinks(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestExtractLinks(unittest.TestCase):
                     expected_result = [TypeAdapter(BaseWidget).validate_python(w)
                                        for w in json.load(f)]
                 content = ''.join(lines)
-                result = extract_widgets(content)
+                result = extract_widgets(parse_html(content))
                 # print(json.dumps(list(result), indent=2))
                 self.assertListEqual(result, expected_result, f'Failed for {file_name}')
 
