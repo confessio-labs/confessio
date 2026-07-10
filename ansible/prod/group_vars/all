@@ -125,3 +125,5 @@ front_site_url: "https://{{ server_host }}"
 # Front secrets (provided via the local .env that prod.sh sources)
 map_tiler_api_key: "{{ lookup('ansible.builtin.env', 'NEXT_PUBLIC_MAP_TILER_API_KEY') }}"
 cron_secret: "{{ lookup('ansible.builtin.env', 'CRON_SECRET') }}"
+posthog_project_token: "{{ lookup('ansible.builtin.env', 'NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN') }}"
+posthog_host: "{{ lookup('ansible.builtin.env', 'NEXT_PUBLIC_POSTHOG_HOST') }}"
