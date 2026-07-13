@@ -43,6 +43,7 @@ CONFESSIONS_OR_SCHEDULES_MENTIONS = [
     'celebrations',
     'feuille',
     'annonces',
+    'actualites',
 ]
 
 IGNORED_EXTENSIONS = [
