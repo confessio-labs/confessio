@@ -40,6 +40,7 @@ CONFESSIONS_OR_SCHEDULES_MENTIONS = [
     'demarche',
     'demarches',
     'agenda',
+    'celebrations',
     'feuille',
     'annonces',
 ]
