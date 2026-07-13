@@ -14,6 +14,7 @@ import {
   BuildingsIcon,
   ChurchIcon,
   CircleNotchIcon,
+  ListIcon,
   UsersIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -93,10 +94,8 @@ export const SearchInput = ({
     [setSearchQuery, pathname, router],
   );
 
-  const filteredData = data.filter((item) => item.type !== "parish");
-
   const selectFirstResult = useCallback(() => {
-    const first = filteredData[0];
+    const first = data[0];
     if (!first) return;
     if (first.type === "church" && first.uuid) {
       inputRef.current?.blur();
@@ -108,7 +107,7 @@ export const SearchInput = ({
     } else {
       onClick(first)();
     }
-  }, [filteredData, router, onClick]);
+  }, [data, router, onClick]);
 
   const hasResults = searchQuery.length > 0 && (data.length > 0 || isLoading);
 
@@ -124,7 +123,7 @@ export const SearchInput = ({
       >
         <div
           className={clsx([
-            "p-2 bg-white gap-2 rounded-full text-deepblue flex relative z-10 border border-hairline transition-shadow",
+            "h-11 px-2 bg-white gap-2 rounded-full text-deepblue flex items-center relative z-10 border border-hairline transition-shadow",
             !isFocused && "shadow-[0_4px_14px_-4px_rgba(36,46,76,0.14)]",
             isFocused && "shadow-none md:shadow-[0_0_0_3px_rgba(0,92,223,0.18),0_8px_24px_-8px_rgba(36,46,76,0.18)]",
           ])}
@@ -133,25 +132,19 @@ export const SearchInput = ({
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={closeSearch}
-              className="cursor-pointer"
+              className="cursor-pointer self-center shrink-0 flex items-center justify-center size-8"
             >
               <ArrowLeftIcon size={24} />
             </button>
           ) : (
-            <button
-              onClick={() => {
-                setIsNavigationModalOpen(true);
-                posthog.capture("navigation_modal_opened");
-              }}
-              className="cursor-pointer"
-            >
+            <div className="self-center shrink-0 flex items-center justify-center size-8">
               <Image
                 src="/confessioLogoBlue.svg"
                 alt="Logo de Confessio"
                 width={24}
                 height={24}
               />
-            </button>
+            </div>
           )}
           <input
             ref={inputRef}
@@ -171,28 +164,40 @@ export const SearchInput = ({
             }}
             onBlur={() => setIsFocused(false)}
             // Keep mobile font-size >= 16px: iOS Safari force-zooms into inputs below 16px. Do not lower.
-            className="outline-none flex-1 bg-transparent text-deepblue placeholder:text-deepblue/45 text-[16px] md:text-[15px]"
+            className="outline-none flex-1 self-stretch bg-transparent text-deepblue placeholder:text-deepblue/45 text-[16px] md:text-[15px]"
           />
           {isLoading && (
-            <CircleNotchIcon
-              size={18}
-              className="animate-spin self-center shrink-0"
-            />
+            <div className="self-center shrink-0 flex items-center justify-center size-8">
+              <CircleNotchIcon size={18} className="animate-spin" />
+            </div>
           )}
-          {searchQuery.length > 0 && (
+          {isFocused && searchQuery.length > 0 && !isLoading && (
             <button
               onClick={() => {
                 setSearchQuery("");
                 setIsFocused(false);
                 inputRef.current?.blur();
               }}
-              className="cursor-pointer"
+              className="cursor-pointer self-center shrink-0 flex items-center justify-center size-8"
               aria-label="Clear search"
               title="Clear search"
               onMouseDown={(e) => e.preventDefault()}
               onMouseUp={(e) => e.preventDefault()}
             >
               <XIcon size={18} />
+            </button>
+          )}
+          {!isFocused && (
+            <button
+              onClick={() => {
+                setIsNavigationModalOpen(true);
+                posthog.capture("navigation_modal_opened");
+              }}
+              className="cursor-pointer self-center shrink-0 flex items-center justify-center size-8 rounded-full border border-hairline bg-paper text-deepblue transition-colors hover:bg-hairline active:bg-hairline"
+              aria-label="Ouvrir le menu"
+              title="Menu"
+            >
+              <ListIcon size={18} />
             </button>
           )}
         </div>
@@ -215,7 +220,7 @@ export const SearchInput = ({
             </li>
           )}
           {isFocused &&
-            filteredData.map((item, index) => {
+            data.map((item, index) => {
               const ItemIcon = mapItemTypeToIcon[item.type] ?? BuildingsIcon;
               const inner = (
                 <>
