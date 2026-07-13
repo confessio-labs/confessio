@@ -8,6 +8,12 @@ from registry.utils.annuairecatholique_utils import AnnuaireCatholiquePlace, fet
 from registry.utils.geo_utils import get_geo_distance
 
 
+# Above this distance (m), an annuairecatholique position differs so wildly from the church's
+# current one that it almost certainly means a wrong place-match, not a real correction — keep
+# staging those for human review instead of auto-applying.
+MAX_AUTO_APPLY_METERS = 20_000
+
+
 def add_church_moderation_if_not_exists(church_moderation: ChurchModeration):
     try:
         ChurchModeration.objects.get(
@@ -71,9 +77,12 @@ def sync_annuairecatholique_location_and_city(church: Church, place: AnnuaireCat
         ],
     ).exclude(status=ModerationStatus.VALIDATED).delete()
 
-    location_far = church.location is not None \
-        and get_geo_distance(church.location, new_point) > 1000
-    if church_location_has_been_checked_by_human(church) or location_far:
+    # Auto-apply the well-sourced annuairecatholique position when a human has never curated this
+    # church's location. Keep staging for review when a human HAS curated it, or when the move is
+    # so large it signals a bad place-match rather than a real correction.
+    location_implausible = church.location is not None \
+        and get_geo_distance(church.location, new_point) > MAX_AUTO_APPLY_METERS
+    if church_location_has_been_checked_by_human(church) or location_implausible:
         add_church_moderation_if_not_exists(
             ChurchModeration(
                 church=church,
@@ -88,6 +97,14 @@ def sync_annuairecatholique_location_and_city(church: Church, place: AnnuaireCat
             )
         )
         return True
+
+    # Applying the correction resolves any un-validated annuairecatholique LOCATION_DIFFERS staged
+    # earlier under the old 1 km guard, so it shouldn't linger as an orphan to_validate row.
+    ChurchModeration.objects.filter(
+        church=church,
+        category=ChurchModeration.Category.LOCATION_DIFFERS,
+        source=ExternalSource.ANNUAIRECATHOLIQUE,
+    ).exclude(status=ModerationStatus.VALIDATED).delete()
 
     church.location = new_point
     church.city = new_city  # do NOT touch church.address / church.zipcode
