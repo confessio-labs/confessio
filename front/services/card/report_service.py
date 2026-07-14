@@ -1,4 +1,5 @@
 from django.http import HttpResponse, HttpResponseBadRequest, HttpRequest
+from django.urls import reverse
 
 from core.utils.discord_utils import send_discord_alert, DiscordChanel
 from front.models import Report, ReportModeration
@@ -31,7 +32,12 @@ def save_report(request: HttpRequest, report: Report):
     if not user:
         add_necessary_moderation_for_report(report)
 
+        website_url = request.build_absolute_uri(
+            reverse('website_view', kwargs={'website_uuid': report.website.uuid})
+        )
+
         email_body = (f"New report on website {report.website.name}\n"
+                      f"url: {website_url}\n"
                       f"feedback_type: {report.feedback_type}\n"
                       f"error_type: {report.error_type}\n\ncomment:\n{report.comment}")
         subject = f'New report on confessio for {report.website.name}'
