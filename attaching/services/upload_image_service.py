@@ -14,6 +14,8 @@ from front.utils.web_utils import get_user_user_agent_and_ip
 
 IMAGE_SIZE_LIMIT = 10 * 1024 * 1024  # 10MB limit for uploaded images
 MAX_IMAGES_IN_30_DAYS = 2000  # Maximum number of images allowed in the last 30 days
+ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
+ALLOWED_IMAGE_MIME_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 
 
 def find_error_in_document_to_upload(document) -> str | None:
@@ -24,6 +26,19 @@ def find_error_in_document_to_upload(document) -> str | None:
     # Validate file size
     if document.size > IMAGE_SIZE_LIMIT:
         return "Le fichier ne doit pas dépasser 10 Mo."
+
+    # Validate image format (OpenAI only accepts jpeg/png/webp/gif). The extension is the
+    # primary gate; the browser-reported content type is only enforced when it declares a
+    # specific type (a generic/empty one, e.g. application/octet-stream, is treated as unknown
+    # so we don't falsely reject a valid image).
+    name = document.name or ''
+    extension = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+    content_type = (document.content_type or '').lower()
+    mime_declared = content_type not in ('', 'application/octet-stream')
+    if extension not in ALLOWED_IMAGE_EXTENSIONS or (
+            mime_declared and content_type not in ALLOWED_IMAGE_MIME_TYPES):
+        return ("Format d'image non supporté. "
+                "Merci d'utiliser une image au format JPG, PNG ou WEBP.")
 
     return None
 

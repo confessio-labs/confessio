@@ -3,9 +3,9 @@ from enum import Enum
 from typing import Literal
 from uuid import UUID
 
-from django.core.exceptions import BadRequest
 from django.http import Http404
 from ninja import NinjaAPI, Schema, File, Form
+from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
 from attaching.public_service import attaching_get_image_public_url, \
@@ -545,12 +545,12 @@ def api_front_post_images(request,
 
     validation_error = attaching_find_error_in_document_to_upload(document)
     if validation_error:
-        raise BadRequest(validation_error)
+        raise HttpError(400, validation_error)
 
     image, error_message = attaching_upload_image(document, website, request,
                                                   comment=comment)
     if image is None:
-        raise BadRequest(error_message or 'Upload failed')
+        raise HttpError(400, error_message or 'Upload failed')
 
     attaching_recognize_and_extract_image(image)
 
