@@ -18,7 +18,7 @@ from httpx import RequestError
 
 from front.utils.department_utils import get_departments_context
 from front.utils.distance_utils import distance
-from registry.models import Parish, Church
+from registry.models import Parish, Church, Website
 from registry.utils.string_utils import get_string_similarity
 from scheduling.utils.string_search import unhyphen_content, normalize_content
 
@@ -71,6 +71,44 @@ class AutocompleteResult:
             latitude=latitude,
             longitude=longitude,
             uuid=parish.uuid,
+        )
+
+    @classmethod
+    def from_website(cls, website: Website) -> 'AutocompleteResult':
+        # TODO save context in website, and create a command to fill it
+
+        longitudes = []
+        latitudes = []
+        cities = set()
+        zipcodes = set()
+        for parish in website.parishes.all():
+            for church in parish.churches.all():
+                longitudes.append(church.location.x)
+                latitudes.append(church.location.y)
+                if church.city:
+                    cities.add(church.city)
+                if church.zipcode:
+                    zipcodes.add(church.zipcode)
+        latitude = longitude = None
+        if latitudes and longitudes:
+            latitude = mean(latitudes)
+            longitude = mean(longitudes)
+
+        if len(zipcodes) == 0:
+            context = None
+        elif len(cities) == 1 and len(zipcodes) == 1:
+            context = f'{zipcodes.pop()} {cities.pop()}'
+        else:
+            context = get_departments_context(zipcodes)
+
+        return AutocompleteResult(
+            type='parish',
+            name=website.name,
+            context=context,
+            url=reverse('website_view', kwargs={'website_uuid': website.uuid}),
+            latitude=latitude,
+            longitude=longitude,
+            uuid=website.uuid,
         )
 
     @classmethod
@@ -177,6 +215,29 @@ async def get_parish_by_name_response(query, latitude: float | None,
     return [AutocompleteResult.from_parish(parish) async for parish in parishes]
 
 
+async def get_website_by_name_response(query, latitude: float | None,
+                                       longitude: float | None) -> list[AutocompleteResult]:
+    query_term = unhyphen_content(normalize_content(query))
+    websites = Website.objects.prefetch_related('parishes__churches').annotate(
+        search_name=Replace(Unaccent(Lower('name')), Value('-'), Value(' '))
+    ).filter(is_active=True, search_name__contains=query_term) \
+        .only("name",
+              "uuid",
+              )
+
+    if latitude is not None and longitude is not None:
+        user_location = Point(longitude, latitude, srid=4326)
+        websites = websites.annotate(
+            centroid=Centroid(Collect('parishes__churches__location')),
+        ).annotate(
+            distance=Distance('centroid', user_location),
+        ).order_by(F('distance').asc(nulls_last=True))
+
+    websites = websites[:MAX_AUTOCOMPLETE_RESULTS]
+
+    return [AutocompleteResult.from_website(website) async for website in websites]
+
+
 async def get_church_by_name_response(query, latitude: float | None,
                                       longitude: float | None) -> list[AutocompleteResult]:
     query_term = unhyphen_content(normalize_content(query))
@@ -227,14 +288,23 @@ def sort_results(query, latitude: float | None, longitude: float | None,
 
 async def get_aggregated_response(query, latitude: float | None, longitude: float | None
                                   ) -> list[AutocompleteResult]:
-    data_gouv_results, parish_by_name_results, church_by_name_results = await asyncio.gather(
-        get_data_gouv_response(query, latitude, longitude),
-        get_parish_by_name_response(query, latitude, longitude),
-        get_church_by_name_response(query, latitude, longitude),
-    )
+    data_gouv_results, website_by_name_results, parish_by_name_results, church_by_name_results = \
+        await asyncio.gather(
+            get_data_gouv_response(query, latitude, longitude),
+            get_website_by_name_response(query, latitude, longitude),
+            get_parish_by_name_response(query, latitude, longitude),
+            get_church_by_name_response(query, latitude, longitude),
+        )
 
     sorted_results = sort_results(
         query, latitude, longitude,
-        data_gouv_results + parish_by_name_results + church_by_name_results)
+        data_gouv_results + website_by_name_results
+        + parish_by_name_results + church_by_name_results)
 
-    return sorted_results[:MAX_AUTOCOMPLETE_RESULTS]
+    seen_urls = set()
+    unique_results = [
+        r for r in sorted_results
+        if r.url not in seen_urls and not seen_urls.add(r.url)
+    ]
+
+    return unique_results[:MAX_AUTOCOMPLETE_RESULTS]
