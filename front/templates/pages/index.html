@@ -308,6 +308,9 @@
                                     <span class="fw-bold text-success">{{ report.user.first_name }} <i class="fas fa-user-check"></i></span>
                                     {% endif %}
                                     <small>le {{ report.created_at|date:"d M Y" }}</small>
+                                    {% if report.church and request.user.is_authenticated and request.user.is_staff %}
+                                        <small class="text-muted">- {{ report.church.name }}</small>
+                                    {% endif %}
                                     <div>{{ report.comment|urlize|linebreaksbr }}</div>
                                     {% if request.user.is_authenticated and request.user.is_staff %}
                                         <a class="text-muted" href="{% url 'admin:front_report_change' report.uuid %}" target="_blank">

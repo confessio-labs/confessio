@@ -38,7 +38,8 @@ def save_report(request: HttpRequest, report: Report):
 
         email_body = (f"New report on website {report.website.name}\n"
                       f"url: {website_url}\n"
-                      f"feedback_type: {report.feedback_type}\n"
+                      + (f"church: {report.church.name}\n" if report.church else "")
+                      + f"feedback_type: {report.feedback_type}\n"
                       f"error_type: {report.error_type}\n\ncomment:\n{report.comment}")
         subject = f'New report on confessio for {report.website.name}'
         send_email_to_admin(subject, email_body)

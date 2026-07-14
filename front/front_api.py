@@ -154,6 +154,7 @@ class ErrorTypeEnum(str, Enum):
 
 class ReportIn(Schema):
     website_uuid: UUID
+    church_uuid: UUID | None = None
     feedback_type: FeedbackTypeEnum
     error_type: ErrorTypeEnum | None = None
     comment: str | None = None
@@ -521,8 +522,16 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
     except Website.DoesNotExist:
         raise Http404(f'Website {report_in.website_uuid} does not exist')
 
+    church = None
+    if report_in.church_uuid:
+        try:
+            church = Church.objects.get(uuid=report_in.church_uuid)
+        except Church.DoesNotExist:
+            raise Http404(f'Church {report_in.church_uuid} does not exist')
+
     report = Report(
         website=website,
+        church=church,
         feedback_type=Report.FeedbackType(report_in.feedback_type),
         error_type=Report.ErrorType(report_in.error_type) if report_in.error_type else None,
         comment=report_in.comment,
