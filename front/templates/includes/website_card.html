@@ -98,6 +98,13 @@
                                             <button type="submit" class="btn btn-success">Valider</button>
                                         </form>
                                     </div>
+                                    <div class="d-inline-block">
+                                        <form method="post" action="{% url 'trigger_recrawl' website.uuid %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="btn btn-gray-400">Re-crawl</button>
+                                        </form>
+                                    </div>
                                 {% endif %}
                             </div>
                             <h3 class="col-md-4 text-md-end">
