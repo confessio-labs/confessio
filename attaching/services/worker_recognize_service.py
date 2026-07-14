@@ -23,11 +23,11 @@ def recognize_image(image: Image):
     prompt_hash = hash_string_to_hex(prompt)
     llm_provider = LLMProvider.OPENAI
     llm_model = get_llm_model()
-    llm_html, llm_error_details = get_html_from_image(get_image_public_url(image),
-                                                      prompt, llm_provider, llm_model)
+    llm_html, llm_error_detail = get_html_from_image(get_image_public_url(image),
+                                                     prompt, llm_provider, llm_model)
 
-    if llm_error_details:
-        image.llm_error_details = llm_error_details
+    if llm_error_detail:
+        image.llm_error_detail = llm_error_detail
     else:
         image.llm_html = llm_html
     image.prompt_hash = prompt_hash
