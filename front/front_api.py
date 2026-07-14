@@ -20,7 +20,7 @@ from front.services.search.aggregation_service import get_search_results
 from front.services.search.autocomplete_service import get_aggregated_response, AutocompleteResult
 from front.services.search.search_service import TimeFilter, AggregationItem, BoundingBox, \
     get_dioceses_bounding_box, get_churches_by_uuid, get_churches_by_diocese, \
-    get_popular_churches, SearchResult
+    get_popular_churches, SearchResult, DEFAULT_LIMIT
 from registry.models import Church, Website, Diocese
 from scheduling.models import IndexEvent
 from scheduling.public_model import SourcedScheduleItem, BaseSource, ParsingSource, OClocherSource
@@ -345,12 +345,14 @@ def api_front_search(request,
                      max_lat: float | None = None,
                      max_lng: float | None = None,
                      date_filter: date | None = None,
-                     hour_min: int = 0, hour_max: int = 24 * 60 - 1
+                     hour_min: int = 0, hour_max: int = 24 * 60 - 1,
+                     limit: int = DEFAULT_LIMIT,
                      ) -> SearchResultOut:
     time_filter = TimeFilter(
         day_filter=date_filter,
         hour_min=hour_min,
         hour_max=hour_max,
+        limit=limit,
     )
     search_result, aggregations = \
         get_search_results(latitude, longitude, min_lat, min_lng, max_lat, max_lng, time_filter)
@@ -366,11 +368,13 @@ def api_front_search_home(request,
                           max_lng: float,
                           date_filter: date | None = None,
                           hour_min: int = 0, hour_max: int = 24 * 60 - 1,
+                          limit: int = DEFAULT_LIMIT,
                           ) -> SearchResultOut:
     time_filter = TimeFilter(
         day_filter=date_filter,
         hour_min=hour_min,
         hour_max=hour_max,
+        limit=limit,
     )
     search_result = get_popular_churches(min_lat, min_lng, max_lat, max_lng, time_filter)
     aggregations = []
@@ -383,11 +387,13 @@ def api_front_search_diocese(request,
                              diocese_uuid: UUID,
                              date_filter: date | None = None,
                              hour_min: int = 0, hour_max: int = 24 * 60 - 1,
+                             limit: int = DEFAULT_LIMIT,
                              ) -> SearchResultOut:
     time_filter = TimeFilter(
         day_filter=date_filter,
         hour_min=hour_min,
         hour_max=hour_max,
+        limit=limit,
     )
     try:
         diocese = Diocese.objects.get(uuid=diocese_uuid)
@@ -405,11 +411,13 @@ def api_front_church_details(request, church_uuid: UUID,
                              date_filter: date | None = None,
                              hour_min: int = 0,
                              hour_max: int = 24 * 60 - 1,
+                             limit: int = DEFAULT_LIMIT,
                              ) -> ChurchDetails:
     time_filter = TimeFilter(
         day_filter=date_filter,
         hour_min=hour_min,
         hour_max=hour_max,
+        limit=limit,
     )
 
     search_result = get_churches_by_uuid(church_uuid, time_filter)

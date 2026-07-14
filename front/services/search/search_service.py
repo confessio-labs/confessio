@@ -16,7 +16,7 @@ from registry.models import Church, Website, Diocese
 from scheduling.models import IndexEvent
 from scheduling.utils.date_utils import time_from_minutes
 
-MAX_CHURCHES_IN_RESULTS = 40
+DEFAULT_LIMIT = 40
 MAX_WEBSITES_IN_RESULTS = 10
 DEFAULT_SEARCH_BOX = [41.787, 51.754, -9.162, 15.183]  # min_lat, max_lat, min_lng, max_lng
 
@@ -30,6 +30,7 @@ class TimeFilter(BaseModel):
     hour_min: int | None
     hour_max: int | None
     legacy_search: bool = False
+    limit: int = DEFAULT_LIMIT
 
     def is_null(self):
         return self.day_filter is None \
@@ -115,7 +116,7 @@ def add_event_filters(event_query: QuerySet[IndexEvent],
 def truncate_results(church_query: QuerySet[Church],
                      time_filter: TimeFilter
                      ) -> SearchResult:
-    churches = list(church_query.all()[:MAX_CHURCHES_IN_RESULTS])
+    churches = list(church_query.all()[:time_filter.limit])
 
     if not time_filter.legacy_search:
         church_by_uuid = {church.uuid: church for church in churches}
@@ -156,7 +157,7 @@ def truncate_results(church_query: QuerySet[Church],
     return SearchResult(
         index_events=events,
         churches=churches,
-        too_many_results=all_churches_have_events and len(churches) == MAX_CHURCHES_IN_RESULTS,
+        too_many_results=all_churches_have_events and len(churches) == time_filter.limit,
         events_truncated_by_website_uuid=events_truncated_by_website_uuid
     )
 
