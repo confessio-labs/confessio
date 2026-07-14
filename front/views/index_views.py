@@ -254,7 +254,8 @@ def index(request, diocese_slug=None, website_uuid: str = None, is_around_me: bo
             except NewReportError as e:
                 return e.response
 
-        search_result = get_churches_by_website(website, time_filter)
+        search_result = get_churches_by_website(website,
+                                                time_filter.model_copy(update={'limit': 80}))
 
         if len(search_result.churches) == 0:
             website_churches = [church for p in website.parishes.all()
