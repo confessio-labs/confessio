@@ -9,6 +9,7 @@ import os
 from dataclasses import dataclass
 
 from asgiref.sync import sync_to_async
+from openai import AsyncOpenAI
 from pydantic_ai import Agent, DeferredToolRequests, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -87,7 +88,16 @@ def build_provider_and_model() -> tuple[OpenAIProvider, OpenAIChatModel]:
     api_key = os.getenv('OPENAI_API_KEY_COPILOT')
     if not api_key:
         raise RuntimeError('OPENAI_API_KEY_COPILOT is not set')
-    provider = OpenAIProvider(api_key=api_key)
+    # Use a DEDICATED AsyncOpenAI client per turn. If we let OpenAIProvider build the client
+    # (OpenAIProvider(api_key=...)), it reuses pydantic-ai's process-global cached httpx client
+    # (cached_async_http_client('openai')). run_and_close() then closes that SHARED client at the
+    # end of every turn, so with concurrent copilot turns (BACKGROUND_TASK_ASYNC_THREADS) one turn
+    # finishing would close the client out from under another turn mid-request — surfacing as
+    # "Cannot send a request, as the client has been closed" / APIConnectionError. A dedicated
+    # client is scoped to this turn, so run_and_close only ever closes its own. Defaults (600s read
+    # timeout, max_retries=2) are inherited from the SDK.
+    client = AsyncOpenAI(api_key=api_key)
+    provider = OpenAIProvider(openai_client=client)
     return provider, OpenAIChatModel(COPILOT_MODEL, provider=provider)
 
 
