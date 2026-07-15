@@ -42,9 +42,9 @@ def compute_church_coordinates(
         church.location = Point(longitude, latitude)
         if not church.address:
             church.address = result.address
-        if not church.zipcode:
+        if not church.zipcode and result.zipcode:
             church.zipcode = result.zipcode
-        if not church.city:
+        if not church.city and result.city:
             church.city = result.city
 
     church_with_same_location = get_church_with_same_location(church)

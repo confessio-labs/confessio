@@ -104,6 +104,11 @@ def get_parishes_and_churches(messesinfo_network_id: str,
                     continue
                 parish_by_community_id[messesinfo_community_id] = parish
 
+            if not church_data['city'] or not church_data['zipcode']:
+                print(f'no city or zipcode for church {church_messesinfo_id}, '
+                      f'ignoring this church')
+                continue
+
             church = Church(
                 name=church_data['name'],
                 location=Point(church_data['longitude'], church_data['latitude']),

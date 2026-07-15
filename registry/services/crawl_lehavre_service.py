@@ -132,6 +132,11 @@ def get_churches_on_lehavre(page: int):
         parish = get_parish(parish_data, website, diocese)
 
         for church_data in parish_data.churches:
+            if not church_data.city or not church_data.zipcode:
+                print(f'no city or zipcode for church {church_data.name}, '
+                      f'ignoring this church')
+                continue
+
             church = Church(
                 name=church_data.name,
                 address=church_data.address,

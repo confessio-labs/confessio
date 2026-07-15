@@ -88,8 +88,10 @@ def sync_trouverunemesse_location_and_name(church: Church,
         else:
             church.location = trouverunemesse_point
             church.address = trouverunemesse_church.street
-            church.zipcode = trouverunemesse_church.code_postal
-            church.city = trouverunemesse_church.commune
+            if trouverunemesse_church.code_postal:
+                church.zipcode = trouverunemesse_church.code_postal
+            if trouverunemesse_church.commune:
+                church.city = trouverunemesse_church.commune
             church.save()
             location_moderation_added = False
 
