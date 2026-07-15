@@ -1,7 +1,7 @@
 """(De)serialize the PydanticAI message history to/from the JSON stored on
 CopilotDiscussion.pydantic_messages."""
-from pydantic_ai.messages import (ModelMessage, ModelMessagesTypeAdapter, RetryPromptPart,
-                                  ToolCallPart, ToolReturnPart)
+from pydantic_ai.messages import (ModelMessage, ModelMessagesTypeAdapter, ModelResponse,
+                                  RetryPromptPart, ToolCallPart, ToolReturnPart, UserPromptPart)
 from pydantic_core import to_jsonable_python
 
 from crawling.utils.string_utils import strip_null_bytes
@@ -21,6 +21,36 @@ def load_messages(raw: list | None) -> list[ModelMessage]:
     if not raw:
         return []
     return ModelMessagesTypeAdapter.validate_python(raw)
+
+
+def latest_user_prompt(messages: list[ModelMessage]) -> str | None:
+    """Content of the most recent user prompt in the history (None if there is none).
+
+    Used to make a turn re-run idempotent: if the preserved history already ends with this exact
+    prompt, the turn was partially run before (auto-retry / dead-task requeue), so we resume with
+    user_prompt=None instead of appending a duplicate user message.
+    """
+    for message in reversed(messages):
+        for part in message.parts:
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                return part.content
+    return None
+
+
+def is_resumable_history(messages: list[ModelMessage]) -> bool:
+    """Whether a (possibly partial) history can be resumed by a later agent run.
+
+    A crash during a model request leaves the history ending in a ModelRequest (user prompt or tool
+    returns) with no following ModelResponse — resumable. A crash *during tool execution* leaves a
+    trailing ModelResponse with unanswered tool calls, which PydanticAI refuses to resume — not
+    resumable, so we must not overwrite the last clean history with it.
+    """
+    if not messages:
+        return True
+    last = messages[-1]
+    if isinstance(last, ModelResponse):
+        return not any(isinstance(part, ToolCallPart) for part in last.parts)
+    return True
 
 
 def deferred_tool_call_ids(messages: list[ModelMessage]) -> set[str]:
