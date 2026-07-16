@@ -193,15 +193,20 @@ def filter_in_box(church_query: QuerySet[Church], min_lat, min_long, max_lat, ma
 ###########
 
 def get_churches_around(center, time_filter: TimeFilter,
+                        radius: float = 0.045  # 0.045 degrees is ~5km
                         ) -> SearchResult:
     latitude, longitude = center
     center_as_point = Point(x=longitude, y=latitude)
 
-    # 0.045 degrees is ~5km
     church_query = build_church_query(time_filter) \
-        .filter(location__dwithin=(center_as_point, 0.045)) \
+        .filter(location__dwithin=(center_as_point, radius)) \
         .annotate(distance=Distance('location', center_as_point)) \
         .order_by('distance')
+    if not church_query.exists():
+        print('try wider search')
+        return get_churches_around(center, time_filter,
+                                   0.16  # 0.16 degrees is ~18km
+                                   )
 
     return truncate_results(church_query, time_filter)
 
