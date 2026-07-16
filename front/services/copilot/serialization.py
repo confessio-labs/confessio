@@ -1,15 +1,10 @@
 """(De)serialize the PydanticAI message history to/from the JSON stored on
 CopilotDiscussion.pydantic_messages."""
-from pydantic_ai.messages import (ModelMessage, ModelMessagesTypeAdapter, ModelRequest,
-                                  ModelResponse, RetryPromptPart, TextPart, ToolCallPart,
-                                  ToolReturnPart, UserPromptPart)
+from pydantic_ai.messages import (ModelMessage, ModelMessagesTypeAdapter, ModelResponse,
+                                  RetryPromptPart, ToolCallPart, ToolReturnPart, UserPromptPart)
 from pydantic_core import to_jsonable_python
 
 from crawling.utils.string_utils import strip_null_bytes
-
-# Denial text put into a ToolReturnPart when reconstructing a rejected proposed tool call; the
-# runner's resume path uses the same constant for ToolDenied so the two stay in sync.
-TOOL_DENIED_MESSAGE = "L'admin a refusé cette action."
 
 
 def dump_messages(messages: list[ModelMessage]) -> list:
@@ -28,57 +23,34 @@ def load_messages(raw: list | None) -> list[ModelMessage]:
     return ModelMessagesTypeAdapter.validate_python(raw)
 
 
-def _synth_tool_call_id(position: int) -> str:
-    """Deterministic, non-empty tool_call_id for autonomous items (which store none).
+def latest_user_prompt(messages: list[ModelMessage]) -> str | None:
+    """Content of the most recent user prompt in the history (None if there is none).
 
-    Position is unique per discussion, and the prefix cannot collide with pydantic-ai's `pyd_ai_*`
-    or a provider's `call_*` ids, so a call and its return stay correctly paired.
+    Used to make a turn re-run idempotent: if the preserved history already ends with this exact
+    prompt, the turn was partially run before (auto-retry / dead-task requeue), so we resume with
+    user_prompt=None instead of appending a duplicate user message.
     """
-    return f'auton_{position}'
+    for message in reversed(messages):
+        for part in message.parts:
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                return part.content
+    return None
 
 
-def _tool_call_response(item: dict, call_id: str) -> ModelResponse:
-    return ModelResponse(parts=[ToolCallPart(
-        tool_name=item['tool_name'], args=item['tool_args'], tool_call_id=call_id)])
+def is_resumable_history(messages: list[ModelMessage]) -> bool:
+    """Whether a (possibly partial) history can be resumed by a later agent run.
 
-
-def _tool_return_request(item: dict, call_id: str, content) -> ModelRequest:
-    return ModelRequest(parts=[ToolReturnPart(
-        tool_name=item['tool_name'], content=content, tool_call_id=call_id)])
-
-
-def build_history_from_item_dicts(items: list[dict]) -> list[ModelMessage]:
-    """Rebuild the agent's message history from ordered CopilotDiscussionItem values.
-
-    The items are the durable, complete record (user messages, autonomous tool calls with their
-    results, agent messages, proposed tool calls with their approval outcome), so this reconstructs
-    the full context even when `pydantic_messages` lost a turn to a crash. Each item maps to one
-    ModelResponse/ModelRequest pair; PydanticAI's own `_clean_message_history` then merges them into
-    the native grouped shape. Item dicts carry the raw CopilotDiscussionItem.ItemType /
-    ApprovalStatus string values. Whether a proposed call is answered or left deferred is driven by
-    the presence of `tool_result`, not by `approval_status` alone.
+    A crash during a model request leaves the history ending in a ModelRequest (user prompt or tool
+    returns) with no following ModelResponse — resumable. A crash *during tool execution* leaves a
+    trailing ModelResponse with unanswered tool calls, which PydanticAI refuses to resume — not
+    resumable, so we must not overwrite the last clean history with it.
     """
-    messages: list[ModelMessage] = []
-    for item in items:
-        item_type = item['item_type']
-        if item_type == 'user_message':
-            messages.append(ModelRequest(parts=[UserPromptPart(content=item['text'])]))
-        elif item_type == 'agent_message':
-            messages.append(ModelResponse(parts=[TextPart(content=item['text'])]))
-        elif item_type == 'autonomous_tool_call':
-            call_id = _synth_tool_call_id(item['position'])
-            messages.append(_tool_call_response(item, call_id))
-            messages.append(_tool_return_request(item, call_id, item['tool_result']))
-        elif item_type == 'proposed_tool_call':
-            call_id = item['tool_call_id'] or _synth_tool_call_id(item['position'])
-            messages.append(_tool_call_response(item, call_id))
-            if item['tool_result'] is not None:
-                # approved+executed, or a failure carrying its error dict → answered
-                messages.append(_tool_return_request(item, call_id, item['tool_result']))
-            elif item['approval_status'] == 'rejected':
-                messages.append(_tool_return_request(item, call_id, TOOL_DENIED_MESSAGE))
-            # pending (no result yet) → leave the call unanswered (deferred trailing call)
-    return messages
+    if not messages:
+        return True
+    last = messages[-1]
+    if isinstance(last, ModelResponse):
+        return not any(isinstance(part, ToolCallPart) for part in last.parts)
+    return True
 
 
 def deferred_tool_call_ids(messages: list[ModelMessage]) -> set[str]:

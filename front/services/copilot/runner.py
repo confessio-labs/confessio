@@ -1,10 +1,9 @@
 """Runs one copilot turn (or resumes after an approval) and materializes the result into
 CopilotDiscussionItem rows. Executed from the django-background-tasks worker (front/tasks.py).
 
-Each new turn rebuilds the agent's context from the durable items (build_history_from_items), so a
-crashed turn never causes amnesia. pydantic_messages is written on every finalize as a native cache
-and read back only on the approval-resume path (always entered from a freshly-finalized, so
-non-divergent, state). Autonomous tool calls are recorded by the tools themselves as they run.
+Autonomous tool calls are recorded by the tools themselves as they run (incremental UI). Here we
+add the agent's final text message and any PROPOSED_TOOL_CALL items, then persist the PydanticAI
+message history (the agent's source of truth) and update the discussion status.
 """
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
 from pydantic_ai.messages import ModelResponse, TextPart
@@ -14,9 +13,10 @@ from core.utils.async_utils import run_and_close
 from crawling.utils.string_utils import remove_unsafe_chars
 from front.models import CopilotDiscussion, CopilotDiscussionItem
 from front.services.copilot.agent import CopilotDeps, agent, build_provider_and_model
-from front.services.copilot.items import add_item, build_history_from_items
-from front.services.copilot.serialization import (TOOL_DENIED_MESSAGE, deferred_tool_call_ids,
-                                                  dump_messages, load_messages)
+from front.services.copilot.items import add_item
+from front.services.copilot.serialization import (deferred_tool_call_ids, dump_messages,
+                                                  is_resumable_history, latest_user_prompt,
+                                                  load_messages)
 
 Status = CopilotDiscussion.Status
 ItemType = CopilotDiscussionItem.ItemType
@@ -24,11 +24,14 @@ ApprovalStatus = CopilotDiscussionItem.ApprovalStatus
 
 
 def run_agent_turn(discussion_uuid: str, user_text: str) -> None:
-    # The view already recorded this turn's user_message item, so the history rebuilt from items
-    # (in _execute) ends with this prompt — nothing to append here. This is inherently idempotent:
-    # a task auto-retry / dead-task requeue sees the same single user_message item (no duplicate)
-    # and resumes from the last recorded tool return instead of re-running the turn from scratch.
-    _execute(discussion_uuid)
+    # Idempotency: if a previous attempt of this same turn already ran partially (auto-retry after a
+    # transient error, or a dead-task requeue), its history was preserved and already ends with this
+    # prompt — resume it instead of appending a duplicate user message.
+    discussion = CopilotDiscussion.objects.get(uuid=discussion_uuid)
+    if latest_user_prompt(load_messages(discussion.pydantic_messages)) == user_text:
+        _execute(discussion_uuid, user_prompt=None)
+    else:
+        _execute(discussion_uuid, user_prompt=user_text)
 
 
 def resume_after_approval(discussion_uuid: str) -> None:
@@ -44,48 +47,70 @@ def resume_after_approval(discussion_uuid: str) -> None:
         for item in discussion.items.filter(
             item_type=ItemType.PROPOSED_TOOL_CALL, tool_call_id__in=deferred_ids)
     }
-    denied = ToolDenied(message=TOOL_DENIED_MESSAGE)
+    denied = ToolDenied(message="L'admin a refusé cette action.")
     approvals = {
         call_id: (True if decisions.get(call_id) == ApprovalStatus.APPROVED else denied)
         for call_id in deferred_ids
     }
-    _execute(discussion_uuid, deferred_tool_results=DeferredToolResults(approvals=approvals))
+    _execute(discussion_uuid, user_prompt=None,
+             deferred_tool_results=DeferredToolResults(approvals=approvals))
 
 
-def _execute(discussion_uuid, deferred_tool_results=None) -> None:
+def _execute(discussion_uuid, user_prompt, deferred_tool_results=None) -> None:
     discussion = CopilotDiscussion.objects.get(uuid=discussion_uuid)
     CopilotDiscussion.objects.filter(uuid=discussion_uuid).update(
         status=Status.RUNNING, error_message='')
 
+    # Captured from inside the run so that, if the turn crashes mid-way (e.g. a transient OpenAI
+    # connection/timeout error after several tool calls), we can still persist the partial message
+    # history instead of losing the whole turn's memory.
+    capture = {'messages': None}
     try:
         provider, model = build_provider_and_model()  # raises if key missing
-        if deferred_tool_results is not None:
-            # Resume path: the native history was just written by the _finalize that set
-            # AWAITING_APPROVAL, so it is fresh and non-divergent — read it as-is.
-            history = load_messages(discussion.pydantic_messages)
-        else:
-            # New-turn path: rebuild from the durable items so the context always reflects every
-            # past human message and tool call, even if an earlier turn crashed.
-            history = build_history_from_items(discussion)
+        history = load_messages(discussion.pydantic_messages)
         deps = CopilotDeps(discussion_uuid=str(discussion_uuid))
 
         async def _coro():
-            return await agent.run(
-                None,
+            async with agent.iter(
+                user_prompt,
                 message_history=history,
                 deferred_tool_results=deferred_tool_results,
                 deps=deps,
                 model=model,
-            )
+            ) as run:
+                try:
+                    async for _node in run:
+                        pass
+                finally:
+                    # all_messages() is the live history; capture it on success AND on failure.
+                    capture['messages'] = run.all_messages()
+                return run.result
 
         result = run_and_close(_coro(), provider.client.close)
     except Exception as e:  # noqa: BLE001
-        CopilotDiscussion.objects.filter(uuid=discussion_uuid).update(
-            status=Status.ERROR,
-            error_message=remove_unsafe_chars(f'{type(e).__name__}: {e}'))
-        raise
+        _persist_failure(discussion_uuid, capture['messages'], e)
+        raise  # re-raise so the task retries; run_agent_turn then resumes (no duplicate work)
 
     _finalize(discussion, result)
+
+
+def _persist_failure(discussion_uuid, messages, exc) -> None:
+    """Record the failure on the discussion, preserving the partial (resumable) message history.
+
+    The partial-history persist is guarded by its own try/except so a serialization/DB problem there
+    can never mask the original error. A non-resumable partial history (trailing unanswered tool
+    calls) is dropped, keeping the last clean pydantic_messages so a later resume stays valid.
+    """
+    fields = {
+        'status': Status.ERROR,
+        'error_message': remove_unsafe_chars(f'{type(exc).__name__}: {exc}'),
+    }
+    try:
+        if messages and is_resumable_history(messages):
+            fields['pydantic_messages'] = dump_messages(messages)
+    except Exception:  # noqa: BLE001
+        pass
+    CopilotDiscussion.objects.filter(uuid=discussion_uuid).update(**fields)
 
 
 def _finalize(discussion: CopilotDiscussion, result) -> None:
