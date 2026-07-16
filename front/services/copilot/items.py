@@ -1,9 +1,20 @@
-"""Synchronous helpers to create/update CopilotDiscussionItem rows. Items drive the UI and the
-approval state machine; the agent's own memory is CopilotDiscussion.pydantic_messages."""
+"""Synchronous helpers to create/update CopilotDiscussionItem rows. Items are the durable, complete
+record of a discussion and the source of truth from which the agent's context is rebuilt each new
+turn (build_history_from_items); they also drive the UI and the approval state machine."""
 from django.db.models import Max
 
 from crawling.utils.string_utils import strip_null_bytes
 from front.models import CopilotDiscussion, CopilotDiscussionItem
+from front.services.copilot.serialization import build_history_from_item_dicts
+
+_HISTORY_FIELDS = ('position', 'item_type', 'text', 'tool_name', 'tool_args', 'tool_result',
+                   'tool_call_id', 'approval_status')
+
+
+def build_history_from_items(discussion: CopilotDiscussion) -> list:
+    """Rebuild the PydanticAI message history for a discussion from its ordered items."""
+    items = list(discussion.items.order_by('position').values(*_HISTORY_FIELDS))
+    return build_history_from_item_dicts(items)
 
 
 def _next_position(discussion: CopilotDiscussion) -> int:
