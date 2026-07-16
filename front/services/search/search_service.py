@@ -203,10 +203,10 @@ def get_churches_around(center, time_filter: TimeFilter,
         .annotate(distance=Distance('location', center_as_point)) \
         .order_by('distance')
     if not church_query.exists():
-        print('try wider search')
-        return get_churches_around(center, time_filter,
-                                   0.16  # 0.16 degrees is ~18km, Granville
-                                   )
+        wider_radius = 0.16  # 0.16 degrees is ~18km, Granville
+        if radius < wider_radius:
+            print('try wider search')
+            return get_churches_around(center, time_filter, wider_radius)
 
     return truncate_results(church_query, time_filter)
 
