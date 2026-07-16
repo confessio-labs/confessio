@@ -16,8 +16,10 @@ class CopilotDiscussion(TimeStampMixin):
     website = models.ForeignKey('registry.Website', on_delete=models.SET_NULL, null=True,
                                 blank=True, related_name='copilot_discussions')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.IDLE)
-    # Serialized PydanticAI message history (ModelMessagesTypeAdapter). This is the source of
-    # truth for the agent; CopilotDiscussionItem rows only drive the UI + approval state.
+    # Write-through cache of the native PydanticAI message history (ModelMessagesTypeAdapter),
+    # refreshed on every finalize. A new turn's context is rebuilt from the CopilotDiscussionItem
+    # rows (the durable source of truth); this cache is read back only on the approval-resume path,
+    # which needs a freshly-finalized native history to resume the deferred tool calls.
     pydantic_messages = models.JSONField(default=list, blank=True)
     error_message = models.TextField(blank=True)
 
