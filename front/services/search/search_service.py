@@ -205,7 +205,7 @@ def get_churches_around(center, time_filter: TimeFilter,
     if not church_query.exists():
         print('try wider search')
         return get_churches_around(center, time_filter,
-                                   0.16  # 0.16 degrees is ~18km
+                                   0.16  # 0.16 degrees is ~18km, Granville
                                    )
 
     return truncate_results(church_query, time_filter)
