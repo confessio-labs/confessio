@@ -40,13 +40,15 @@ class TelemetryMiddleware:
         url_name = request.resolver_match.url_name or "unknown"
 
         # regrouping url_name for better metrics aggregation
-        if url_name in ['around_place_view', 'in_area_view', 'around_me_view']:
-            return 'search_view'
+        if url_name in ['index', 'around_place_view', 'in_area_view', 'around_me_view']:
+            return 'legacy_search'
+        if url_name == 'autocomplete':
+            return 'legacy_autocomplete'
         if url_name.startswith('api_front'):
-            return 'api_front'
+            return url_name
         if url_name.startswith('api_public'):
             return 'api_public'
 
-        whitelist = ['index', 'autocomplete', 'diocese_view', 'website_view', 'api_churches']
+        whitelist = ['diocese_view', 'website_view']
 
         return url_name if url_name in whitelist else 'other'
