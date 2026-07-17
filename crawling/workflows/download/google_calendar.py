@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from urllib.parse import urlparse, parse_qs, quote
 from zoneinfo import ZoneInfo
 
@@ -161,6 +161,16 @@ def to_paris(value: date):
     return value
 
 
+def to_sort_datetime(start) -> datetime:
+    # All-day events give a date, and a dateTime without offset gives a naive datetime; neither is
+    # comparable with an aware datetime, so normalize everything to aware Paris time.
+    if not isinstance(start, datetime):
+        return datetime.combine(start, time.min, tzinfo=PARIS_TZ)
+    if start.tzinfo is None:
+        return start.replace(tzinfo=PARIS_TZ)
+    return start
+
+
 def render_time(start) -> str:
     if not isinstance(start, datetime):
         return ''  # all-day event, no time to render
@@ -249,7 +259,8 @@ def get_rrule(event: dict) -> vRecur | None:
     return None
 
 
-def render_event(event: dict, reference_date: date) -> str | None:
+def render_event(event: dict, reference_date: date) -> tuple[date, bool, str] | None:
+    """Return (start, is_recurring, line), or None if the event must not be rendered."""
     if event.get('status') == 'cancelled':
         return None
 
@@ -278,7 +289,7 @@ def render_event(event: dict, reference_date: date) -> str | None:
     summary = (event.get('summary') or '').strip()
     location = (event.get('location') or '').strip()
     parts = [p for p in [summary, when, location] if p]
-    return ' — '.join(parts)
+    return start, rrule is not None, ' — '.join(parts)
 
 
 def render_events_to_html(calendar_name: str, events: list[dict],
@@ -286,11 +297,23 @@ def render_events_to_html(calendar_name: str, events: list[dict],
     if reference_date is None:
         reference_date = datetime.now(PARIS_TZ).date()
 
-    lines = []
+    recurring: list[str] = []
+    one_offs: list[tuple[datetime, str]] = []
     for event in events:
         rendered = render_event(event, reference_date)
-        if rendered:
-            lines.append(f'<p>{rendered}</p>')
+        if rendered is None:
+            continue
+        start, is_recurring, line = rendered
+        if is_recurring:
+            recurring.append(line)
+        else:
+            one_offs.append((to_sort_datetime(start), line))
+
+    # Google's order is unspecified (singleEvents=false forbids orderBy=startTime) and the joined
+    # result is hashed into Pruning.extracted_html_hash, so pin it here. Recurrence text carries no
+    # date and stays stable across crawls, so it leads and sorts by text; one-offs sort by start.
+    lines = [f'<p>{line}</p>'
+             for line in sorted(recurring) + [line for _, line in sorted(one_offs)]]
 
     if not lines:
         return ''
@@ -301,7 +324,9 @@ def render_events_to_html(calendar_name: str, events: list[dict],
 
 
 if __name__ == '__main__':
-    url_ = ('https://calendar.google.com/calendar/embed'
-            '?src=notredamedurocher%40gmail.com&ctz=Europe%2FParis')
+    from dotenv import load_dotenv
+    load_dotenv()
+    url_ = ('https://calendar.google.com/calendar/u/0/newembed?'
+            'src=paroissesaintleger@gmail.com&ctz=Europe/Paris')
     print(url_)
     print(get_google_calendar_html(url_))

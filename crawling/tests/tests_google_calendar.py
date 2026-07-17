@@ -10,8 +10,16 @@ from crawling.workflows.download.google_calendar import is_google_calendar_url, 
 EMBED_URL = ('https://calendar.google.com/calendar/embed'
              '?src=notredamedurocher%40gmail.com&ctz=Europe%2FParis')
 
+REFERENCE_DATE = date(2026, 3, 1)
+
 
 class TestGoogleCalendar(unittest.TestCase):
+    @staticmethod
+    def load_events_fixture() -> dict:
+        tests_dir = os.path.dirname(os.path.realpath(__file__))
+        with open(f'{tests_dir}/fixtures/google_calendar/events.json') as f:
+            return json.load(f)
+
     def test_is_google_calendar_url(self):
         self.assertTrue(is_google_calendar_url(EMBED_URL))
         self.assertTrue(is_google_calendar_url(
@@ -57,20 +65,30 @@ class TestGoogleCalendar(unittest.TestCase):
         self.assertEqual(detect_google_calendar_urls(parse_html(html)), set())
 
     def test_render_events_to_html(self):
-        tests_dir = os.path.dirname(os.path.realpath(__file__))
-        with open(f'{tests_dir}/fixtures/google_calendar/events.json') as f:
-            data = json.load(f)
+        data = self.load_events_fixture()
 
         result = render_events_to_html(data['summary'], data['items'],
-                                       reference_date=date(2026, 3, 1))
+                                       reference_date=REFERENCE_DATE)
         expected = (
             '<h2>Paroisse Test</h2>\n'
             '<p>Confessions — tous les samedis à 17h00 — Saint-Martin</p>\n'
             '<p>Groupe de louange — le 3e jeudi du mois à 20h00</p>\n'
             '<p>Oraison — tous les mardis, mercredis, jeudis et vendredis à 7h00</p>\n'
-            '<p>Confessions avant Paques — vendredi 20 mars 2026 à 9h30</p>'
+            '<p>Fete patronale — vendredi 20 mars 2026</p>\n'
+            '<p>Confessions avant Paques — vendredi 20 mars 2026 à 9h30</p>\n'
+            '<p>Vigile pascale — samedi 4 avril 2026 à 21h00</p>\n'
+            '<p>Messe de Paques — dimanche 5 avril 2026 à 10h30</p>'
         )
         self.assertEqual(result, expected)
+
+    def test_render_events_to_html_order_is_independent_of_input_order(self):
+        # Google's paging order is unspecified; it must never leak into the hashed output.
+        items = self.load_events_fixture()['items']
+
+        self.assertEqual(render_events_to_html('Paroisse Test', items,
+                                               reference_date=REFERENCE_DATE),
+                         render_events_to_html('Paroisse Test', list(reversed(items)),
+                                               reference_date=REFERENCE_DATE))
 
     def test_render_events_to_html_empty(self):
         self.assertEqual(render_events_to_html('Paroisse Test', []), '')
