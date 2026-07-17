@@ -222,7 +222,14 @@ export interface components {
             schedules_indices: number[];
             /** Source Has Been Moderated */
             source_has_been_moderated: boolean;
+            /** Periods */
+            periods: components["schemas"]["PeriodEnum"][];
         };
+        /**
+         * PeriodEnum
+         * @enum {string}
+         */
+        PeriodEnum: "summer" | "winter" | "advent" | "lent" | "solemnities" | "holy_week" | "school_holidays";
         /** SearchResultOut */
         SearchResultOut: {
             /** Churches */
@@ -281,11 +288,6 @@ export interface components {
             /** Image Url */
             image_url: string | null;
         };
-        /**
-         * PeriodEnum
-         * @enum {string}
-         */
-        PeriodEnum: "summer" | "winter" | "advent" | "lent" | "solemnities" | "holy_week" | "school_holidays";
         /** ReportOut */
         ReportOut: {
             /**
@@ -392,6 +394,8 @@ export interface components {
              * Format: uuid
              */
             website_uuid: string;
+            /** Church Uuid */
+            church_uuid?: string | null;
             feedback_type: components["schemas"]["FeedbackTypeEnum"];
             error_type?: components["schemas"]["ErrorTypeEnum"] | null;
             /** Comment */
@@ -428,6 +432,7 @@ export interface operations {
                 date_filter?: string | null;
                 hour_min?: number;
                 hour_max?: number;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -456,6 +461,7 @@ export interface operations {
                 date_filter?: string | null;
                 hour_min?: number;
                 hour_max?: number;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -480,6 +486,7 @@ export interface operations {
                 date_filter?: string | null;
                 hour_min?: number;
                 hour_max?: number;
+                limit?: number;
             };
             header?: never;
             path: {
@@ -515,6 +522,7 @@ export interface operations {
                 date_filter?: string | null;
                 hour_min?: number;
                 hour_max?: number;
+                limit?: number;
             };
             header?: never;
             path: {

@@ -291,6 +291,7 @@ const ChurchCard = ({
     if (!churchDetails?.website?.uuid || !feedbackOpen) return;
     postReport.mutate({
       website_uuid: churchDetails.website.uuid,
+      church_uuid: church.uuid,
       feedback_type: feedbackOpen,
       error_type: feedbackOpen === "error" ? errorType : null,
       comment: feedbackText.trim() || null,
