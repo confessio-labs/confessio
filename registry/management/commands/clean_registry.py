@@ -9,12 +9,18 @@ class Command(AbstractCleaningCommand):
     def handle(self, *args, **options):
         # Delete parishes without churches
         self.info('Starting cleaning parishes without church')
-        parish_count, _ = Parish.objects.filter(churches__isnull=True).delete()
+        parish_count = 0
+        for parish in Parish.objects.filter(churches__isnull=True).all():
+            parish.delete()
+            parish_count += 1
         self.success(f"Deleted {parish_count} parishes without churches.")
 
         # Delete websites without parishes
         self.info('Starting cleaning websites without parish')
-        website_count, _ = Website.objects.filter(parishes__isnull=True).delete()
+        website_count = 0
+        for website in Website.objects.filter(parishes__isnull=True).all():
+            website.delete()
+            website_count += 1
         self.success(f"Deleted {website_count} websites without parishes.")
 
         # Church moderation
