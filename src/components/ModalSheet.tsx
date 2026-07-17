@@ -1,9 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useEffect } from "react";
-import { useSheetRef } from "./ModalSheet/SheetContext";
 import { ChurchCard } from "./ChurchCard";
-import ModalSheetContainer from "./ModalSheet/ModalSheetContainer";
 import ModalSheetScroller from "./ModalSheet/ModalSheetScroller";
 import ModalSheetDragZone from "./ModalSheet/ModalSheetDragZone";
 import { AggregatedSearchResults } from "@/utils";
@@ -59,7 +56,6 @@ function ModalSheet({
   selectedChurch?: components["schemas"]["ChurchDetails"];
 }) {
   // URL is the single source of truth - use the church from server if present
-  const sheetRef = useSheetRef();
   const { data: searchResults } = useSearchResults();
   const { date } = useDateFilter();
 
@@ -67,41 +63,33 @@ function ModalSheet({
     ? searchResults
     : originalSearchResults;
 
-  useEffect(() => {
-    if (selectedChurch) sheetRef?.current?.snapTo(1);
-  }, [selectedChurch]);
+  if (selectedChurch) return <ChurchCard church={selectedChurch} />;
 
   return (
-    <ModalSheetContainer>
-      {selectedChurch ? (
-        <ChurchCard church={selectedChurch} />
-      ) : (
-        <>
-          <ModalSheetDragZone>
-            <div className="flex flex-col gap-2 py-2">
-              <h4 className="text-base md:text-lg font-semibold text-white px-4">
-                {`Horaires de confession ${dateHeadingSuffix(date)}`.trim()}
-              </h4>
-            </div>
-          </ModalSheetDragZone>
-          <DateFilterRail />
-          <hr className="text-gray-500 mt-2" />
-          <ModalSheetScroller draggableAt="top">
-            <div className="p-4 space-y-4">
-              {displayedSearchResults?.churches?.map((church) => (
-                <ChurchTile key={church.uuid} church={church} />
-              ))}
-              <div className="flex items-center justify-center gap-2 py-4">
-                <span className="text-white text-xs">Un projet généreusement encouragé par</span>
-                <a href="https://hozana.org" target="_blank" rel="noopener noreferrer">
-                  <Image src="/hozana-logo-white.png" alt="Hozana" height={16} width={64} />
-                </a>
-              </div>
-            </div>
-          </ModalSheetScroller>
-        </>
-      )}
-    </ModalSheetContainer>
+    <>
+      <ModalSheetDragZone>
+        <div className="flex flex-col gap-2 py-2">
+          <h4 className="text-base md:text-lg font-semibold text-white px-4">
+            {`Horaires de confession ${dateHeadingSuffix(date)}`.trim()}
+          </h4>
+        </div>
+      </ModalSheetDragZone>
+      <DateFilterRail />
+      <hr className="text-gray-500 mt-2" />
+      <ModalSheetScroller draggableAt="top">
+        <div className="p-4 space-y-4">
+          {displayedSearchResults?.churches?.map((church) => (
+            <ChurchTile key={church.uuid} church={church} />
+          ))}
+          <div className="flex items-center justify-center gap-2 py-4">
+            <span className="text-white text-xs">Un projet généreusement encouragé par</span>
+            <a href="https://hozana.org" target="_blank" rel="noopener noreferrer">
+              <Image src="/hozana-logo-white.png" alt="Hozana" height={16} width={64} />
+            </a>
+          </div>
+        </div>
+      </ModalSheetScroller>
+    </>
   );
 }
 

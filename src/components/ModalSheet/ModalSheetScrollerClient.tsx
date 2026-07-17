@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { Sheet, SheetScrollerProps } from "react-modal-sheet";
 
 function ModalSheetScrollerClient({
@@ -7,6 +8,13 @@ function ModalSheetScrollerClient({
   ...props
 }: { children: React.ReactNode } & SheetScrollerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+
+  // Same-segment navigations (church A → church B) keep this scroller
+  // instance mounted, so the previous scroll offset would carry over.
+  useEffect(() => {
+    if (scrollerRef.current) scrollerRef.current.scrollTop = 0;
+  }, [pathname]);
 
   // The library's scroll-boundary → drag handoff (preventScrollMobileSafari)
   // only runs on iOS. We replicate it here for all platforms: when the scroller

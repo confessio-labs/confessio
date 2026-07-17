@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { Sheet, SheetRef } from "react-modal-sheet";
 import { SheetRefContext } from "./SheetContext";
 
@@ -11,6 +12,20 @@ function ModalSheetContainerClient({
   children: React.ReactNode;
 }) {
   const sheetRef = useRef<SheetRef>(null);
+  const pathname = usePathname();
+  const prevPathnameRef = useRef<string | null>(null);
+
+  // The sheet persists across navigations (mounted in the @modal layout), so
+  // snap points no longer reset via remount — set them per transition instead.
+  // On first mount a list route keeps the initialSnap entrance animation; a
+  // church deep link snaps up like any church navigation.
+  useEffect(() => {
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = pathname;
+    if (prev === pathname) return;
+    if (pathname.startsWith("/church/")) sheetRef.current?.snapTo(1);
+    else if (prev !== null) sheetRef.current?.snapTo(2);
+  }, [pathname]);
 
   // Hard-stop at the bottom snap point during drag.
   // The library only constrains the TOP snap in onDrag; the bottom is

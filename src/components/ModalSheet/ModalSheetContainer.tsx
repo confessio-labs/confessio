@@ -1,3 +1,4 @@
+"use client";
 import { ReactNode } from "react";
 import ModalSheetContainerClient from "./ModalSheetContainerClient";
 import ModalSheetContainerServer from "./ModalSheetContainerServer";
