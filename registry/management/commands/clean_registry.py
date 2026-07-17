@@ -1,5 +1,5 @@
 from core.management.abstract_cleaning_command import AbstractCleaningCommand
-from registry.models import ChurchModeration, Website, WebsiteModeration
+from registry.models import ChurchModeration, Website, WebsiteModeration, Parish
 from registry.models.base_moderation_models import ModerationStatus
 
 
@@ -7,6 +7,16 @@ class Command(AbstractCleaningCommand):
     help = "Clean registry-related data from the database"
 
     def handle(self, *args, **options):
+        # Delete parishes without churches
+        self.info('Starting cleaning parishes without church')
+        parish_count, _ = Parish.objects.filter(churches__isnull=True).delete()
+        self.success(f"Deleted {parish_count} parishes without churches.")
+
+        # Delete websites without parishes
+        self.info('Starting cleaning websites without parish')
+        website_count, _ = Website.objects.filter(parishes__isnull=True).delete()
+        self.success(f"Deleted {website_count} websites without parishes.")
+
         # Church moderation
         self.info('Starting cleaning church moderation items')
         counter = 0
