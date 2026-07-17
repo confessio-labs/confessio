@@ -545,53 +545,81 @@ const ChurchCard = ({
             </div>
           )}
 
+          {!isLoading && churchDetails && dayKeys.length === 0 && (
+            <p className="text-center text-white/55 py-6 text-sm">
+              Aucun horaire trouvé,{" "}
+              {churchDetails.website?.home_url ? (
+                <Link
+                  href={churchDetails.website.home_url}
+                  target="_blank"
+                  className="underline underline-offset-4 decoration-white/30 hover:decoration-white/70 text-white/75 hover:text-white transition-colors"
+                  onClick={() =>
+                    posthog.capture("parish_website_clicked", {
+                      church_uuid: church.uuid,
+                      church_name: church.name,
+                      parish_url: churchDetails.website?.home_url,
+                    })
+                  }
+                >
+                  visitez le site de la paroisse
+                </Link>
+              ) : (
+                "visitez le site de la paroisse"
+              )}
+            </p>
+          )}
+
           <div className="flex flex-col items-center py-5 gap-3">
-            <div className="flex items-center gap-3 px-3 bg-white/8 border border-white/12 rounded-full h-9">
-              <button
-                aria-label="Utile"
-                disabled={!canReport}
-                className={[
-                  "flex items-center justify-center w-6 h-6 transition-colors",
-                  feedbackOpen === "good"
-                    ? "text-emerald-300"
-                    : "text-white/85 hover:text-white",
-                  !canReport && "opacity-40 cursor-not-allowed",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => handleFeedbackClick("good")}
-              >
-                <ThumbsUpIcon
-                  size={18}
-                  weight={feedbackOpen === "good" ? "fill" : "regular"}
-                />
-              </button>
-              <span className="tabular text-white text-[14px] font-semibold min-w-[1ch] text-center">
-                {upvotes}
-              </span>
-              <div className="w-px h-5 bg-white/20" />
-              <span className="tabular text-white text-[14px] font-semibold min-w-[1ch] text-center">
-                {downvotes}
-              </span>
-              <button
-                aria-label="Pas utile"
-                disabled={!canReport}
-                className={[
-                  "flex items-center justify-center w-6 h-6 transition-colors",
-                  feedbackOpen === "error"
-                    ? "text-rose-300"
-                    : "text-white/85 hover:text-white",
-                  !canReport && "opacity-40 cursor-not-allowed",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => handleFeedbackClick("error")}
-              >
-                <ThumbsDownIcon
-                  size={18}
-                  weight={feedbackOpen === "error" ? "fill" : "regular"}
-                />
-              </button>
+            <div className="w-full max-w-[300px] flex flex-col items-center gap-2.5">
+              <p className="text-white/70 text-[13px] font-medium text-center">
+                Ces informations sont-elles à jour&nbsp;?
+              </p>
+              <div className="flex gap-2 w-full">
+                <button
+                  aria-label="Confirmer que ces informations sont à jour"
+                  disabled={!canReport}
+                  className={[
+                    "flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full border text-[13px] font-semibold transition-colors",
+                    feedbackOpen === "good"
+                      ? "bg-emerald-300/12 border-emerald-300/50 text-white"
+                      : "bg-white/7 border-white/14 text-white/90 hover:bg-white/12",
+                    !canReport && "opacity-40 cursor-not-allowed",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => handleFeedbackClick("good")}
+                >
+                  <ThumbsUpIcon
+                    size={16}
+                    weight={feedbackOpen === "good" ? "fill" : "regular"}
+                    className="text-emerald-300 shrink-0"
+                  />
+                  <span>Oui</span>
+                  <span className="tabular text-white/55">{upvotes}</span>
+                </button>
+                <button
+                  aria-label="Signaler une erreur"
+                  disabled={!canReport}
+                  className={[
+                    "flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full border text-[13px] font-semibold transition-colors",
+                    feedbackOpen === "error"
+                      ? "bg-rose-300/12 border-rose-300/50 text-white"
+                      : "bg-white/7 border-white/14 text-white/90 hover:bg-white/12",
+                    !canReport && "opacity-40 cursor-not-allowed",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => handleFeedbackClick("error")}
+                >
+                  <ThumbsDownIcon
+                    size={16}
+                    weight={feedbackOpen === "error" ? "fill" : "regular"}
+                    className="text-rose-300 shrink-0"
+                  />
+                  <span>Erreur</span>
+                  <span className="tabular text-white/55">{downvotes}</span>
+                </button>
+              </div>
             </div>
 
             {feedbackOpen && (
@@ -728,12 +756,6 @@ const ChurchCard = ({
               Compl&eacute;ter les horaires de cette paroisse
             </Link>
           </div>
-
-          {!isLoading && churchDetails && dayKeys.length === 0 && (
-            <p className="text-center text-white/55 py-6 text-sm">
-              Aucun horaire disponible
-            </p>
-          )}
         </div>
       </ModalSheetScroller>
       {portalReady &&

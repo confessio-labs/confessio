@@ -141,9 +141,20 @@ Each event row is a centered deepblue time pill (tabular) plus muted source
 text below. The whole thing has a single low-opacity shadow — sits on the
 dark canvas like a physical receipt.
 
-**Votes capsule.** `bg-white/8` with a `white/12` inner stroke. Two icon
-buttons flanking the up/down counts, with a thin `white/20` vertical rule
-between them. Readable from a distance, no labels needed.
+**Feedback control.** A short question — *"Ces informations sont-elles à
+jour ?"* — over two labeled pills: **Oui** (emerald thumb glyph + upvote count)
+and **Erreur** (rose thumb glyph + downvote count). Pills are `bg-white/7` with
+a `white/14` border, ≥44px tall; the active one tints to its sentiment
+(`emerald-300/12` / `rose-300/12` bg, matching border). The count sits at
+`white/55` beside each label as quiet social proof.
+
+We previously used a bare icon-only vote capsule ("readable from a distance, no
+labels needed"). It tested badly: a thumb next to a number read as a *scoreboard
+to look at*, not a *control to tap* — users couldn't find how to report an
+error. The fix is framing it as a **question with a verb**: that converts the
+widget from output to input, which is the affordance a mobile control needs (no
+hover to fall back on). This is a deliberate, scoped exception to the icon-only
+preference — feedback is the one place the interface must actively *ask*.
 
 **Comment bubbles.** Paper-colored on the dark canvas, deepblue text. Reads
 as "a letter" rather than a chat DM — editorial tone matching the subject
