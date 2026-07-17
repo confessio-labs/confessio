@@ -30,7 +30,7 @@ def get_fresh_extracted_html_list(url) -> list[str] | None:
 
 
 if __name__ == '__main__':
-    url_ = ('http://paroisseluchon.com/celebrations/')
+    url_ = ('https://www.paroissesaintleger.fr/agenda-2/')
     extracted_html_list_ = get_fresh_extracted_html_list(url_)
 
     print()

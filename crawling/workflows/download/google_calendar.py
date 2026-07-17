@@ -97,11 +97,11 @@ def fetch_calendar_events(calendar_id: str) -> tuple[str, list[dict]] | None:
     calendar_name = ''
     events: list[dict] = []
     page_token = None
-    for _ in range(MAX_PAGES):
+    for i in range(MAX_PAGES):
         if page_token:
             params['pageToken'] = page_token
 
-        info(f'getting google calendar events for {calendar_id}')
+        info(f'getting google calendar events for {calendar_id} (page {i + 1}/{MAX_PAGES})')
         try:
             with httpx.Client() as client:
                 r = client.get(api_url, params=params, headers=get_headers(), timeout=TIMEOUT)

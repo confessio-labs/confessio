@@ -61,6 +61,18 @@ class Command(AbstractCleaningCommand):
 
         self.clean_history(Sentence, Sentence.history.model)
 
+        # Every reclassification rewrites each sentence's embedding and classifier pointers,
+        # storing a full copy of both vectors (~7 KB) in a new history item. Only
+        # human-curated changes are worth keeping.
+        self.delete_irrelevant_history(Sentence, {
+            'updated_at',
+            'encoder', 'encoder_embedding',  # v2 embedding
+            'transformer_name', 'embedding',  # v1 embedding
+            'action', 'classifier',
+            'ml_temporal', 'temporal_classifier',
+            'ml_confession', 'confession_new_classifier',
+        })
+
         # Classifiers
         self.info('Starting removing draft classifiers, older than 3 days')
         draft_classifiers = Classifier.objects.filter(

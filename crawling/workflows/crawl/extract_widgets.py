@@ -70,7 +70,7 @@ def detect_google_calendar_urls(soup: BeautifulSoup) -> set[str]:
     """Find embedded public Google Calendar URLs (cross-domain <iframe>/<a>) on a page."""
     urls = set()
     for iframe in soup.find_all('iframe'):
-        src = iframe.get('src')
+        src = iframe.get('src') or iframe.get('data-src')
         if src and is_google_calendar_url(src):
             urls.add(src.strip())
     for link in soup.find_all('a', href=True):

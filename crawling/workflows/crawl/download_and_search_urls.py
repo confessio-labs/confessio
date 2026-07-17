@@ -157,9 +157,9 @@ if __name__ == '__main__':
     # home_url_ = 'https://paroissecroixrousse.fr/'
     # home_url_ = 'https://www.espace-saint-ignace.fr/'
     # home_url_ = 'https://www.paroisse-st-martin-largentiere.fr'
-    home_url_ = 'https://www.bayonnecentre.fr/'
+    home_url_ = 'https://www.paroissesaintleger.fr'
     confession_pages = search_for_confession_pages(home_url_,
-                                                   {'www.bayonnecentre.fr'},
+                                                   {'www.paroissesaintleger.fr'},
                                                    set(), {}, set())
     for cr in confession_pages.confession_pages:
         print(f'url: {cr}')
