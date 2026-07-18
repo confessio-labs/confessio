@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-07-18
+
+### Changed
+
+- Church feedback reworked into a clear question — "Ces informations sont-elles
+  à jour ?" — with labeled **Oui** / **Erreur** pills instead of bare thumb
+  icons.
+- Holiday-period schedule warning is now scoped to the day selected in the date
+  filter, instead of showing whenever any upcoming date falls in a holiday
+  period.
+- Renamed the date-filter default chip to "Tous les jours" (was "Toutes les
+  dates") and removed the "Nous soutenir" link from the navigation modal.
+
+### Fixed
+
+- Bottom sheet no longer remounts when navigating between the map and
+  church/diocese routes — its position and scroll state persist, with no flicker.
+- Search pill no longer shifts height or alignment when it gains focus.
+
 ## [1.0.2] - 2026-07-07
 
 ### Changed
