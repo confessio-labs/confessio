@@ -9,7 +9,7 @@ from crawling.workflows.crawl.extract_widgets import extract_widgets, BaseWidget
     detect_google_calendar_urls, parse_html
 from crawling.workflows.download.download_content import get_content_from_url, get_url_aliases, \
     DOWNLOAD_TIMEOUT
-from crawling.workflows.scrape.download_refine_and_extract import get_extracted_html_list
+from crawling.workflows.scrape.download_refine_and_extract import get_extracted_v2_html_list
 from scheduling.utils.html_utils import split_lines
 
 MAX_VISITED_LINKS = 50
@@ -106,7 +106,7 @@ def search_for_confession_pages(home_url, aliases_domains: set[str],
         html_content, pdf_bytes = content
 
         # Looking if new confession part is found
-        extracted_html_list = get_extracted_html_list(html_content)
+        extracted_html_list = get_extracted_v2_html_list(html_content)
         if extracted_html_list and any(extracted_html not in extracted_html_seen
                                        for extracted_html in extracted_html_list or []):
             content_by_url[link] = (extracted_html_list, pdf_bytes)

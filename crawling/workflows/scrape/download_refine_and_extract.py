@@ -26,11 +26,11 @@ def get_fresh_extracted_html_list(url) -> list[str] | None:
         return None
     html_content, _ = content
 
-    return get_extracted_html_list(html_content)
+    return get_extracted_v2_html_list(html_content)
 
 
 if __name__ == '__main__':
-    url_ = ('https://www.paroissesaintleger.fr/agenda-2/')
+    url_ = ('https://www.cathocoulommiers.fr/etapes-de-la-vie-chretienne/reconciliation/')
     extracted_html_list_ = get_fresh_extracted_html_list(url_)
 
     print()

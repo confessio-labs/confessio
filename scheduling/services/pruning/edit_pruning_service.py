@@ -32,15 +32,12 @@ class PruningHumanPiece(BaseModel):
 
 
 def get_pruning_human_pieces(pruning: Pruning) -> list[PruningHumanPiece]:
-    indices = pruning.human_indices if pruning.human_indices is not None \
-        else pruning.ml_indices
-
     pruning_human_pieces = []
     for i, line in enumerate(split_lines(pruning.extracted_html)):
         text_without_link = replace_link_by_their_content(line)
         pruning_human_pieces.append(PruningHumanPiece(
             id=f'{i}',
-            do_show=i in indices,
+            do_show=i in pruning.get_pruned_indices(),
             text_without_link=text_without_link
         ))
 
@@ -48,13 +45,7 @@ def get_pruning_human_pieces(pruning: Pruning) -> list[PruningHumanPiece]:
 
 
 def set_human_indices(pruning: Pruning, indices: list[int]):
-    needs_reschedule = False
-    if pruning.human_indices is not None:
-        if pruning.human_indices != indices:
-            needs_reschedule = True
-    else:
-        if pruning.ml_indices != indices:
-            needs_reschedule = True
+    needs_reschedule = pruning.get_pruned_indices() != indices
 
     pruning.human_indices = indices
     pruning.save()

@@ -10,7 +10,7 @@ from crawling.services.widget_extraction_service import process_extracted_widget
 from crawling.utils.url_utils import get_path, get_domain, have_similar_domain
 from crawling.workflows.crawl.download_and_search_urls import search_for_confession_pages, \
     get_new_url_and_aliases, forbid_diocese_home_links, CrawlingResult, is_new_url_valid
-from crawling.workflows.scrape.download_refine_and_extract import get_extracted_html_list
+from crawling.workflows.scrape.download_refine_and_extract import get_extracted_v2_html_list
 from registry.models import Website, WebsiteModeration
 from registry.public_service import registry_add_website_moderation, \
     registry_remove_not_validated_moderation
@@ -151,7 +151,7 @@ def recognize_pdf_in_results(crawling_result: CrawlingResult) -> CrawlingResult:
     for url, (extracted_html_list, pdf_bytes) in crawling_result.confession_pages.items():
         if pdf_bytes is not None and len(pdf_bytes) <= MAX_PDF_SIZE_FOR_RECOGNITION:
             pdf_html = attaching_recognize_pdf(url, pdf_bytes)
-            new_extracted_html_list = get_extracted_html_list(pdf_html)
+            new_extracted_html_list = get_extracted_v2_html_list(pdf_html)
             if new_extracted_html_list:
                 new_confession_pages[url] = (new_extracted_html_list, pdf_bytes)
         else:

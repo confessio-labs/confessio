@@ -21,7 +21,7 @@ class Pruning(TimeStampMixin):
     history = HistoricalRecords()
 
     def get_pruned_indices(self):
-        return self.human_indices if self.human_indices is not None else self.ml_indices
+        return self.human_indices if self.human_indices is not None else self.v2_indices
 
     def get_diocese(self) -> Diocese | None:
         if not self.scrapings.exists():

@@ -143,6 +143,10 @@ PERIOD_MENTIONS = [
     'toussaint',
 ]
 
+PLACE_MENTIONS = [
+    'eglises',
+]
+
 
 def is_confession_mentions(content: str):
     return has_any_of_words(content, CONFESSIONS_MENTIONS)
@@ -164,6 +168,10 @@ def is_period_description(content: str):
     return has_any_of_words(content, PERIOD_MENTIONS)
 
 
+def is_place_description(content: str):
+    return has_any_of_words(content, PLACE_MENTIONS)
+
+
 ########
 # MAIN #
 ########
@@ -177,6 +185,9 @@ def get_temporal_tags_with_regex(stringified_line: str) -> Set[Temporal]:
         temporal_tags.add(Temporal.SPEC)
 
     if is_period_description(stringified_line):
+        temporal_tags.add(Temporal.SPEC)
+
+    if is_place_description(stringified_line):
         temporal_tags.add(Temporal.SPEC)
 
     return temporal_tags

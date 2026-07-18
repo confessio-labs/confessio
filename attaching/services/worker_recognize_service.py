@@ -7,7 +7,7 @@ from attaching.workflows.recognize.recognize_image_with_pdf import (get_html_fro
                                                                     get_pdf_prompt,
                                                                     get_pdf_llm_model)
 from core.utils.llm_utils import LLMProvider
-from crawling.public_workflow import crawling_get_extracted_html_list
+from crawling.public_workflow import crawling_get_extracted_v2_html_list
 from scheduling.public_service import scheduling_create_pruning
 from scheduling.utils.hash_utils import hash_string_to_hex, hash_bytes_to_sha256_hex
 
@@ -70,7 +70,7 @@ def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
 
 
 def extract_image(image: Image):
-    extracted_html_list = crawling_get_extracted_html_list(get_image_html(image))
+    extracted_html_list = crawling_get_extracted_v2_html_list(get_image_html(image))
     if not extracted_html_list:
         return
 
