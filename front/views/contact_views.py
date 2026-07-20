@@ -62,13 +62,13 @@ def contact(request, message=None, email=None, name_text=None, message_text=None
 def about(request):
     diocese_count = Diocese.objects.count()
     website_count = Website.objects.count()
-    index_events_count = IndexEvent.objects.count()
+    confession_places_count = IndexEvent.objects.values('church').distinct().count()
 
     return render(request, 'pages/about.html', {
         'meta_title': 'Qui sommes-nous ?',
         'diocese_count': diocese_count,
         'website_count': website_count,
-        'index_events_count': index_events_count,
+        'confession_places_count': confession_places_count,
     })
 
 
