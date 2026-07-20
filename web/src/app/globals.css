@@ -1,0 +1,279 @@
+@import "tailwindcss";
+
+@theme {
+  --color-deepblue: #242e4c;
+  --color-lightblue: #005cdf;
+  --color-paper: #f7f4ee;
+  --color-hairline: #e7e3db;
+  --color-ink: #1b2236;
+  /* State color — holiday-notice only. Deliberate exception to "no new grays/
+     colors" (design.md rule #4), justified by rule #6 (match Google Maps'
+     "Hours might differ"). Warm amber, harmonized with --color-paper. */
+  --color-warn-amber: #92500c;
+  --color-warn-amber-bg: #fbf1df;
+  --font-sans:
+    var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Helvetica, Arial, sans-serif;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Disable double-tap-to-zoom (app-like feel) while keeping pinch-to-zoom for accessibility */
+  touch-action: manipulation;
+}
+
+/* Tabular (equal-width) numerals for times. Same sans as body, just aligned. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Restore browser default: pointer on enabled buttons (Tailwind v4 preflight removes it) */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Day tab corner cutouts — fade in/out when selection changes */
+.day-tab::before,
+.day-tab::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.day-tab::before {
+  left: -8px;
+  background: radial-gradient(
+    circle at 0 0,
+    transparent 8px,
+    var(--color-paper) 8px
+  );
+}
+.day-tab::after {
+  right: -8px;
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent 8px,
+    var(--color-paper) 8px
+  );
+}
+.day-tab-selected::before,
+.day-tab-selected::after {
+  opacity: 1;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Map tile-loading shimmer — covers the beige style background until the
+   MapTiler map fires its first `load`, then fades out. */
+.map-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+  background-color: var(--color-hairline);
+  background-image: linear-gradient(
+    100deg,
+    transparent 25%,
+    var(--color-paper) 40%,
+    rgba(255, 255, 255, 0.95) 50%,
+    var(--color-paper) 60%,
+    transparent 75%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: map-shimmer-sweep 1.25s ease-in-out infinite;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+.map-shimmer--hidden {
+  opacity: 0;
+}
+@keyframes map-shimmer-sweep {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-shimmer {
+    animation: none;
+  }
+}
+
+/* Leaflet overrides */
+.leaflet-popup-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 10px 20px 10px 18px !important;
+}
+
+/* ---------- Map markers ---------- */
+
+.current-position-marker {
+  background: transparent;
+  border: none;
+}
+
+.current-position-marker div {
+  transition: all 0.2s ease;
+}
+
+.current-position-marker div:hover {
+  transform: scale(1.1);
+  box-shadow:
+    0 0 0 3px #007bff,
+    0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+/* Aggregation dot (cluster count) */
+.aggregation-marker-count {
+  background-color: var(--color-deepblue);
+  height: 28px;
+  width: 28px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 5px rgba(36, 46, 76, 0.22);
+  transition: box-shadow 0.15s ease;
+}
+
+.aggregation-marker-count:hover {
+  box-shadow: 0 3px 8px rgba(36, 46, 76, 0.28);
+}
+
+/* Empty (no known schedule) church — small dot */
+.empty-church-marker {
+  width: 100%;
+  height: 100%;
+  background-color: #a7b4d6;
+  border-radius: 9999px;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(36, 46, 76, 0.2);
+  box-sizing: border-box;
+}
+
+.empty-church-marker-selected {
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-deepblue);
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  box-sizing: border-box;
+  box-shadow: 0 2px 6px rgba(36, 46, 76, 0.32);
+}
+
+/* Church pin — time pill */
+.church-marker {
+  position: relative;
+  background-color: var(--color-lightblue);
+  height: 24px;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  width: max-content;
+  min-width: 44px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1.5px 4px rgba(36, 46, 76, 0.22);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+.church-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid var(--color-lightblue);
+}
+
+.church-marker-selected {
+  position: relative;
+  background-color: var(--color-deepblue);
+  height: 28px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  width: max-content;
+  min-width: 50px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2.5px 7px rgba(36, 46, 76, 0.38);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+.church-marker-selected::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--color-deepblue);
+}
