@@ -1,9 +1,9 @@
 ---
-name: deploy-prod
+name: test-merge-deploy-front
 description: Walk through the staging → main release checklist (SEO tests, manual QA verification, changelog entry + version bump, push, print compare URL)
 ---
 
-# Deploy prod
+# Test merge deploy front
 
 Run before merging `staging` into `main` (~monthly cadence). This skill is a
 gated checklist: hard gates block the release, soft gates print a warning and
