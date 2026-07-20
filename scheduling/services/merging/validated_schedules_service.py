@@ -8,7 +8,7 @@ from scheduling.services.merging.sourced_schedules_service import retrieve_sched
 from scheduling.services.scheduling.scheduling_service import get_indexed_scheduling
 from scheduling.workflows.merging.compare_explanations import ValidatedSchedulesComparison, \
     build_validated_schedules_comparison as build_comparison
-from scheduling.workflows.parsing.schedules import ScheduleItem
+from scheduling.workflows.parsing.schedules import ScheduleItem, canonicalize_item_times
 
 
 #############################
@@ -68,7 +68,7 @@ def get_schedule_items(sourced_schedules_list: SourcedSchedulesList) -> set[Sche
             if not has_parsing_source(sourced_schedule_item):
                 continue
 
-            schedule_items.add(sourced_schedule_item.item)
+            schedule_items.add(canonicalize_item_times(sourced_schedule_item.item))
 
     return schedule_items
 

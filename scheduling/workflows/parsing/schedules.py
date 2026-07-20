@@ -289,6 +289,19 @@ class Event(BaseModel, frozen=True):
             < (other.start, other.church_id if other.church_id is not None else 100)
 
 
+def canonicalize_item_times(item: ScheduleItem) -> ScheduleItem:
+    """'' and 'null' mean the same as None for time fields; harmonize them before
+    equality checks so schedules differing only in the empty-time sentinel compare
+    equal. Does not mutate the model or stored data, only the compared copy."""
+    update = {}
+    if item.start_time_iso8601 in ('', 'null'):
+        update['start_time_iso8601'] = None
+    if item.end_time_iso8601 in ('', 'null'):
+        update['end_time_iso8601'] = None
+
+    return item.model_copy(update=update) if update else item
+
+
 def get_merged_schedules_list(sls: list[SchedulesList]) -> SchedulesList:
     return SchedulesList(
         schedules=[s for sl in sls for s in sl.schedules],
