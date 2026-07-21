@@ -35,6 +35,7 @@ class AutocompleteResult:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     uuid: UUID | None = None
+    church_uuid: UUID | None = None
 
     @classmethod
     def from_parish(cls, parish: Parish) -> 'AutocompleteResult':
@@ -44,6 +45,7 @@ class AutocompleteResult:
         latitudes = []
         cities = set()
         zipcodes = set()
+        church_uuids = set()
         for church in parish.churches.all():
             longitudes.append(church.location.x)
             latitudes.append(church.location.y)
@@ -51,6 +53,7 @@ class AutocompleteResult:
                 cities.add(church.city)
             if church.zipcode:
                 zipcodes.add(church.zipcode)
+            church_uuids.add(church.uuid)
         latitude = longitude = None
         if latitudes and longitudes:
             latitude = mean(latitudes)
@@ -63,6 +66,10 @@ class AutocompleteResult:
         else:
             context = get_departments_context(zipcodes)
 
+        church_uuid = None
+        if len(church_uuids) == 1:
+            church_uuid = church_uuids.pop()
+
         return AutocompleteResult(
             type='parish',
             name=parish.name,
@@ -71,6 +78,7 @@ class AutocompleteResult:
             latitude=latitude,
             longitude=longitude,
             uuid=parish.uuid,
+            church_uuid=church_uuid,
         )
 
     @classmethod
@@ -81,6 +89,7 @@ class AutocompleteResult:
         latitudes = []
         cities = set()
         zipcodes = set()
+        church_uuids = set()
         for parish in website.parishes.all():
             for church in parish.churches.all():
                 longitudes.append(church.location.x)
@@ -89,6 +98,7 @@ class AutocompleteResult:
                     cities.add(church.city)
                 if church.zipcode:
                     zipcodes.add(church.zipcode)
+                church_uuids.add(church.uuid)
         latitude = longitude = None
         if latitudes and longitudes:
             latitude = mean(latitudes)
@@ -101,6 +111,10 @@ class AutocompleteResult:
         else:
             context = get_departments_context(zipcodes)
 
+        church_uuid = None
+        if len(church_uuids) == 1:
+            church_uuid = church_uuids.pop()
+
         return AutocompleteResult(
             type='parish',
             name=website.name,
@@ -109,6 +123,7 @@ class AutocompleteResult:
             latitude=latitude,
             longitude=longitude,
             uuid=website.uuid,
+            church_uuid=church_uuid,
         )
 
     @classmethod
@@ -128,6 +143,7 @@ class AutocompleteResult:
             latitude=church.location.y,
             longitude=church.location.x,
             uuid=church.uuid,
+            church_uuid=church.uuid,
         )
 
 
