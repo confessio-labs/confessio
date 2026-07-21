@@ -30,7 +30,7 @@ def get_fresh_extracted_html_list(url) -> list[str] | None:
 
 
 if __name__ == '__main__':
-    url_ = ('https://www.cathocoulommiers.fr/etapes-de-la-vie-chretienne/reconciliation/')
+    url_ = ('https://www.paroisses-plessis-clamart.fr/')
     extracted_html_list_ = get_fresh_extracted_html_list(url_)
 
     print()

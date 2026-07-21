@@ -146,6 +146,8 @@ PERIOD_MENTIONS = [
 PLACE_MENTIONS = [
     'eglises',
     'chapelle',
+    'saint',
+    'sainte',
 ]
 
 
