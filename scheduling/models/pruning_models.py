@@ -79,8 +79,6 @@ class Classifier(TimeStampMixin):
         PROD = "prod"
 
     class Target(models.TextChoices):
-        # V1
-        ACTION = "action"
         # V2
         TEMPORAL = "temporal"
         CONFESSION = "confession"
