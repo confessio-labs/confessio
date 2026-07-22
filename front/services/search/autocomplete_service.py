@@ -10,20 +10,44 @@ from django.contrib.gis.db.models import Collect
 from django.contrib.gis.db.models.functions import Distance, Centroid
 from django.contrib.gis.geos import Point
 from django.contrib.postgres.lookups import Unaccent
+from django.contrib.postgres.search import TrigramSimilarity
+from django.db.models import Case, ExpressionWrapper, FloatField, Q, When
 from django.db.models import F
 from django.db.models import Value
-from django.db.models.functions import Replace, Lower
+from django.db.models.functions import Greatest, Ln, Replace, Lower
 from django.urls import reverse
 from httpx import RequestError
 
 from front.utils.department_utils import get_departments_context
 from front.utils.distance_utils import distance
-from registry.models import Parish, Church, Website
+from registry.models import City, Parish, Church, Website
+from registry.utils.city_name_utils import normalize_city_name
 from registry.utils.string_utils import get_string_similarity
 from scheduling.utils.string_search import unhyphen_content, normalize_content
 
 MAX_AUTOCOMPLETE_RESULTS = 15
 HALF_LIFE_DISTANCE = 5000
+
+# Every municipality result shares the same url (around_place_view), and get_aggregated_response
+# dedups on url, so only one city can ever reach the dropdown. Cities are ranked by the SQL score
+# below, which balances name, proximity and population far better than get_score() does at
+# national scale, so we pick the winner here rather than letting sort_results() re-rank them.
+MAX_CITY_RESULTS = 1
+
+# Weights of the City ranking score. Tuned on 62 labelled (query, user location) -> expected city
+# cases: population had to be raised (8 -> 20) and trigram similarity lowered (30 -> 10), because
+# similarity mechanically penalizes long names ('aix en provence' scores 0.25 against the query
+# 'aix', while a 352-inhabitant hamlet named 'Aix' scores 1.0).
+PREFIX_WEIGHT = 50.0
+SIMILARITY_WEIGHT = 10.0
+GEO_WEIGHT = 12.0
+POPULATION_WEIGHT = 20.0
+# ln(2_500_000), a bit above the most populated commune, so that s_pop stays in [0, 1]
+MAX_LN_POPULATION = 14.73
+# Distance at which the proximity score halves. Django's Distance() on this geometry compiles to
+# ST_DistanceSphere, which returns METERS, so a raw 1/(1+d) would pin s_geo to ~0 everywhere
+# (1/144886 at 145 km) and waste the whole geo term.
+GEO_HALF_LIFE_METERS = 50000.0
 
 
 @dataclass
@@ -146,9 +170,74 @@ class AutocompleteResult:
             church_uuid=church.uuid,
         )
 
+    @classmethod
+    def from_city(cls, city: City) -> 'AutocompleteResult':
+        return AutocompleteResult(
+            type='municipality',
+            name=city.name,
+            context=city.zipcode,
+            latitude=city.location.y,
+            longitude=city.location.x,
+            url=reverse('around_place_view'),
+            uuid=city.uuid,
+        )
+
+
+async def get_city_response(query: str, latitude: float | None, longitude: float | None
+                            ) -> list[AutocompleteResult]:
+    if not query or len(query) > 200 or len(query) < 3 or not query[0].isalnum():
+        return []
+
+    query_term = normalize_city_name(query)
+
+    cities = City.objects.filter(
+        Q(name_norm__trigram_similar=query_term) | Q(name_norm__startswith=query_term)
+    ).annotate(
+        s_prefix=Case(
+            When(name_norm__startswith=query_term, then=Value(1.0)),
+            default=Value(0.0),
+            output_field=FloatField(),
+        ),
+        s_sim=TrigramSimilarity('name_norm', query_term),
+        s_pop=ExpressionWrapper(
+            Ln(Greatest(F('population'), Value(1))) / Value(MAX_LN_POPULATION),
+            output_field=FloatField(),
+        ),
+    )
+
+    if latitude is not None and longitude is not None:
+        user_location = Point(longitude, latitude, srid=4326)
+        cities = cities.annotate(
+            distance=Distance('location', user_location),
+        ).annotate(
+            s_geo=ExpressionWrapper(
+                Value(1.0) / (Value(1.0) + F('distance') / Value(GEO_HALF_LIFE_METERS)),
+                output_field=FloatField(),
+            ),
+        )
+    else:
+        cities = cities.annotate(s_geo=Value(0.0, output_field=FloatField()))
+
+    cities = cities.annotate(
+        final_score=ExpressionWrapper(
+            F('s_prefix') * Value(PREFIX_WEIGHT)
+            + F('s_sim') * Value(SIMILARITY_WEIGHT)
+            + F('s_geo') * Value(GEO_WEIGHT)
+            + F('s_pop') * Value(POPULATION_WEIGHT),
+            output_field=FloatField(),
+        )
+    ).order_by('-final_score')[:MAX_CITY_RESULTS]
+
+    return [AutocompleteResult.from_city(city) async for city in cities]
+
 
 async def get_data_gouv_response(query: str, latitude: float | None, longitude: float | None
                                  ) -> list[AutocompleteResult]:
+    """Legacy municipality autocomplete, superseded by get_city_response().
+
+    Kept as a fallback: to switch back, call it instead of get_city_response() in
+    get_aggregated_response().
+    """
     if not query or len(query) > 200 or len(query) < 3 or not query[0].isalnum():
         return []
 
@@ -304,9 +393,9 @@ def sort_results(query, latitude: float | None, longitude: float | None,
 
 async def get_aggregated_response(query, latitude: float | None, longitude: float | None
                                   ) -> list[AutocompleteResult]:
-    data_gouv_results, website_by_name_results, parish_by_name_results, church_by_name_results = \
+    city_results, website_by_name_results, parish_by_name_results, church_by_name_results = \
         await asyncio.gather(
-            get_data_gouv_response(query, latitude, longitude),
+            get_city_response(query, latitude, longitude),
             get_website_by_name_response(query, latitude, longitude),
             get_parish_by_name_response(query, latitude, longitude),
             get_church_by_name_response(query, latitude, longitude),
@@ -314,7 +403,7 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
 
     sorted_results = sort_results(
         query, latitude, longitude,
-        data_gouv_results + website_by_name_results
+        city_results + website_by_name_results
         + parish_by_name_results + church_by_name_results)
 
     seen_urls = set()
