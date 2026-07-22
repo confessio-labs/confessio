@@ -47,23 +47,41 @@ GEO_WEIGHT = 12.0
 POPULATION_WEIGHT = 20.0
 # ln(2_500_000), a bit above the most populated commune, so that s_pop stays in [0, 1]
 MAX_LN_POPULATION = 14.73
+# Municipality popularity multiplier used by get_score(): neutral up to the floor, then growing
+# with log(population). Grid-searched on 2088 recorded autocomplete hits.
+POPULARITY_FLOOR_POPULATION = 10000
+POPULARITY_SCALE = 0.7
 # Distance at which the proximity score halves. Django's Distance() on this geometry compiles to
 # ST_DistanceSphere, which returns METERS, so a raw 1/(1+d) would pin s_geo to ~0 everywhere
 # (1/144886 at 145 km) and waste the whole geo term.
 GEO_HALF_LIFE_METERS = 50000.0
 
 
+def get_normalized_similarity(query: str, name: str) -> float:
+    """Name similarity that ignores case, accents and hyphens.
+
+    Raw SequenceMatcher scores 'saint etienne' against 'Saint-Étienne' at only 0.769 although it
+    is a perfect match. get_string_similarity() itself is left alone: it is also used to match
+    names in sync_parishes_service and church_name_service.
+    """
+    return get_string_similarity(unhyphen_content(normalize_content(query)),
+                                 unhyphen_content(normalize_content(name)))
+
+
 def popularity_of_population(population: int | None) -> float:
-    """Popularity of a municipality, from its inhabitants.
+    """Popularity multiplier of a municipality, from its inhabitants.
+
+    Neutral (1.0) for every result by default, so a small commune is never penalised: only towns
+    above the floor get a boost, growing with the log of their population.
 
     Counterparts for the other types are not written yet: a website-backed result (parish, church,
     website) would derive its popularity from Website.nb_recent_hits, which
     front.services.search.popularity_service already maintains from the last 14 days of traffic.
     """
-    if not population or population < 1:
-        return 0.0
+    if not population or population <= POPULARITY_FLOOR_POPULATION:
+        return 1.0
 
-    return min(log(population) / MAX_LN_POPULATION, 1.0)
+    return 1.0 + POPULARITY_SCALE * log(population / POPULARITY_FLOOR_POPULATION)
 
 
 @dataclass
@@ -76,9 +94,10 @@ class AutocompleteResult:
     longitude: Optional[float] = None
     uuid: UUID | None = None
     church_uuid: UUID | None = None
-    # 0..1, how prominent this result is within its own kind: inhabitants for a municipality,
-    # recent page hits for anything backed by a website. See popularity_of_* below.
-    popularity: float = 0.0
+    # Score multiplier for how prominent this result is within its own kind: inhabitants for a
+    # municipality, recent page hits for anything backed by a website. 1.0 means "no opinion",
+    # which is the default for every type that has no popularity signal yet.
+    popularity: float = 1.0
 
     @property
     def dedup_key(self) -> tuple:
@@ -412,12 +431,13 @@ async def get_church_by_name_response(query, latitude: float | None,
 
 def get_score(query, latitude: float | None, longitude: float | None,
               result: AutocompleteResult) -> float:
-    string_similarity = get_string_similarity(query, result.name)
+    string_similarity = get_normalized_similarity(query, result.name)
     d = 0.0
     if latitude is not None and longitude is not None \
             and result.latitude is not None and result.longitude is not None:
         d = distance(latitude, longitude, result.latitude, result.longitude)
 
+    # result.popularity is deliberately NOT applied here, see restore_municipality_order()
     return string_similarity * HALF_LIFE_DISTANCE / (HALF_LIFE_DISTANCE + d)
 
 
@@ -445,13 +465,12 @@ def restore_municipality_order(results: list[AutocompleteResult],
     the tuned SQL score, which does weigh population, so get_score() is only allowed to decide
     *where* the municipality slots sit among the other types, not which city fills them.
 
-    Feeding AutocompleteResult.popularity into get_score() instead was measured on 2088 recorded
-    hits and is not enough to replace this: the best bonus shape reached 58.5% top-1 / 0.684 MRR
-    against 68.6% / 0.767 here, and it also cost recall (93.7% -> 92.5%) by crowding churches out.
-    get_score()'s SequenceMatcher similarity is case- and accent-sensitive, so 'saint etienne' only
-    scores 0.769 against 'Saint-Étienne'; a popularity bonus cannot lift a base that weak past a
-    nearby hamlet. Fixing that would mean scoring every type with the same prefix + trigram signals
-    the SQL uses, which is a bigger change than this function.
+    Multiplying get_score() by AutocompleteResult.popularity instead was grid-searched on 2088
+    recorded hits (population floor 1..50000 x scale 0.3..1.5, with the accent-insensitive
+    similarity above) and does not replace this. Best was floor=2000, scale=0.7 at 60.7% top-1 /
+    0.704 MRR, against 67.9% / 0.761 here; applying it *on top* is worse still (66.3% / 0.743),
+    because it moves the whole municipality block rather than reordering it. Population is already
+    weighed where it belongs, in the SQL score that ranks the cities.
     """
     source_order = iter(municipality_results)
 
