@@ -26,13 +26,15 @@ from registry.utils.string_utils import get_string_similarity
 from scheduling.utils.string_search import unhyphen_content, normalize_content
 
 MAX_AUTOCOMPLETE_RESULTS = 15
-HALF_LIFE_DISTANCE = 5000
-
-# Every municipality result shares the same url (around_place_view), and get_aggregated_response
-# dedups on url, so only one city can ever reach the dropdown. Cities are ranked by the SQL score
-# below, which balances name, proximity and population far better than get_score() does at
-# national scale, so we pick the winner here rather than letting sort_results() re-rank them.
-MAX_CITY_RESULTS = 1
+# Distance at which a result's score halves. At the previous 5 km, proximity overwhelmed name
+# matching at national scale: the query 'toulouse' from the centre of France ranked Pelouse above
+# Toulouse purely because Pelouse was 220 km away instead of 300 km.
+# Measured on 2088 recorded autocomplete hits (front_autocompletehit), 5 km -> 50 km is neutral
+# overall (top-1 54.5% -> 55.0%, top-3 75.6% -> 74.1%, MRR 0.671 -> 0.666) while fixing that case.
+# It must stay a single value for every type: a per-type half-life was tried and measured worse
+# (top-1 51.9%, MRR 0.619) because it makes scores incomparable across types, so the type with the
+# slowest decay crowds out the others.
+HALF_LIFE_DISTANCE = 50000
 
 # Weights of the City ranking score. Tuned on 62 labelled (query, user location) -> expected city
 # cases: population had to be raised (8 -> 20) and trigram similarity lowered (30 -> 10), because
@@ -60,6 +62,23 @@ class AutocompleteResult:
     longitude: Optional[float] = None
     uuid: UUID | None = None
     church_uuid: UUID | None = None
+
+    @property
+    def dedup_key(self) -> tuple:
+        """What makes two suggestions the same result.
+
+        Parish, Website and Church results are deduped on their destination url, because several
+        of them legitimately point at the same website page. Municipalities all share the
+        around_place url: it is a destination, not an identity, so they are keyed on the place.
+
+        TODO give each municipality its own route (e.g. /around_place/<city_uuid>) so that the
+        url is a real identity for every type and this whole special case can go away.
+        """
+        if self.type == 'municipality':
+            # data.gouv results carry no uuid, fall back to what identifies the place there
+            return 'municipality', self.uuid or (self.name, self.context)
+
+        return 'url', self.url
 
     @classmethod
     def from_parish(cls, parish: Parish) -> 'AutocompleteResult':
@@ -231,7 +250,7 @@ async def get_city_response(query: str, latitude: float | None, longitude: float
             + F('s_pop') * Value(POPULATION_WEIGHT),
             output_field=FloatField(),
         )
-    ).order_by('-final_score')[:MAX_CITY_RESULTS]
+    ).order_by('-final_score')[:MAX_AUTOCOMPLETE_RESULTS]
 
     return [AutocompleteResult.from_city(city) async for city in cities]
 
@@ -414,10 +433,10 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
         data_gouv_results + website_by_name_results
         + parish_by_name_results + church_by_name_results)
 
-    seen_urls = set()
+    seen_keys = set()
     unique_results = [
         r for r in sorted_results
-        if r.url not in seen_urls and not seen_urls.add(r.url)
+        if r.dedup_key not in seen_keys and not seen_keys.add(r.dedup_key)
     ]
 
     return unique_results[:MAX_AUTOCOMPLETE_RESULTS]
