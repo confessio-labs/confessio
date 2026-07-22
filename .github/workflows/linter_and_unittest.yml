@@ -35,11 +35,9 @@ jobs:
           uv-${{ runner.os }}-
     - name: Install dependencies
       run: uv sync --group ci
-    # `uv run` re-syncs the environment, and default-groups is empty, so each step must name
-    # the ci group or it would uninstall flake8/tach first.
     - name: Run flake8
-      run: uv run --group ci flake8 .
+      run: uv run flake8 .
     - name: Check module dependencies
-      run: uv run --group ci python scripts/check_dependencies.py
+      run: uv run python scripts/check_dependencies.py
     - name: Run unittests
-      run: uv run --group ci python -m unittest discover -s scheduling/tests -s crawling/tests
+      run: uv run python -m unittest discover -s scheduling/tests -s crawling/tests
