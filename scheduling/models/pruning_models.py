@@ -35,19 +35,17 @@ class Sentence(TimeStampMixin):
     updated_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True)
     updated_on_pruning = models.ForeignKey('Pruning', on_delete=models.SET_NULL, null=True)
     # v1 (action) uses the frozen sentence-transformer embedding (legacy)
-    transformer_name = models.CharField(max_length=100)
-    embedding = VectorField(dimensions=768)
+    transformer_name = models.CharField(max_length=100, null=True, blank=True)
+    embedding = VectorField(dimensions=768, null=True, blank=True)
     # v2 (temporal/confession) uses the fine-tuned Encoder embedding
-    # TODO set not null (once every sentence is embedded by an Encoder)
-    encoder = models.ForeignKey('Encoder', on_delete=models.SET_NULL,
-                                related_name='sentences', null=True)
-    # TODO set not null (once every sentence is re-embedded by the current Encoder)
-    encoder_embedding = VectorField(dimensions=1024, null=True)
+    encoder = models.ForeignKey('Encoder', on_delete=models.SET_NULL, related_name='sentences',
+                                null=True)
+    encoder_embedding = VectorField(dimensions=1024)
     # v1
-    action = models.CharField(max_length=5, choices=Action.choices())
-    source = models.CharField(max_length=5, choices=Source.choices())
+    action = models.CharField(max_length=5, choices=Action.choices(), null=True, blank=True)
+    source = models.CharField(max_length=5, choices=Source.choices(), null=True, blank=True)
     classifier = models.ForeignKey('Classifier', on_delete=models.SET_NULL,
-                                   related_name='sentences', null=True)
+                                   related_name='sentences', null=True, blank=True)
     # v2
     ml_temporal = models.CharField(max_length=5, choices=Temporal.choices())
     human_temporal = models.CharField(max_length=5, choices=Temporal.choices(), null=True)
