@@ -107,7 +107,7 @@ def get_unvalidated_pruning_moderation(pruning: Pruning) -> Optional[PruningMode
         return pruning.moderations.exclude(
             status=ModerationStatus.VALIDATED,
         ).filter(
-            category=PruningModeration.Category.NEW_PRUNED_HTML,
+            category=PruningModeration.Category.V2_DIFF_HUMAN,
         ).get()
     except PruningModeration.DoesNotExist:
         return None
