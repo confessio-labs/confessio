@@ -6,7 +6,6 @@ from simple_history.models import HistoricalRecords
 from core.models.base_models import TimeStampMixin
 from registry.models import Diocese
 from registry.models.base_moderation_models import ModerationMixin
-from scheduling.workflows.pruning.extract.models import Action, Source
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 
 
@@ -34,18 +33,10 @@ class Sentence(TimeStampMixin):
     prunings = models.ManyToManyField('Pruning', related_name='sentences')
     updated_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True)
     updated_on_pruning = models.ForeignKey('Pruning', on_delete=models.SET_NULL, null=True)
-    # v1 (action) uses the frozen sentence-transformer embedding (legacy)
-    transformer_name = models.CharField(max_length=100, null=True, blank=True)
-    embedding = VectorField(dimensions=768, null=True, blank=True)
     # v2 (temporal/confession) uses the fine-tuned Encoder embedding
     encoder = models.ForeignKey('Encoder', on_delete=models.SET_NULL, related_name='sentences',
                                 null=True)
     encoder_embedding = VectorField(dimensions=1024)
-    # v1
-    action = models.CharField(max_length=5, choices=Action.choices(), null=True, blank=True)
-    source = models.CharField(max_length=5, choices=Source.choices(), null=True, blank=True)
-    classifier = models.ForeignKey('Classifier', on_delete=models.SET_NULL,
-                                   related_name='sentences', null=True, blank=True)
     # v2
     ml_temporal = models.CharField(max_length=5, choices=Temporal.choices())
     human_temporal = models.CharField(max_length=5, choices=Temporal.choices(), null=True)

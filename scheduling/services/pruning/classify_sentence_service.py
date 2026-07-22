@@ -9,7 +9,6 @@ from scheduling.services.pruning.encoder_service import (get_prod_encoder,
 from scheduling.services.pruning.train_classifier_service import set_label
 from scheduling.utils.enum_utils import StringEnum
 from scheduling.workflows.pruning.encoder import TorchHeadModel
-from scheduling.workflows.pruning.extract.models import Source
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 from scheduling.workflows.pruning.train_and_predict import TensorFlowModel
 
@@ -148,7 +147,6 @@ def classify_and_create_sentence(stringified_line: str,
 
     sentence = Sentence(
         line=stringified_line,
-        source=Source.ML,
         updated_on_pruning=pruning,
         updated_by=None,
         encoder=prod_encoder,
