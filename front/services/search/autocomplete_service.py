@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from json import JSONDecodeError
+from math import log
 from statistics import mean
 from typing import Optional
 from uuid import UUID
@@ -52,6 +53,19 @@ MAX_LN_POPULATION = 14.73
 GEO_HALF_LIFE_METERS = 50000.0
 
 
+def popularity_of_population(population: int | None) -> float:
+    """Popularity of a municipality, from its inhabitants.
+
+    Counterparts for the other types are not written yet: a website-backed result (parish, church,
+    website) would derive its popularity from Website.nb_recent_hits, which
+    front.services.search.popularity_service already maintains from the last 14 days of traffic.
+    """
+    if not population or population < 1:
+        return 0.0
+
+    return min(log(population) / MAX_LN_POPULATION, 1.0)
+
+
 @dataclass
 class AutocompleteResult:
     type: str
@@ -62,6 +76,9 @@ class AutocompleteResult:
     longitude: Optional[float] = None
     uuid: UUID | None = None
     church_uuid: UUID | None = None
+    # 0..1, how prominent this result is within its own kind: inhabitants for a municipality,
+    # recent page hits for anything backed by a website. See popularity_of_* below.
+    popularity: float = 0.0
 
     @property
     def dedup_key(self) -> tuple:
@@ -199,6 +216,7 @@ class AutocompleteResult:
             longitude=city.location.x,
             url=reverse('around_place_view'),
             uuid=city.uuid,
+            popularity=popularity_of_population(city.population),
         )
 
 
@@ -420,12 +438,20 @@ def restore_municipality_order(results: list[AutocompleteResult],
                                ) -> list[AutocompleteResult]:
     """Put the municipality slots back in the order their source produced them.
 
-    get_score() ranks every type on name similarity and distance only. It has no population term,
+    get_score() ranks every type on name similarity and distance only. It has no popularity term,
     so among municipalities it puts any hamlet that happens to be nearby above a major city: from
-    Paris, 'saint etienne' scored Saint-Étienne-Roilaye (194 inhabitants, 70 km) at 0.238 against
+    Paris, 'saint etienne' scored Saint-Étienne-Roilaye (301 inhabitants, 70 km) at 0.238 against
     0.083 for Saint-Étienne (173k inhabitants, 400 km). Municipalities already arrive ranked by
     the tuned SQL score, which does weigh population, so get_score() is only allowed to decide
     *where* the municipality slots sit among the other types, not which city fills them.
+
+    Feeding AutocompleteResult.popularity into get_score() instead was measured on 2088 recorded
+    hits and is not enough to replace this: the best bonus shape reached 58.5% top-1 / 0.684 MRR
+    against 68.6% / 0.767 here, and it also cost recall (93.7% -> 92.5%) by crowding churches out.
+    get_score()'s SequenceMatcher similarity is case- and accent-sensitive, so 'saint etienne' only
+    scores 0.769 against 'Saint-Étienne'; a popularity bonus cannot lift a base that weak past a
+    nearby hamlet. Fixing that would mean scoring every type with the same prefix + trigram signals
+    the SQL uses, which is a bigger change than this function.
     """
     source_order = iter(municipality_results)
 
