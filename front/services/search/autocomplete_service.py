@@ -484,7 +484,7 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
     # silently disappear until it does.
     municipality_results, website_by_name_results, parish_by_name_results, church_by_name_results \
         = await asyncio.gather(
-            get_data_gouv_response(query, latitude, longitude),
+            get_city_response(query, latitude, longitude),
             get_website_by_name_response(query, latitude, longitude),
             get_parish_by_name_response(query, latitude, longitude),
             get_church_by_name_response(query, latitude, longitude),
