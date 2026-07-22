@@ -21,13 +21,12 @@ from scheduling.services.parsing.parsing_service import get_schedules_list_from_
 from scheduling.services.parsing.reparse_parsing_service import reparse_parsing
 from scheduling.services.pruning.edit_pruning_service import get_single_line_colored_piece, \
     TEMPORAL_COLORS, EVENT_MENTION_COLORS, on_pruning_human_validation, \
-    update_sentence_labels_with_request
+    update_sentence_labels_with_request, Source
 from scheduling.services.pruning.edit_pruning_service import set_v2_indices_as_human
 from scheduling.services.pruning.prune_scraping_service import SentenceQualifyLineInterface, \
     MLSentenceQualifyLineInterface
 from scheduling.services.scheduling.scheduling_process_service import init_scheduling
 from scheduling.services.scheduling.scheduling_service import get_parsing_moderation_of_pruning
-from scheduling.workflows.pruning.extract.models import Source
 from scheduling.workflows.pruning.extract_v2.split_content import create_line_and_tag_v2
 
 

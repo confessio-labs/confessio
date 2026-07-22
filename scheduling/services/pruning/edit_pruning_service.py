@@ -6,8 +6,8 @@ from scheduling.models.pruning_models import Sentence, Pruning, Classifier
 from scheduling.public_service import init_scheduling_for_pruning
 from scheduling.services.pruning.prune_scraping_service import add_necessary_moderation_v2
 from scheduling.services.pruning.train_classifier_service import extract_label
+from scheduling.utils.enum_utils import StringEnum
 from scheduling.utils.html_utils import split_lines, replace_link_by_their_content
-from scheduling.workflows.pruning.extract.models import Source
 from scheduling.workflows.pruning.extract_v2.models import EventMention, Temporal
 from scheduling.workflows.pruning.extract_v2.prune_lines_v2 import get_pruned_lines_indices_v2
 from scheduling.workflows.pruning.extract_v2.qualify_line_interfaces import BaseQualifyLineInterface
@@ -75,6 +75,11 @@ class ColoredPieceV2(BaseModel):
     temporal: Temporal
     source_icon: str
     sentence_uuid: UUID | None
+
+
+class Source(StringEnum):
+    HUMAN = "human"
+    ML = "ml"
 
 
 def get_colored_pieces_v2(extracted_html: str, qualify_line_interface: BaseQualifyLineInterface
