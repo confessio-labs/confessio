@@ -3,9 +3,8 @@
 - `FineTunedEncoder`: loads the PROD `Encoder`'s body from its private HF repo and turns a line
   into a 1024-d embedding (the <s>-token vector). Thread-safe singleton, like `get_transformer`.
 - `Head` / `TorchHeadModel`: the small per-task classifier consuming that embedding. `Head` is the
-  ONE shared definition reused by joint encoder training (`train_encoder.py`) and by cheap nightly
-  head retraining, so head weights are interchangeable. `TorchHeadModel` implements the existing
-  `MachineLearningInterface` so it drops into the training/inference flow next to `TensorFlowModel`.
+  ONE shared definition used by joint encoder training (`train_encoder.py`) and by inference, so
+  head weights are interchangeable. `TorchHeadModel` implements `MachineLearningInterface`.
 
 Env note: torch must be imported before scipy/sklearn (macOS duplicate-OpenMP segfault), and
 transformers must not load its TF backend. We set these guards at import time.

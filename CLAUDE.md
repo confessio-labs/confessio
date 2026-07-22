@@ -56,9 +56,9 @@ in **dev** and promoted on **prod** by hand (it needs ~5-6 GB, too heavy for the
 The two V2 heads are trained **only** jointly with the encoder (`train_encoder`) and registered by
 `promote_encoder` — there is **no** nightly V2 head retrain: the encoder is label-fine-tuned on
 those sentences, so retraining/evaluating a head alone on the stored embeddings leaks (the embedding
-already encodes the label). Nightly only retrains the V1 `action` head (`train_action_model`, frozen
-sentence-transformer, no leakage) and runs `reclassify_sentences` (re-embed/relabel) +
-`find_sentence_outliers`. Requires `HF_TOKEN` (write access to the private HF repo).
+already encodes the label). Nightly only runs `reclassify_sentences` (re-embed/relabel) and
+`find_sentence_outliers` — no model training at all. Requires `HF_TOKEN` (write access to the
+private HF repo).
 
 Dev/prod split: `train_encoder` runs in dev on a prod-DB dump and writes only to HF (no DB);
 `promote_encoder` runs on prod (or locally to test) and registers the encoder from HF into the DB.
@@ -79,8 +79,12 @@ python manage.py promote_encoder --repo-id confessio-labs/pruning-v2-encoder --r
 
 Re-embedding is **lazy**: when the encoder changes, each sentence's `encoder_embedding` is
 recomputed on-the-fly the next time it's classified, and persisted in bulk by the nightly
-`reclassify_sentences`. Action (V1) is unaffected and keeps its frozen sentence-transformer
-embedding.
+`reclassify_sentences`.
+
+Dependencies: inference needs only `torch` + `transformers` (the `ml` dependency group, installed
+in dev and prod). `scikit-learn` is used solely by `train_encoder.py`, so it lives in the `dev`
+group and `encoder_service.train_and_stage_encoder` imports the training module lazily to keep it
+off the prod import path.
 
 ## Architecture
 
@@ -132,7 +136,7 @@ django-ninja API defined in `front/api.py`, mounted in `front/urls.py`. Namespac
 - **django-simple-history** for model versioning (all key models have `HistoricalRecords`)
 - **django-background-tasks** for async workers
 - **fructose** / **openai** for LLM calls
-- **sentence-transformers** + **keras** for ML models (pruning, action classification)
+- **torch** + **transformers** for ML models (fine-tuned camembert-large encoder + per-target heads)
 - **uv** for dependency management (`pyproject.toml`)
 
 ## Code style
