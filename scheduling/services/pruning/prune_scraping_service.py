@@ -8,36 +8,11 @@ from registry.models.base_moderation_models import ModerationStatus
 from scheduling.models.pruning_models import PruningModeration, Pruning, Sentence
 from scheduling.services.pruning.classify_sentence_service import classify_and_create_sentence
 from scheduling.utils.hash_utils import hash_string_to_hex
-from scheduling.workflows.pruning.extract.action_interfaces import BaseActionInterface
-from scheduling.workflows.pruning.extract.extract_content import \
-    extract_paragraphs_lines_and_indices
 from scheduling.workflows.pruning.extract_interface import ExtractMode
 from scheduling.workflows.pruning.extract_v2.extract_content import \
     extract_paragraphs_lines_and_indices_v2
 from scheduling.workflows.pruning.extract_v2.models import EventMention, Temporal
 from scheduling.workflows.pruning.extract_v2.qualify_line_interfaces import BaseQualifyLineInterface
-from scheduling.workflows.pruning.extract.models import Action, Source
-
-
-######################
-# TAGGING WITH DB V1 #
-######################
-
-class SentenceFromDbActionInterface(BaseActionInterface):
-    def __init__(self, pruning: Pruning):
-        self.pruning = pruning
-
-    def get_action(self, stringified_line: str) -> tuple[Action, Source, UUID]:
-        sentence = self.get_sentence(stringified_line)
-        sentence.prunings.add(self.pruning)
-
-        return Action(sentence.action), Source(sentence.source), sentence.uuid
-
-    def get_sentence(self, stringified_line: str) -> Sentence:
-        try:
-            return Sentence.objects.get(line=stringified_line)
-        except Sentence.DoesNotExist:
-            return classify_and_create_sentence(stringified_line, self.pruning)
 
 
 ######################
@@ -145,63 +120,21 @@ def add_new_moderation(pruning: Pruning, category):
              f'already exists, skipping creation')
 
 
-def add_necessary_moderation(pruning: Pruning):
-    category = PruningModeration.Category.NEW_PRUNED_HTML
-    current_moderation = get_current_moderation(pruning, category)
-
-    if pruning.ml_indices == pruning.human_indices:
-        if current_moderation is not None:
-            current_moderation.delete()
-        return
-
-    # 1. If pruning has already moderation
-    if current_moderation is not None:
-        if current_moderation.status != ModerationStatus.VALIDATED:
-            # moderation is not validated yet, we just keep it
-            return
-
-        # moderation has been validated
-        current_moderation.delete()
-
-    add_new_moderation(pruning, category)
-
-
 def add_necessary_moderation_v2(pruning: Pruning):
-    if pruning.v2_indices == pruning.human_indices \
-            or (pruning.human_indices is None and pruning.v2_indices == pruning.ml_indices):
-        delete_moderation(pruning, PruningModeration.Category.V2_DIFF_HUMAN)
-        delete_moderation(pruning, PruningModeration.Category.V2_DIFF_V1)
-        return
-
     if pruning.human_indices is not None and pruning.v2_indices != pruning.human_indices:
         add_new_moderation(pruning, PruningModeration.Category.V2_DIFF_HUMAN)
-        delete_moderation(pruning, PruningModeration.Category.V2_DIFF_V1)
         return
 
     delete_moderation(pruning, PruningModeration.Category.V2_DIFF_HUMAN)
-    add_new_moderation(pruning, PruningModeration.Category.V2_DIFF_V1)
 
 
 ########
 # MAIN #
 ########
 
-def prune_pruning(pruning: Pruning) -> ():
+def prune_pruning(pruning: Pruning) -> None:
     assert pruning.extracted_html, 'Pruning must have not empty extracted_html'
 
-    # V1
-    paragraphs = extract_paragraphs_lines_and_indices(pruning.extracted_html,
-                                                      SentenceFromDbActionInterface(pruning),
-                                                      ExtractMode.PRUNE)
-    ml_indices = sum([indices for _, indices in paragraphs], [])
-
-    if ml_indices != pruning.ml_indices:
-        pruning.ml_indices = ml_indices
-        pruning.save()
-
-        add_necessary_moderation(pruning)
-
-    # V2
     paragraphs_v2 = extract_paragraphs_lines_and_indices_v2(pruning.extracted_html,
                                                             SentenceQualifyLineInterface(pruning),
                                                             ExtractMode.PRUNE)

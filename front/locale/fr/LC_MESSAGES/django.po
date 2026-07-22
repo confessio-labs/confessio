@@ -157,7 +157,6 @@ msgid "diocesesTitle"
 msgstr "Liste des diocèses opérés"
 
 #: templates/pages/edit_pruning_human.html:17
-#: templates/pages/edit_pruning_v1.html:17
 #: templates/pages/edit_pruning_v2.html:17
 #: templates/partials/website_sources.html:12
 #, python-format

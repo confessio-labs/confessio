@@ -25,7 +25,7 @@
             </p>
         </div>
     {% endfor %}
-    {% if human_lines_and_colors and human_lines_and_colors != ml_lines_and_colors %}
+    {% if human_lines_and_colors and v2_lines_and_colors != human_lines_and_colors %}
         <h3>Human validated pruning</h3>
         <p><a class="btn btn-gray-500" href="{% url 'edit_pruning_human' pruning.uuid %}" target="_blank" role="button">
         Edit human pruning<i class="fas fa-up-right-from-square"></i>
@@ -35,29 +35,20 @@
         {% endfor %}
     {% endif %}
     {% if v2_lines_and_colors %}
-        {% if v2_lines_and_colors != ml_lines_and_colors or v2_lines_and_colors != human_lines_and_colors %}
-            <h3>V2 pruning</h3>
-            <p><a class="btn btn-gray-500" href="{% url 'edit_pruning_v2' pruning.uuid %}" target="_blank" role="button">
-            Edit pruning V2 <i class="fas fa-up-right-from-square"></i>
-            </a></p>
-            {% for line, color, differs in v2_lines_and_colors %}
-                <div class="{{ color }} {{ differs }}">{{ line|safe }}</div>
-            {% endfor %}
-            <div>
-                <form action="{% url 'set_v2_as_human' moderation.uuid %}" method="post">
-                    {% csrf_token %}
-                <button type="submit" class="btn btn-warning">Set v2 as human</button>
-                </form>
-            </div>
-        {% endif %}
+        <h3>V2 pruning</h3>
+        <p><a class="btn btn-gray-500" href="{% url 'edit_pruning_v2' pruning.uuid %}" target="_blank" role="button">
+        Edit pruning V2 <i class="fas fa-up-right-from-square"></i>
+        </a></p>
+        {% for line, color, differs in v2_lines_and_colors %}
+            <div class="{{ color }} {{ differs }}">{{ line|safe }}</div>
+        {% endfor %}
+        <div>
+            <form action="{% url 'set_v2_as_human' moderation.uuid %}" method="post">
+                {% csrf_token %}
+            <button type="submit" class="btn btn-warning">Set v2 as human</button>
+            </form>
+        </div>
     {% endif %}
-    <h3>V1 pruning</h3>
-    <p><a class="btn btn-gray-500" href="{% url 'edit_pruning_v1' pruning.uuid %}" target="_blank" role="button">
-        Edit pruning V1 <i class="fas fa-up-right-from-square"></i>
-    </a></p>
-    {% for line, color, differs in ml_lines_and_colors %}
-        <div class="{{ color }} {{ differs }}">{{ line|safe }}</div>
-    {% endfor %}
 
     {% if parsing_moderation %}
         <div>

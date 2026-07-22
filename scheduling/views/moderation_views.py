@@ -46,18 +46,11 @@ def create_pruning_moderation_context(moderation: PruningModeration) -> dict:
 
     differs_by_index = []
     for i in range(len(pruning.extracted_html.split('<br>\n'))):
-        i_in_ml = None if pruning.ml_indices is None else i in pruning.ml_indices
         i_in_human = None if pruning.human_indices is None else i in pruning.human_indices
         i_in_v2 = None if pruning.v2_indices is None else i in pruning.v2_indices
 
-        values = list(filter(lambda b: b is not None, [i_in_ml, i_in_human, i_in_v2]))
+        values = list(filter(lambda b: b is not None, [i_in_human, i_in_v2]))
         differs_by_index.append(len(set(values)) > 1)
-
-    ml_lines_and_colors = []
-    for i, line in enumerate(pruning.extracted_html.split('<br>\n')):
-        color = '' if i in (pruning.ml_indices or []) else 'text-warning'
-        differs = 'fw-bold display-5' if differs_by_index[i] else ''
-        ml_lines_and_colors.append((line, color, differs))
 
     human_lines_and_colors = []
     if pruning.human_indices is not None:
@@ -77,7 +70,6 @@ def create_pruning_moderation_context(moderation: PruningModeration) -> dict:
 
     return {
         'pruning': pruning,
-        'ml_lines_and_colors': ml_lines_and_colors,
         'human_lines_and_colors': human_lines_and_colors,
         'v2_lines_and_colors': v2_lines_and_colors,
         'parsing_moderation': parsing_moderation,

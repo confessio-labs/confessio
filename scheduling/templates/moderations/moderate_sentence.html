@@ -25,15 +25,9 @@
     {% endif %}
 
     {% for pruning in sentence.prunings.all %}
-        {% if moderation.category == 'ml_mismatch' %}
-            <p><a class="btn btn-gray-500" href="{% url 'edit_pruning_v1' pruning.uuid %}" target="_blank" role="button">
-            Edit pruning V1 <i class="fas fa-up-right-from-square"></i>
-            </a></p>
-        {% else %}
-            <p><a class="btn btn-gray-500" href="{% url 'edit_pruning_v2' pruning.uuid %}" target="_blank" role="button">
-            Edit pruning V2 <i class="fas fa-up-right-from-square"></i>
-            </a></p>
-        {% endif %}
+        <p><a class="btn btn-gray-500" href="{% url 'edit_pruning_v2' pruning.uuid %}" target="_blank" role="button">
+        Edit pruning V2 <i class="fas fa-up-right-from-square"></i>
+        </a></p>
     {% endfor %}
 
     {% include 'moderations/_footer.html' %}

@@ -2,17 +2,12 @@ from crawling.workflows.crawl.download_and_search_urls import get_new_url_and_al
     is_new_url_valid
 from crawling.workflows.download.download_content import redirects_to_other_url, \
     get_content_from_url
-from crawling.workflows.scrape.download_refine_and_extract import get_extracted_html_list, \
-    get_extracted_v2_html_list
+from crawling.workflows.scrape.download_refine_and_extract import get_extracted_v2_html_list
 
 
 ######################
 # REFINE AND EXTRACT #
 ######################
-
-def crawling_get_extracted_html_list(html_content: str) -> list[str] | None:
-    return get_extracted_html_list(html_content)
-
 
 def crawling_get_extracted_v2_html_list(html_content: str) -> list[str] | None:
     return get_extracted_v2_html_list(html_content)

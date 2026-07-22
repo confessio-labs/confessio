@@ -72,7 +72,7 @@
             <div>
                 <a href="{{ scraping.url }}" target="_blank">{{ scraping.url }}</a>
                 {% for pruning in scraping.prunings.all %}
-                    <a class="btn btn-gray-500" href="{% url 'edit_pruning_v1' pruning.uuid %}" target="_blank" role="button">
+                    <a class="btn btn-gray-500" href="{% url 'edit_pruning_v2' pruning.uuid %}" target="_blank" role="button">
                         Edit pruning <i class="fas fa-up-right-from-square"></i>
                     </a>
                 {% endfor %}

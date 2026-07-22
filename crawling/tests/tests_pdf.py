@@ -2,7 +2,7 @@ import os
 import unittest
 
 from crawling.workflows.refine.pdf_utils import extract_text_from_pdf_file
-from crawling.workflows.scrape.download_refine_and_extract import get_extracted_html_list
+from crawling.workflows.scrape.download_refine_and_extract import get_extracted_v2_html_list
 
 
 class MyTestCase(unittest.TestCase):
@@ -27,7 +27,7 @@ class MyTestCase(unittest.TestCase):
                     expected_lines = f.readlines()
                 expected_confession_part = ''.join(expected_lines)
 
-                confession_parts = get_extracted_html_list(content_html)
+                confession_parts = get_extracted_v2_html_list(content_html)
                 confession_part = '\n\n'.join(confession_parts) if confession_parts else None
                 # print(confession_part)
 

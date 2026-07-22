@@ -12,70 +12,15 @@ from scheduling.models.pruning_models import Pruning, Sentence
 from scheduling.public_service import init_scheduling_for_sentences
 from scheduling.services.parsing.edit_parsing_service import set_human_json
 from scheduling.services.parsing.parsing_service import get_parsing_schedules_list
-from scheduling.services.pruning.edit_pruning_service import get_colored_pieces, \
-    update_sentence_action, \
-    set_ml_indices_as_human, set_human_indices, \
+from scheduling.services.pruning.edit_pruning_service import set_human_indices, \
     get_pruning_human_pieces, get_colored_pieces_v2, set_v2_indices_as_human, \
     update_sentence_labels_with_request, TEMPORAL_COLORS, EVENT_MENTION_COLORS
-from scheduling.services.pruning.prune_scraping_service import SentenceFromDbActionInterface, \
-    prune_pruning, SentenceQualifyLineInterface
+from scheduling.services.pruning.prune_scraping_service import prune_pruning, \
+    SentenceQualifyLineInterface
 from scheduling.utils.html_utils import split_lines
 from scheduling.workflows.parsing.schedules import SchedulesList, SCHEDULES_LIST_VERSION
-from scheduling.workflows.pruning.extract.action_interfaces import DummyActionInterface
 from scheduling.workflows.pruning.extract_v2.qualify_line_interfaces import \
     DummyQualifyLineInterface
-from scheduling.workflows.pruning.extract.models import Action
-
-
-@login_required
-@permission_required("scheduling.change_sentence")
-def edit_pruning_v1(request, pruning_uuid):
-    try:
-        pruning = Pruning.objects.get(uuid=pruning_uuid)
-    except Pruning.DoesNotExist:
-        return HttpResponseNotFound("Pruning not found")
-
-    extracted_html = pruning.extracted_html
-
-    if request.method == "POST":
-        # We extract action per line from POST
-        dummy_colored_pieces = get_colored_pieces(extracted_html,
-                                                  DummyActionInterface())
-        modified_sentences = []
-        for dummy_piece in dummy_colored_pieces:
-            new_action = Action(request.POST.get(f"action-{dummy_piece.id}"))
-            sentence_uuid = request.POST.get(f"sentence-uuid-{dummy_piece.id}")
-            sentence = Sentence.objects.get(uuid=sentence_uuid)
-
-            if Action(sentence.action) != new_action:
-                modified_sentences.append(sentence)
-                update_sentence_action(sentence, pruning, request.user, new_action)
-
-        # Save pruning
-        prune_pruning(pruning)
-
-        # Set human indices
-        set_ml_indices_as_human(pruning)
-
-        if modified_sentences:
-            # re-prune affected prunings
-            init_scheduling_for_sentences(modified_sentences)
-
-    colored_pieces = get_colored_pieces(extracted_html,
-                                        SentenceFromDbActionInterface(pruning))
-
-    action_colors = {
-        Action.START: 'info',
-        Action.SHOW: 'success',
-        Action.HIDE: 'black',
-        Action.STOP: 'danger',
-    }
-
-    return render(request, 'pages/edit_pruning_v1.html', {
-        'pruning': pruning,
-        'colored_pieces': colored_pieces,
-        'action_colors': action_colors,
-    })
 
 
 @login_required

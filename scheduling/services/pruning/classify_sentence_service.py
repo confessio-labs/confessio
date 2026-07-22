@@ -3,16 +3,16 @@ import threading
 from django.db import transaction, IntegrityError
 
 from scheduling.models.pruning_models import Classifier, Sentence, Pruning
-from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
-from scheduling.workflows.pruning.extract.models import Source, Action
-from scheduling.workflows.pruning.train_and_predict import TensorFlowModel
-from scheduling.workflows.pruning.encoder import TorchHeadModel
-from scheduling.workflows.pruning.transform_sentence import get_transformer, TRANSFORMER_NAME
 from scheduling.services.pruning.classifier_target_service import get_target_enum
 from scheduling.services.pruning.encoder_service import (ENCODER_TARGETS, get_prod_encoder,
                                                          get_prod_encoder_model)
 from scheduling.services.pruning.train_classifier_service import set_label
 from scheduling.utils.enum_utils import StringEnum
+from scheduling.workflows.pruning.encoder import TorchHeadModel
+from scheduling.workflows.pruning.extract.models import Source
+from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
+from scheduling.workflows.pruning.train_and_predict import TensorFlowModel
+from scheduling.workflows.pruning.transform_sentence import get_transformer, TRANSFORMER_NAME
 
 _classifier = {}
 _classifier_lock = threading.Lock()
@@ -141,10 +141,7 @@ def get_ml_label(sentence: Sentence, target: Classifier.Target) -> StringEnum:
     assert target == classifier.target, \
         f"Target {target} does not match classifier target {classifier.target}"
 
-    if target == Classifier.Target.ACTION:
-        if sentence.source == Source.ML and sentence.classifier_id == classifier.uuid:
-            return Action(sentence.action)
-    elif target == Classifier.Target.TEMPORAL:
+    if target == Classifier.Target.TEMPORAL:
         if sentence.temporal_classifier_id == classifier.uuid:
             return Temporal(sentence.ml_temporal)
     elif target == Classifier.Target.CONFESSION:
@@ -154,9 +151,8 @@ def get_ml_label(sentence: Sentence, target: Classifier.Target) -> StringEnum:
         raise NotImplementedError(f'Target {target} is not supported for label extraction')
 
     ml_label, _ = classify_existing_sentence(sentence, target)
-    if not (target == Classifier.Target.ACTION and sentence.source == Source.HUMAN):
-        set_label(sentence, ml_label, classifier)
-        sentence.save()
+    set_label(sentence, ml_label, classifier)
+    sentence.save()
 
     return ml_label
 
@@ -166,8 +162,6 @@ def get_sentences_with_wrong_classifier(target: Classifier.Target) -> list[Sente
 
     sentence_query = Sentence.objects
 
-    if target == Classifier.Target.ACTION:
-        sentence_query = sentence_query.filter(source=Source.ML).exclude(classifier=classifier)
     if target == Classifier.Target.TEMPORAL:
         sentence_query = sentence_query.exclude(temporal_classifier=classifier)
     if target == Classifier.Target.CONFESSION:

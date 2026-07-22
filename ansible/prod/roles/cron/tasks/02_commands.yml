@@ -9,18 +9,6 @@
     minute: "{{ item.minute }}"
     job: "(tmux has-session -t {{ item.name }} || tmux new-session -d -s {{ item.name }}) && tmux send-keys -t {{ item.name }} 'sudo systemd-run --scope --property=MemoryMax={{ item.memory_max }} flock /var/lock/manage.lock bash -c \". {{ app_dir }}/.env; {{ venv_python }} {{ app_dir }}/manage.py {{ item.command }}\"' C-m"
   with_items:
-    - name: daily_train_action_model
-      command: "train_action_model --automatic"
-      hour: "0"
-      minute: 35
-      memory_max: "3200M"
-    - name: daily_reclassify_action
-      command: "reclassify_sentences -t action"
-      hour: "0"
-      minute: 40
-      memory_max: "3200M"
-    # V2 reclassify/outliers load the fine-tuned camembert-large encoder (~1.3 GB) to re-embed
-    # stale sentences the night after an encoder promotion -> higher cap than the 3.2 GB default.
     - name: daily_reclassify_temporal
       command: "reclassify_sentences -t temporal"
       hour: "0"
@@ -46,16 +34,6 @@
       hour: "8"
       minute: 0
       memory_max: "800M"
-#    - name: hourly_scrape_pages
-#      command: "scrape_pages -t 6900"
-#      hour: "9,11,13,15,17,19,21"
-#      minute: 0
-#      memory_max: "800M"
-#    - name: hourly_crawl_websites_in_error
-#      command: "crawl_websites --in-error -t 21300"
-#      hour: "10,16"
-#      minute: 0
-#      memory_max: "800M"
     - name: daily_clean_database
       command: "clean_database"
       hour: "23"
