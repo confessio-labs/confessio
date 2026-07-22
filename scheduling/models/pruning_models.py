@@ -132,7 +132,6 @@ class PruningModeration(ModerationMixin):
 
 class SentenceModeration(ModerationMixin):
     class Category(models.TextChoices):
-        ML_MISMATCH = "ml_mismatch"
         V2_OUTLIER = "v2_outlier"
 
     resource = 'sentence'
@@ -141,15 +140,9 @@ class SentenceModeration(ModerationMixin):
     history = HistoricalRecords()
     sentence = models.ForeignKey('Sentence', on_delete=models.CASCADE, related_name='moderations')
     category = models.CharField(max_length=20, choices=Category)
-    action = models.CharField(max_length=5, choices=Action.choices(), null=True)
-    other_action = models.CharField(max_length=5, choices=Action.choices(), null=True)
 
     class Meta:
         unique_together = ('sentence', 'category')
 
     def delete_on_validate(self) -> bool:
-        if self.category == self.Category.ML_MISMATCH and self.sentence.action != self.action:
-            # We delete moderation if action has been changed
-            return True
-
         return False

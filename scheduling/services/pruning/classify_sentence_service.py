@@ -4,7 +4,7 @@ from django.db import transaction, IntegrityError
 
 from scheduling.models.pruning_models import Classifier, Sentence, Pruning
 from scheduling.services.pruning.classifier_target_service import get_target_enum
-from scheduling.services.pruning.encoder_service import (ENCODER_TARGETS, get_prod_encoder,
+from scheduling.services.pruning.encoder_service import (get_prod_encoder,
                                                          get_prod_encoder_model)
 from scheduling.services.pruning.train_classifier_service import set_label
 from scheduling.utils.enum_utils import StringEnum
@@ -12,7 +12,6 @@ from scheduling.workflows.pruning.encoder import TorchHeadModel
 from scheduling.workflows.pruning.extract.models import Source
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 from scheduling.workflows.pruning.train_and_predict import TensorFlowModel
-from scheduling.workflows.pruning.transform_sentence import get_transformer, TRANSFORMER_NAME
 
 _classifier = {}
 _classifier_lock = threading.Lock()
@@ -34,13 +33,9 @@ def get_classifier(target: Classifier.Target
                 except Classifier.DoesNotExist:
                     raise ValueError(f"No classifier in production for target {target}")
 
-                if target in ENCODER_TARGETS:
-                    # compatibility = trained on the current PROD encoder (DB row only, no HF load)
-                    assert classifier.encoder_id == get_prod_encoder_model().uuid, \
-                        "Classifier and PROD encoder are not compatible"
-                else:
-                    assert classifier.transformer_name == TRANSFORMER_NAME, \
-                        "Classifier and transformer are not compatible"
+                # compatibility = trained on the current PROD encoder (DB row only, no HF load)
+                assert classifier.encoder_id == get_prod_encoder_model().uuid, \
+                    "Classifier and PROD encoder are not compatible"
                 _classifier[target] = classifier
 
     return _classifier[target]
@@ -67,26 +62,6 @@ def get_model(classifier: Classifier):
     return _model[target]
 
 
-def classify_line(stringified_line: str, target: Classifier.Target
-                  ) -> tuple[StringEnum, Classifier, list, object]:
-    # 1. Embed the line (sentence-transformer for action, fine-tuned encoder for v2)
-    if target in ENCODER_TARGETS:
-        _, embedder = get_prod_encoder()
-    else:
-        embedder = get_transformer()
-    embedding = embedder.embed(stringified_line) if target in ENCODER_TARGETS \
-        else embedder.transform(stringified_line)
-
-    # 2. Get classifier + model
-    classifier = get_classifier(target)
-    model = get_model(classifier)
-
-    # 3. Predict label
-    label = model.predict([embedding])[0]
-
-    return label, classifier, embedding, embedder
-
-
 def classify_existing_sentence(sentence: Sentence, target: Classifier.Target
                                ) -> tuple[StringEnum, Classifier]:
     labels, classifier = classify_existing_sentences([sentence], target)
@@ -97,12 +72,7 @@ def classify_existing_sentence(sentence: Sentence, target: Classifier.Target
 def classify_existing_sentences(sentences: list[Sentence], target: Classifier.Target
                                 ) -> tuple[list[StringEnum], Classifier]:
     # 1. Collect embeddings, reusing the stored one when still produced by the current encoder.
-    if target in ENCODER_TARGETS:
-        embeddings = _encoder_embeddings(sentences)
-    else:
-        transformer = get_transformer()
-        embeddings = [sentence.embedding if sentence.transformer_name == transformer.get_name()
-                      else transformer.transform(sentence.line) for sentence in sentences]
+    embeddings = _encoder_embeddings(sentences)
 
     # 2. Get classifier + model
     classifier = get_classifier(target)
@@ -172,22 +142,15 @@ def get_sentences_with_wrong_classifier(target: Classifier.Target) -> list[Sente
 
 def classify_and_create_sentence(stringified_line: str,
                                  pruning: Pruning) -> Sentence:
-    # v1 action: sentence-transformer embedding + action label
-    action, classifier, embedding, transformer = classify_line(stringified_line,
-                                                               Classifier.Target.ACTION)
     # v2: fine-tuned encoder embedding (shared by temporal + confession)
     prod_encoder, finetuned = get_prod_encoder()
     encoder_embedding = finetuned.embed(stringified_line)
 
     sentence = Sentence(
         line=stringified_line,
-        action=action,
         source=Source.ML,
         updated_on_pruning=pruning,
         updated_by=None,
-        classifier=classifier,
-        embedding=embedding,
-        transformer_name=transformer.get_name(),
         encoder=prod_encoder,
         encoder_embedding=encoder_embedding,
     )
