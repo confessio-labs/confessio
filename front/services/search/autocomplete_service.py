@@ -185,6 +185,11 @@ class AutocompleteResult:
 
 async def get_city_response(query: str, latitude: float | None, longitude: float | None
                             ) -> list[AutocompleteResult]:
+    """Municipality autocomplete from the local City table, replacing get_data_gouv_response().
+
+    Not wired in yet: it returns nothing until one_shot__seed_cities has run, so it is switched
+    on from get_aggregated_response() only once the target database has been seeded.
+    """
     if not query or len(query) > 200 or len(query) < 3 or not query[0].isalnum():
         return []
 
@@ -233,10 +238,10 @@ async def get_city_response(query: str, latitude: float | None, longitude: float
 
 async def get_data_gouv_response(query: str, latitude: float | None, longitude: float | None
                                  ) -> list[AutocompleteResult]:
-    """Legacy municipality autocomplete, superseded by get_city_response().
+    """Municipality autocomplete through the external data.gouv completion API.
 
-    Kept as a fallback: to switch back, call it instead of get_city_response() in
-    get_aggregated_response().
+    Still the one wired into get_aggregated_response(). It is meant to be replaced by
+    get_city_response(), which is why it is kept here: switching back is a one-line change.
     """
     if not query or len(query) > 200 or len(query) < 3 or not query[0].isalnum():
         return []
@@ -393,9 +398,12 @@ def sort_results(query, latitude: float | None, longitude: float | None,
 
 async def get_aggregated_response(query, latitude: float | None, longitude: float | None
                                   ) -> list[AutocompleteResult]:
-    city_results, website_by_name_results, parish_by_name_results, church_by_name_results = \
+    # To switch to the local City table, call get_city_response() here instead. Do it only once
+    # one_shot__seed_cities has run on the target database, otherwise municipality suggestions
+    # silently disappear until it does.
+    data_gouv_results, website_by_name_results, parish_by_name_results, church_by_name_results = \
         await asyncio.gather(
-            get_city_response(query, latitude, longitude),
+            get_data_gouv_response(query, latitude, longitude),
             get_website_by_name_response(query, latitude, longitude),
             get_parish_by_name_response(query, latitude, longitude),
             get_church_by_name_response(query, latitude, longitude),
@@ -403,7 +411,7 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
 
     sorted_results = sort_results(
         query, latitude, longitude,
-        city_results + website_by_name_results
+        data_gouv_results + website_by_name_results
         + parish_by_name_results + church_by_name_results)
 
     seen_urls = set()
