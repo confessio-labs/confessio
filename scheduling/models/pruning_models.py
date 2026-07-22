@@ -14,7 +14,6 @@ class Pruning(TimeStampMixin):
     # We can not set unique=True because size can exceed index limits
     extracted_html = models.TextField(editable=False)
     extracted_html_hash = models.CharField(max_length=32, unique=True, editable=False)
-    ml_indices = ArrayField(models.PositiveSmallIntegerField(), null=True)
     v2_indices = ArrayField(models.PositiveSmallIntegerField(), null=True)
     human_indices = ArrayField(models.PositiveSmallIntegerField(), null=True)
 
