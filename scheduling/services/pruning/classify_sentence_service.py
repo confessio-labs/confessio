@@ -10,7 +10,6 @@ from scheduling.services.pruning.train_classifier_service import set_label
 from scheduling.utils.enum_utils import StringEnum
 from scheduling.workflows.pruning.encoder import TorchHeadModel
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
-from scheduling.workflows.pruning.train_and_predict import TensorFlowModel
 
 _classifier = {}
 _classifier_lock = threading.Lock()
@@ -51,10 +50,7 @@ def get_model(classifier: Classifier):
                 different_labels = target_enum.list_items()
                 assert classifier.different_labels == different_labels, \
                     "Classifier and model are not compatible"
-                if classifier.encoder_id is None:
-                    tmp_model = TensorFlowModel[target_enum](different_labels)
-                else:
-                    tmp_model = TorchHeadModel[target_enum](different_labels)
+                tmp_model = TorchHeadModel[target_enum](different_labels)
                 tmp_model.from_pickle(classifier.pickle)
                 _model[target] = tmp_model
 
