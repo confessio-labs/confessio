@@ -415,13 +415,30 @@ def sort_results(query, latitude: float | None, longitude: float | None,
     return sorted_values
 
 
+def restore_municipality_order(results: list[AutocompleteResult],
+                               municipality_results: list[AutocompleteResult]
+                               ) -> list[AutocompleteResult]:
+    """Put the municipality slots back in the order their source produced them.
+
+    get_score() ranks every type on name similarity and distance only. It has no population term,
+    so among municipalities it puts any hamlet that happens to be nearby above a major city: from
+    Paris, 'saint etienne' scored Saint-Étienne-Roilaye (194 inhabitants, 70 km) at 0.238 against
+    0.083 for Saint-Étienne (173k inhabitants, 400 km). Municipalities already arrive ranked by
+    the tuned SQL score, which does weigh population, so get_score() is only allowed to decide
+    *where* the municipality slots sit among the other types, not which city fills them.
+    """
+    source_order = iter(municipality_results)
+
+    return [next(source_order, r) if r.type == 'municipality' else r for r in results]
+
+
 async def get_aggregated_response(query, latitude: float | None, longitude: float | None
                                   ) -> list[AutocompleteResult]:
     # To switch to the local City table, call get_city_response() here instead. Do it only once
     # one_shot__seed_cities has run on the target database, otherwise municipality suggestions
     # silently disappear until it does.
-    data_gouv_results, website_by_name_results, parish_by_name_results, church_by_name_results = \
-        await asyncio.gather(
+    municipality_results, website_by_name_results, parish_by_name_results, church_by_name_results \
+        = await asyncio.gather(
             get_data_gouv_response(query, latitude, longitude),
             get_website_by_name_response(query, latitude, longitude),
             get_parish_by_name_response(query, latitude, longitude),
@@ -430,7 +447,7 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
 
     sorted_results = sort_results(
         query, latitude, longitude,
-        data_gouv_results + website_by_name_results
+        municipality_results + website_by_name_results
         + parish_by_name_results + church_by_name_results)
 
     seen_keys = set()
@@ -438,5 +455,6 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
         r for r in sorted_results
         if r.dedup_key not in seen_keys and not seen_keys.add(r.dedup_key)
     ]
+    unique_results = restore_municipality_order(unique_results, municipality_results)
 
     return unique_results[:MAX_AUTOCOMPLETE_RESULTS]
