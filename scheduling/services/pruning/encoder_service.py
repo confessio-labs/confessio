@@ -20,7 +20,6 @@ from scheduling.models.pruning_models import Classifier, Encoder, Sentence
 from scheduling.services.pruning.classifier_target_service import get_target_enum
 from scheduling.utils.stat_utils import is_significantly_different
 from scheduling.workflows.pruning.encoder import FineTunedEncoder, TorchHeadModel
-from scheduling.workflows.pruning.train_encoder import train_multitask
 
 DEFAULT_HF_REPO_ID = os.environ.get("ENCODER_HF_REPO_ID", "confessio-labs/pruning-v2-encoder")
 DEFAULT_BASE_MODEL = "camembert/camembert-large"
@@ -150,6 +149,10 @@ def train_and_stage_encoder(base_model: str = DEFAULT_BASE_MODEL) -> dict:
     """Fine-tune and stage artifacts locally (body + tokenizer + meta.json). NO database writes,
     NO network. Returns metrics. The caller pushes separately (so a failed upload never hides the
     training result and is retryable via push_encoder)."""
+    # Imported lazily: train_encoder pulls scikit-learn, a dev-only dependency. Keeping it out of
+    # the module scope keeps the prod inference path (classify_sentence_service) free of it.
+    from scheduling.workflows.pruning.train_encoder import train_multitask
+
     lines, labels_by_task = build_encoder_dataset()
     model, tokenizer, metrics = train_multitask(lines, labels_by_task, base_model=base_model)
     meta = _build_meta(model, metrics, base_model)

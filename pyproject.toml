@@ -26,9 +26,6 @@ dependencies = [
     "beautifulsoup4==4.14.2",
     "fructose==0.0.11",
     "haversine==2.8.1",
-    "scikit-learn==1.5.1",
-    "pandas==2.3.3",
-    "keras==3.13.2",
     "numpy==2.3.5",
     "scipy==1.16.3",
     "tqdm==4.66.3",
@@ -53,17 +50,18 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    { include-group = "ci" },  # Include all CI dependencies
-
-    # Heavy dependencies
-    "sentence-transformers==2.5.1",
-    # V2 fine-tuned encoder (camembert-large) + heads
+# V2 fine-tuned encoder (camembert-large) + heads. Runtime dependency, needed by dev AND prod.
+ml = [
     "torch==2.12.0",
     "transformers==4.57.3",
+]
 
-    # Differs from production
-    "tensorflow==2.20.0",
+dev = [
+    { include-group = "ci" },  # Include all CI dependencies
+    { include-group = "ml" },  # Include the encoder runtime
+
+    # Encoder fine-tuning only (train_encoder.py), never imported on prod
+    "scikit-learn==1.5.1",
 
     # Used to deploy
     "ansible==13.3.0",
@@ -77,14 +75,7 @@ dev = [
 ]
 
 prod = [
-    # Heavy dependencies
-    "sentence-transformers==2.5.1",
-    # V2 fine-tuned encoder (camembert-large) + heads
-    "torch==2.12.0",
-    "transformers==4.57.3",
-
-    # Differs from dev
-    "tensorflow-cpu==2.20.0",
+    { include-group = "ml" },  # Include the encoder runtime
 ]
 
 ci = [
@@ -99,12 +90,17 @@ ci = [
     "tach==0.33.2",
 ]
 
+[tool.uv]
+# uv defaults this to ["dev"], which silently leaked ansible/matplotlib/silk into
+# `uv sync --group prod` and `--group ci`. Every call site must now name its group explicitly.
+default-groups = []
+
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true  # Only use this index for packages that explicitly reference it
 
 [tool.uv.sources]
-# This tells uv: "Whenever you see 'torch', only look in the 'pytorch-cpu' index"
+# This tells uv: "Whenever you see 'torch', only look in the 'pytorch-cpu' index".
+# Without it, the Linux resolution pulls the CUDA build and ~10 nvidia-* wheels (multi-GB).
 torch = { index = "pytorch-cpu" }
-torchvision = { index = "pytorch-cpu" }
