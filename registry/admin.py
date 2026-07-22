@@ -4,7 +4,7 @@ from leaflet.admin import LeafletGeoAdmin, LeafletGeoAdminMixin
 from simple_history.admin import SimpleHistoryAdmin
 
 from crawling.models import WebsiteForbiddenPath
-from registry.models import Church, Parish, Diocese, Website
+from registry.models import Church, City, Parish, Diocese, Website
 
 
 @admin.register(Diocese)
@@ -60,6 +60,13 @@ class ChurchAdmin(LeafletGeoAdmin, SimpleHistoryAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(City)
+class CityAdmin(LeafletGeoAdmin):
+    list_display = ["name", "zipcode", "population"]
+    search_fields = ["name", "zipcode"]
+    display_raw = True
 
 
 # https://books.agiliq.com/projects/django-admin-cookbook/en/latest/fk_display.html

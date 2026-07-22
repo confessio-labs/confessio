@@ -1,7 +1,7 @@
 from urllib.parse import quote
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from requests import RequestException, JSONDecodeError
 
 
@@ -55,6 +55,45 @@ def geocode_gouv_fr(name, address, city, zipcode) -> GouvFrGeocodingResult | Non
         city=city,
         zipcode=zipcode
     )
+
+
+class GouvFrCommune(BaseModel):
+    nom: str
+    code: str
+    zipcodes: list[str] = Field(default_factory=list, alias='codesPostaux')
+    population: int | None = None
+    centre: dict | None = None
+
+
+def fetch_communes() -> list[GouvFrCommune]:
+    """Fetches every current French commune (~35k, ~5 MB).
+
+    `type=commune-actuelle` is the API default, but passing it explicitly guarantees that
+    arrondissements municipaux (Paris 1er, Lyon 3e, ...) stay out: Paris, Lyon and Marseille
+    are each returned once, with all their arrondissement zipcodes aggregated.
+    """
+    url = ('https://geo.api.gouv.fr/communes'
+           '?fields=nom,code,codesPostaux,population,centre&type=commune-actuelle')
+
+    try:
+        r = requests.get(url, timeout=120)
+    except RequestException as e:
+        print('error while fetching communes', e)
+        return []
+
+    if r.status_code != 200:
+        print(r.status_code)
+        print(r.text[:500])
+        return []
+
+    try:
+        data = r.json()
+    except JSONDecodeError as e:
+        print('invalid json response', e)
+        print(r.text[:500])
+        return []
+
+    return [GouvFrCommune(**item) for item in data]
 
 
 if __name__ == '__main__':
