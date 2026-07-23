@@ -1,12 +1,10 @@
 import asyncio
 from dataclasses import dataclass
-from json import JSONDecodeError
 from math import log
 from statistics import mean
 from typing import Optional
 from uuid import UUID
 
-import httpx
 from django.contrib.gis.db.models import Collect
 from django.contrib.gis.db.models.functions import Distance, Centroid
 from django.contrib.gis.geos import Point
@@ -17,7 +15,6 @@ from django.db.models import F
 from django.db.models import Value
 from django.db.models.functions import Greatest, Ln, Replace, Lower
 from django.urls import reverse
-from httpx import RequestError
 
 from front.utils.department_utils import get_departments_context
 from front.utils.distance_utils import distance
@@ -290,72 +287,6 @@ async def get_city_response(query: str, latitude: float | None, longitude: float
     ).order_by('-final_score')[:MAX_AUTOCOMPLETE_RESULTS]
 
     return [AutocompleteResult.from_city(city) async for city in cities]
-
-
-async def get_data_gouv_response(query: str, latitude: float | None, longitude: float | None
-                                 ) -> list[AutocompleteResult]:
-    """Municipality autocomplete through the external data.gouv completion API.
-
-    Still the one wired into get_aggregated_response(). It is meant to be replaced by
-    get_city_response(), which is why it is kept here: switching back is a one-line change.
-    """
-    if not query or len(query) > 200 or len(query) < 3 or not query[0].isalnum():
-        return []
-
-    # https://cartes.gouv.fr/aide/fr/guides-utilisateur/utiliser-les-services-de-la-geoplateforme/autocompletion/
-    url = f'https://data.geopf.fr/geocodage/completion/'
-    lonlat_dict = {}
-    if latitude is not None and longitude is not None:
-        lonlat_dict = {'lonlat': f'{longitude},{latitude}'}
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url, params={
-                    'text': query,
-                    'maximumResponses': MAX_AUTOCOMPLETE_RESULTS,
-                    'type': 'PositionOfInterest',
-                    'poiType': 'commune',
-                } | lonlat_dict)
-    except RequestError as e:
-        print(f'Exception in get_data_gouv_response: {e}')
-        print(f"Query: {query}")
-        from core.otel.metrics_service import metrics_service
-        metrics_service.increment_warning_counter('data_gouv_error')
-        return []
-
-    if response.status_code != 200:
-        print(f'Error in get_data_gouv_response: {response.status_code}')
-        print(f"Query: {query}, Response code {response.status_code}, "
-              f"Response text: {response.text}")
-        from core.otel.metrics_service import metrics_service
-        metrics_service.increment_warning_counter('data_gouv_error')
-        return []
-
-    try:
-        data = response.json()
-    except JSONDecodeError as e:
-        print(f'JSON decode error in get_data_gouv_response: {e}')
-        print(f'Query: {query}, Response text: {response.text}')
-        from core.otel.metrics_service import metrics_service
-        metrics_service.increment_warning_counter('data_gouv_error')
-        return []
-
-    if 'results' not in data or not data['results']:
-        return []
-
-    results = []
-    for result in data['results']:
-        results.append(AutocompleteResult(
-            type='municipality',
-            name=result['names'][0],
-            context=result.get('zipcode', ''),
-            latitude=result['y'],
-            longitude=result['x'],
-            url=reverse('around_place_view'),
-        ))
-
-    return results
 
 
 async def get_parish_by_name_response(query, latitude: float | None,
