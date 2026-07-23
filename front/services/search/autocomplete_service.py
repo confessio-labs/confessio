@@ -100,17 +100,9 @@ class AutocompleteResult:
     def dedup_key(self) -> tuple:
         """What makes two suggestions the same result.
 
-        Parish, Website and Church results are deduped on their destination url, because several
-        of them legitimately point at the same website page. Municipalities all share the
-        around_place url: it is a destination, not an identity, so they are keyed on the place.
-
-        TODO give each municipality its own route (e.g. /around_place/<city_uuid>) so that the
-        url is a real identity for every type and this whole special case can go away.
+        The destination url, for every type: several parishes, websites or churches legitimately
+        point at the same website page, and each municipality has its own /ville/<slug> route.
         """
-        if self.type == 'municipality':
-            # data.gouv results carry no uuid, fall back to what identifies the place there
-            return 'municipality', self.uuid or (self.name, self.context)
-
         return 'url', self.url
 
     @classmethod
@@ -230,7 +222,7 @@ class AutocompleteResult:
             context=city.zipcode,
             latitude=city.location.y,
             longitude=city.location.x,
-            url=reverse('around_place_view'),
+            url=reverse('city_view', kwargs={'city_slug': city.slug}),
             uuid=city.uuid,
             popularity=popularity_of_population(city.population),
         )

@@ -25,7 +25,7 @@ from front.services.search.search_service import TimeFilter, get_churches_in_box
     fetch_events, DEFAULT_SEARCH_BOX, SearchResult
 from front.services.search.stat_service import new_search_hit
 from front.utils.web_utils import redirect_with_url_params
-from registry.models import Website, Diocese, Church
+from registry.models import Website, Diocese, Church, City
 from registry.utils.string_utils import lower_first, city_and_prefix
 from scheduling.public_service import scheduling_get_indexed_scheduling, \
     scheduling_get_scheduling_sources, scheduling_get_scheduling_primary_sources
@@ -217,7 +217,8 @@ def home(request):
     return redirect('index')
 
 
-def index(request, diocese_slug=None, website_uuid: str = None, is_around_me: bool = False):
+def index(request, diocese_slug=None, city_slug: str = None, website_uuid: str = None,
+          is_around_me: bool = False):
     location = request.GET.get('location', '')
     latitude = extract_float('latitude', request)
     longitude = extract_float('longitude', request)
@@ -269,6 +270,24 @@ def index(request, diocese_slug=None, website_uuid: str = None, is_around_me: bo
         bounds = None
 
         h1_title = f'{website.name}'
+        meta_title = f"{h1_title} | {gettext('confessioTitle')}"
+        display_sub_title = False
+    # before the latitude/longitude branch: the filter forms re-post every current GET parameter
+    # to action_path, so stale coordinates must never win over the slug
+    elif city_slug:
+        try:
+            city = City.objects.get(slug=city_slug)
+        except City.DoesNotExist:
+            return HttpResponseNotFound("City not found")
+
+        center = [city.location.y, city.location.x]
+        search_result = get_churches_around(center, time_filter)
+        search_result.too_many_results = False
+        bounds = None
+        # prefills the search box, like the location query param does for around_place
+        location = city.name
+
+        h1_title = f'Se confesser {city_and_prefix(city.name)}'
         meta_title = f"{h1_title} | {gettext('confessioTitle')}"
         display_sub_title = False
     elif latitude and longitude:

@@ -37,13 +37,13 @@
             <div class="row text-white mb-3">
                 <div class="col-12 text-center">
                     <div>Accès rapide :</div>
-                    <a href="{% url 'around_place_view' %}?location=Paris&latitude=48.859&longitude=2.347">
+                    <a href="{% url 'city_view' 'paris' %}">
                         Paris
-                    </a> ○ <a href="{% url 'around_place_view' %}?location=Lyon&latitude=45.758&longitude=4.835">
+                    </a> ○ <a href="{% url 'city_view' 'lyon' %}">
                         Lyon
-                    </a> ○ <a href="{% url 'around_place_view' %}?location=Marseille&latitude=43.282&longitude=5.405">
+                    </a> ○ <a href="{% url 'city_view' 'marseille' %}">
                         Marseille
-                    </a> ○ <a href="{% url 'around_place_view' %}?location=Toulouse&latitude=43.604082&longitude=1.433805">
+                    </a> ○ <a href="{% url 'city_view' 'toulouse' %}">
                         Toulouse
                     </a>
                 </div>
