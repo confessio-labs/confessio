@@ -1,5 +1,7 @@
 import string
 
+import pymupdf
+
 
 def has_bad_encoding(text: str) -> bool:
     words = text.split()
@@ -134,15 +136,11 @@ def extract_text_from_pdf_page(page) -> str:
 
 
 def extract_text_from_pdf_file(pdf_file: str) -> str:
-    import pymupdf
-
     doc = pymupdf.open(pdf_file)
     return extract_text_from_doc(doc)
 
 
 def extract_text_from_pdf_bytes(raw_content: bytes) -> str | None:
-    import pymupdf
-
     try:
         doc = pymupdf.open(stream=raw_content, filetype="pdf")
     except pymupdf.FileDataError as e:
