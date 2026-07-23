@@ -52,7 +52,7 @@ dependencies = [
 [dependency-groups]
 # V2 fine-tuned encoder (camembert-large) + heads. Runtime dependency, needed by dev AND prod.
 ml = [
-    "torch==2.12.0",
+    "torch==2.13.0",
     "transformers==4.57.3",
 ]
 
