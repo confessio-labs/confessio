@@ -1,6 +1,7 @@
 import string
 
-import pymupdf
+# pymupdf (~0.06 s) is imported lazily, inside the two functions that open a document, to keep it
+# off the server startup path.
 
 
 def has_bad_encoding(text: str) -> bool:
@@ -136,11 +137,15 @@ def extract_text_from_pdf_page(page) -> str:
 
 
 def extract_text_from_pdf_file(pdf_file: str) -> str:
+    import pymupdf
+
     doc = pymupdf.open(pdf_file)
     return extract_text_from_doc(doc)
 
 
 def extract_text_from_pdf_bytes(raw_content: bytes) -> str | None:
+    import pymupdf
+
     try:
         doc = pymupdf.open(stream=raw_content, filetype="pdf")
     except pymupdf.FileDataError as e:

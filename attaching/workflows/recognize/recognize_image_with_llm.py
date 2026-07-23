@@ -1,9 +1,9 @@
-import openai
 import os
 
-from openai import BadRequestError
-
 from core.utils.llm_utils import LLMProvider
+
+# openai (~0.24 s) is imported lazily: this module is worker-only but is reachable from the
+# server startup path (attaching.signals -> attaching.public_service -> worker_recognize_service).
 
 
 def get_prompt() -> str:
@@ -23,6 +23,9 @@ def remove_triple_quotes(text: str) -> str:
 
 def get_html_from_image(image_url: str, prompt: str, llm_provider: LLMProvider,
                         llm_model: str, max_attempts: int = 3) -> tuple[str | None, str | None]:
+    import openai
+    from openai import BadRequestError
+
     assert llm_provider == LLMProvider.OPENAI
     openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY_RECOGNIZE"))
 

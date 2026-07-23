@@ -1,5 +1,3 @@
-from scipy import stats
-
 # Minimum number of labeled sentences required to train/evaluate a classifier head.
 MIN_DATASET_SIZE = 300
 
@@ -21,6 +19,11 @@ def get_test_size(dataset_size: int) -> int:
 def is_significantly_different(accuracy1, accuracy2, n1, n2):
     if n1 == 0 or n2 == 0:
         return False
+
+    # scipy costs ~0.7 s to import and is only needed here (encoder promotion), never on the
+    # server import path. torch first: macOS duplicate-OpenMP segfault guard.
+    import torch  # noqa: F401
+    from scipy import stats
 
     nb_success1 = round(n1 * accuracy1)
     values1 = [1] * nb_success1 + [0] * (n1 - nb_success1)
