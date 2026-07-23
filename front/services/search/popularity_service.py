@@ -20,7 +20,7 @@ def update_popularity_of_websites():
 
     count_by_website_uuids = {}
     for request in all_website_requests:
-        request_path = request.path
+        request_path = request.path.split('?')[0]
         website_uuid = request_path.split('/')[2]
         try:
             website_uuid = UUID(website_uuid)
@@ -36,7 +36,7 @@ def update_popularity_of_websites():
 
     count_by_church_uuids = {}
     for request in all_church_requests:
-        request_path = request.path
+        request_path = request.path.split('?')[0]
         church_uuid = request_path.split('/')[4]
         try:
             church_uuid = UUID(church_uuid)

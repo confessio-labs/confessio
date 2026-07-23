@@ -83,7 +83,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "request.middleware.RequestMiddleware",
+    "core.middlewares.FullPathRequestMiddleware",  # django-request, with query params
     'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
