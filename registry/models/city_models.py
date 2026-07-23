@@ -16,6 +16,9 @@ class City(TimeStampMixin):
     """
     insee_code = models.CharField(max_length=5, unique=True)
     name = models.CharField(max_length=255)
+    # Filled by `generate_city_slugs`. unique + null is exactly "unique if not null" on Postgres:
+    # two NULLs are never equal in a unique index.
+    slug = models.SlugField(max_length=100, unique=True, null=True, blank=True)
     zipcode = models.CharField(max_length=5)
     population = models.PositiveIntegerField(default=0)
     location = gis_models.PointField(geography=False, srid=4326)

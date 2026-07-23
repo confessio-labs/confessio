@@ -1,5 +1,5 @@
 from core.management.abstract_command import AbstractCommand
-from registry.services.city_service import build_city, upsert_cities
+from registry.services.city_service import build_city, refresh_city_slugs, upsert_cities
 from registry.utils.gouv_fr_utils import fetch_communes
 
 
@@ -25,3 +25,7 @@ class Command(AbstractCommand):
 
         upsert_cities(cities)
         self.success(f'Successfully seeded {len(cities)} cities ({nb_skipped} skipped).')
+
+        self.info('Refreshing city slugs...')
+        nb_cities, nb_changed = refresh_city_slugs()
+        self.success(f'Successfully computed {nb_cities} city slugs, {nb_changed} updated.')

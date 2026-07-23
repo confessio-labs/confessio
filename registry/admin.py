@@ -64,8 +64,8 @@ class ChurchAdmin(LeafletGeoAdmin, SimpleHistoryAdmin):
 
 @admin.register(City)
 class CityAdmin(LeafletGeoAdmin):
-    list_display = ["name", "zipcode", "population"]
-    search_fields = ["name", "zipcode"]
+    list_display = ["name", "slug", "zipcode", "population"]
+    search_fields = ["name", "slug", "zipcode"]
     display_raw = True
 
 
