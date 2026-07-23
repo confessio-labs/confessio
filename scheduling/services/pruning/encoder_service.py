@@ -13,13 +13,20 @@ import os
 import shutil
 import threading
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 
 from scheduling.models.pruning_models import Classifier, Encoder, Sentence
 from scheduling.services.pruning.classifier_target_service import get_target_enum
+from scheduling.utils import ml_env  # noqa: F401  transformers/HF env guards
 from scheduling.utils.stat_utils import is_significantly_different
-from scheduling.workflows.pruning.encoder import FineTunedEncoder, TorchHeadModel
+
+if TYPE_CHECKING:
+    # `scheduling.workflows.pruning.encoder` imports torch (~0.7 s). Kept out of the module scope
+    # so that the server startup path (registry.signals -> scheduling.public_service -> ... -> this
+    # module) never loads it; the few functions that need it import it lazily.
+    from scheduling.workflows.pruning.encoder import FineTunedEncoder
 
 DEFAULT_HF_REPO_ID = os.environ.get("ENCODER_HF_REPO_ID", "confessio-labs/pruning-v2-encoder")
 DEFAULT_BASE_MODEL = "camembert/camembert-large"
@@ -50,11 +57,13 @@ def get_prod_encoder_model() -> Encoder:
         raise ValueError("No encoder in production. Run train_encoder + promote_encoder first.")
 
 
-def build_finetuned_encoder(encoder: Encoder) -> FineTunedEncoder:
+def build_finetuned_encoder(encoder: Encoder) -> 'FineTunedEncoder':
+    from scheduling.workflows.pruning.encoder import FineTunedEncoder
+
     return FineTunedEncoder(encoder.hf_repo_id, encoder.hf_revision, encoder.base_model)
 
 
-def get_prod_encoder() -> tuple[Encoder, FineTunedEncoder]:
+def get_prod_encoder() -> tuple[Encoder, 'FineTunedEncoder']:
     """Cached (Encoder, FineTunedEncoder) for the PROD encoder (loaded from HF once)."""
     global _prod
     if _prod is None:
@@ -85,6 +94,8 @@ def _staging_dir() -> Path:
 
 
 def _head_pickle(model, task: str, target_enum) -> str:
+    from scheduling.workflows.pruning.encoder import TorchHeadModel
+
     head_model = TorchHeadModel[target_enum](target_enum.list_items())
     head_model.head = model.heads[task]
     return head_model.to_pickle()

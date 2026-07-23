@@ -1,5 +1,16 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(flake8)",
+      "Bash(flake8 *)",
+      "Bash(python scripts/check_dependencies.py)",
+      "Bash(python -m unittest discover *)",
+      "Bash(python manage.py check)",
+      "Bash(mise run check)",
+      "Bash(mise run lint)",
+      "Bash(mise run test)",
+      "Bash(mise run check-deps)"
+    ],
     "deny": [
       "Read(.env)",
       "Read(.envrc)",

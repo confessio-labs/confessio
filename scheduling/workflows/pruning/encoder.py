@@ -7,24 +7,23 @@
   head weights are interchangeable. `TorchHeadModel` implements `MachineLearningInterface`.
 
 Env note: torch must be imported before scipy/sklearn (macOS duplicate-OpenMP segfault), and
-transformers must not load its TF backend. We set these guards at import time.
+transformers must not load its TF backend. `ml_env` sets the latter guards at import time.
+
+Importing this module costs ~0.7 s (torch), so the service layer imports it lazily, inside the
+functions that actually build a head or an encoder — it must stay off the server startup path.
 """
+import base64
+import io
 import os
+from typing import Generic, TypeVar
 
-os.environ.setdefault("USE_TF", "0")  # transformers: torch-only backend
-os.environ.setdefault("HF_HUB_DISABLE_XET", "1")  # avoid the flaky Xet download backend
-os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+import numpy as np
+import torch  # MUST precede scipy/sklearn imports (OpenMP segfault guard)
+import torch.nn as nn
 
-import base64  # noqa: E402
-import io  # noqa: E402
-from typing import Generic, TypeVar  # noqa: E402
-
-import numpy as np  # noqa: E402
-import torch  # noqa: E402  MUST precede scipy/sklearn imports (OpenMP segfault guard)
-import torch.nn as nn  # noqa: E402
-
-from scheduling.workflows.pruning.train_and_predict import MachineLearningInterface  # noqa: E402
-from scheduling.utils.enum_utils import StringEnum  # noqa: E402
+from scheduling.utils import ml_env  # noqa: F401  transformers/HF env guards
+from scheduling.workflows.pruning.train_and_predict import MachineLearningInterface
+from scheduling.utils.enum_utils import StringEnum
 
 E = TypeVar('E', bound=StringEnum)
 

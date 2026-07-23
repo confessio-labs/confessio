@@ -8,7 +8,6 @@ from scheduling.services.pruning.encoder_service import (get_prod_encoder,
                                                          get_prod_encoder_model)
 from scheduling.services.pruning.train_classifier_service import set_label
 from scheduling.utils.enum_utils import StringEnum
-from scheduling.workflows.pruning.encoder import TorchHeadModel
 from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
 
 _classifier = {}
@@ -46,6 +45,9 @@ def get_model(classifier: Classifier):
     if _model.get(target, None) is None:
         with _model_lock:
             if _model.get(target, None) is None:
+                # torch (~0.7 s) is only needed here, never on the server startup path.
+                from scheduling.workflows.pruning.encoder import TorchHeadModel
+
                 target_enum = get_target_enum(target)
                 different_labels = target_enum.list_items()
                 assert classifier.different_labels == different_labels, \

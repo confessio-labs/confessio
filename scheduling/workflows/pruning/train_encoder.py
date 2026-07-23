@@ -7,19 +7,16 @@ torch model, its tokenizer, and held-out accuracies. The service layer turns thi
 """
 import os
 
-os.environ.setdefault("USE_TF", "0")
-os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
-os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+import numpy as np
+import torch  # before sklearn (OpenMP guard)
+import torch.nn as nn
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 
-import numpy as np  # noqa: E402
-import torch  # noqa: E402  before sklearn (OpenMP guard)
-import torch.nn as nn  # noqa: E402
-from sklearn.metrics import accuracy_score  # noqa: E402
-from sklearn.model_selection import train_test_split  # noqa: E402
-
-from scheduling.workflows.pruning.encoder import Head, MAX_LENGTH  # noqa: E402
-from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention  # noqa: E402
-from scheduling.utils.stat_utils import get_test_size  # noqa: E402
+from scheduling.utils import ml_env  # noqa: F401  transformers/HF env guards
+from scheduling.workflows.pruning.encoder import Head, MAX_LENGTH
+from scheduling.workflows.pruning.extract_v2.models import Temporal, EventMention
+from scheduling.utils.stat_utils import get_test_size
 
 # task -> ordered label list (must match Classifier.different_labels for that target)
 TASK_LABELS = {

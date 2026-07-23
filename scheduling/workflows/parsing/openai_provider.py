@@ -1,12 +1,19 @@
-import os
-from typing import Optional
+from __future__ import annotations
 
-from openai import AsyncOpenAI, BadRequestError
+import os
+from typing import Optional, TYPE_CHECKING
+
 from pydantic import ValidationError
 
 from core.utils.llm_utils import LLMProvider
 from scheduling.workflows.parsing.llm_client import LLMClientInterface
 from scheduling.workflows.parsing.schedules import SchedulesList
+
+if TYPE_CHECKING:
+    # openai costs ~0.24 s to import and is only needed by the worker, but this module is
+    # reachable from the server startup path, so it is imported lazily. `from __future__ import
+    # annotations` above keeps the AsyncOpenAI annotations from being evaluated at runtime.
+    from openai import AsyncOpenAI
 
 
 class OpenAILLMClient(LLMClientInterface):
@@ -19,6 +26,8 @@ class OpenAILLMClient(LLMClientInterface):
     async def get_completions(self,
                               messages: list[dict],
                               temperature: float) -> tuple[Optional[SchedulesList], Optional[str]]:
+        from openai import BadRequestError
+
         try:
             temperature_args = {'temperature': temperature} if self.model != 'o3' else {}
             response = await self.client.chat.completions.parse(
@@ -52,6 +61,8 @@ class OpenAILLMClient(LLMClientInterface):
 
 
 def get_openai_client(openai_api_key: Optional[str] = None) -> AsyncOpenAI:
+    from openai import AsyncOpenAI
+
     if not openai_api_key:
         openai_api_key = os.getenv("OPENAI_API_KEY")
 

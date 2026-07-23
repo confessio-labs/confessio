@@ -1,9 +1,14 @@
 import os
+from typing import TYPE_CHECKING
 
-from openai import OpenAI, BadRequestError
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionUserMessageParam, \
-    ChatCompletionContentPartTextParam
 from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    # openai costs ~0.24 s to import and this module is only ever used by the worker, but it is
+    # reachable from the server startup path (scheduling.public_service -> ... -> here), so it is
+    # imported lazily, inside the functions that need it.
+    from openai import OpenAI
+    from openai.types.chat import ChatCompletionMessageParam
 
 from fetching.workflows.oclocher.oclocher_matrix import OClocherMatrix
 from scheduling.utils.hash_utils import hash_string_to_hex
@@ -58,7 +63,11 @@ def build_prompt_text(prompt_template: str,
 
 def build_input_messages(prompt_template: str,
                          church_desc_by_id: dict[int, str],
-                         location_desc_by_id: dict[int, str]) -> list[ChatCompletionMessageParam]:
+                         location_desc_by_id: dict[int, str]
+                         ) -> list['ChatCompletionMessageParam']:
+    from openai.types.chat import ChatCompletionUserMessageParam, \
+        ChatCompletionContentPartTextParam
+
     return [
         ChatCompletionUserMessageParam(
             role="user",
@@ -72,7 +81,9 @@ def build_input_messages(prompt_template: str,
     ]
 
 
-def get_openai_client() -> OpenAI:
+def get_openai_client() -> 'OpenAI':
+    from openai import OpenAI
+
     return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
@@ -82,6 +93,8 @@ def run_llm_completion(
         church_desc_by_id: dict[int, str],
         location_desc_by_id: dict[int, str]
 ) -> tuple[OClocherMatrix | None, str | None]:
+    from openai import BadRequestError
+
     openai_client = get_openai_client()
     try:
         temperature_args = {'temperature': 0.0} if llm_model != 'o3' else {}

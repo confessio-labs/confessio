@@ -1,4 +1,3 @@
-import torch  # noqa: F401  load torch before sklearn/scipy (macOS duplicate-OpenMP segfault guard)
 from django.db.models import Q
 
 from scheduling.models.pruning_models import Classifier, Sentence

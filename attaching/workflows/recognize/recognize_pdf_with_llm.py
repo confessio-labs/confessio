@@ -1,10 +1,6 @@
 import base64
 import os
 
-import openai
-import pymupdf
-from openai import BadRequestError
-
 from attaching.workflows.recognize.recognize_image_with_llm import remove_triple_quotes
 from core.utils.llm_utils import LLMProvider
 
@@ -21,6 +17,8 @@ def get_pdf_llm_model() -> str:
 
 def convert_pdf_to_images(pdf_bytes: bytes) -> tuple[list[bytes], int]:
     """Convert each page of a PDF into a PNG image (rendered at 1.5x zoom for readability)."""
+    import pymupdf
+
     images = []
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
         nb_pages = doc.page_count
@@ -34,6 +32,9 @@ def convert_pdf_to_images(pdf_bytes: bytes) -> tuple[list[bytes], int]:
 def get_html_from_pdf(pdf_bytes: bytes, prompt: str, llm_provider: LLMProvider,
                       llm_model: str, max_attempts: int = 3
                       ) -> tuple[str | None, str | None, int]:
+    import openai
+    from openai import BadRequestError
+
     assert llm_provider == LLMProvider.OPENAI
     images, nb_pages = convert_pdf_to_images(pdf_bytes)
 
