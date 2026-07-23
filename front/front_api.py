@@ -8,6 +8,7 @@ from ninja import NinjaAPI, Schema, File, Form
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
+from attaching.models import Image
 from attaching.public_service import attaching_get_image_public_url, \
     attaching_upload_image, attaching_find_error_in_document_to_upload, \
     attaching_recognize_and_extract_image
@@ -178,22 +179,37 @@ class ReportOut(Schema):
         )
 
 
+class ImageOut(Schema):
+    image_uuid: UUID
+    public_url: str
+
+    @classmethod
+    def from_image(cls, image: Image) -> 'ImageOut':
+        return cls(
+            image_uuid=image.uuid,
+            public_url=attaching_get_image_public_url(image),
+        )
+
+
 class WebsiteOut(Schema):
     uuid: UUID
     name: str
     home_url: str
     reports: list[ReportOut]
+    images: list[ImageOut]
 
     @classmethod
     def from_website(cls,
                      website: Website,
                      reports: list[ReportOut],
+                     images: list[ImageOut],
                      ):
         return cls(
             uuid=website.uuid,
             name=website.name,
             home_url=website.home_url,
             reports=reports,
+            images=images,
         )
 
 
@@ -201,7 +217,6 @@ class ChurchDetails(ChurchOut):
     website: WebsiteOut
     schedules: list[ScheduleOut]
     parsings: list[ParsingOut]
-    periods: list[PeriodEnum]  # TODO legacy
 
     @classmethod
     def from_church_and_schedules(cls, church: Church, index_events: list[IndexEvent],
@@ -210,19 +225,12 @@ class ChurchDetails(ChurchOut):
                                   parsings: list[ParsingOut],
                                   ) -> 'ChurchDetails':
         base = ChurchOut.from_church_and_events(church, index_events)
-        # TODO legacy
-        periods_seen = set()
-        periods = [
-            period for event in sorted(index_events) for period in event.periods
-            if period not in periods_seen and not periods_seen.add(period)
-        ]
 
         return cls(
             **base.dict(),
             website=website,
             schedules=schedules,
             parsings=parsings,
-            periods=periods,   # TODO legacy
         )
 
 
@@ -330,11 +338,6 @@ class DioceseOut(Schema):
             min_longitude=bounding_box.min_longitude,
             max_longitude=bounding_box.max_longitude,
         )
-
-
-class ImageOut(Schema):
-    image_uuid: UUID
-    public_url: str
 
 
 class ErrorSchema(Schema):
@@ -451,7 +454,12 @@ def api_front_church_details(request, church_uuid: UUID,
             sub_reports_by_main_report[report.uuid] = []
     reports = [ReportOut.from_report(main_report, sub_reports_by_main_report[main_report.uuid])
                for main_report in reversed(main_reports)]
-    website_out = WebsiteOut.from_website(website, reports)
+
+    # Images
+    website_images = list(Image.objects.filter(website=website).order_by('created_at').all())
+    images = [ImageOut.from_image(image) for image in website_images]
+
+    website_out = WebsiteOut.from_website(website, reports, images)
 
     # Schedules
     scheduling = scheduling_get_indexed_scheduling(website)
@@ -571,7 +579,4 @@ def api_front_post_images(request,
 
     attaching_recognize_and_extract_image(image)
 
-    return ImageOut(
-        image_uuid=image.uuid,
-        public_url=attaching_get_image_public_url(image),
-    )
+    return ImageOut.from_image(image)
