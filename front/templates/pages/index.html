@@ -57,9 +57,7 @@
                             <input class="form-control"
                                    type="text"
                                    id="search-input"
-                                   name="location"
                                    placeholder="{% trans 'searchPlaceHolder' %}"
-                                   value="{{ location }}"
                                    data-autocomplete-url="{% url 'autocomplete' %}"
                                    data-autocomplete-hits-url="/front/api/autocomplete/hits"
                                    data-autocomplete-latitude="{{ latitude|unlocalize }}"
@@ -67,8 +65,6 @@
                                    >
                         </div>
                     </div>
-                    <input type="hidden" id="latitude-input" name="latitude">
-                    <input type="hidden" id="longitude-input" name="longitude">
                     <input type="hidden" name="dateFilter" value="{{ date_filter_value }}">
                     {% if hour_min %}<input type="hidden" name="hourMin" value="{{ hour_min }}">{% endif %}
                     {% if hour_max %}<input type="hidden" name="hourMax" value="{{ hour_max }}">{% endif %}

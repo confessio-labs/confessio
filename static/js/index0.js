@@ -72,14 +72,6 @@ $( function() {
         let blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
         navigator.sendBeacon(autocompleteHitsUrl, blob);
 
-        $("#search-input").val(ui.item.name);
-        $("#latitude-input").val(ui.item.latitude);
-        $("#longitude-input").val(ui.item.longitude);
-        // A /ville/<slug> destination already identifies the place, only around_place needs it in
-        // the query string. Removing the name keeps the input visible but unsubmitted.
-        if (ui.item.url.startsWith('/ville/')) {
-          $("#search-input, #latitude-input, #longitude-input").removeAttr('name');
-        }
         $("#search-form").attr('action', ui.item.url).submit();
       }
     }).autocomplete( "instance" )._renderItem = function( ul, item ) {

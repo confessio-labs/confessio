@@ -36,7 +36,7 @@ def render_map(request, center,
                search_result: SearchResult,
                h1_title: str,
                meta_title: str, display_sub_title: bool,
-               bounds, location, is_around_me: bool, time_filter: TimeFilter,
+               bounds, is_around_me: bool, time_filter: TimeFilter,
                page_website: Website | None, success_message: str | None,
                welcome_message: str | None, display_quick_search_cities: bool):
     upload_success = extract_bool('upload_success', request)
@@ -128,7 +128,6 @@ def render_map(request, center,
         'h1_title': h1_title,
         'meta_title': meta_title,
         'display_sub_title': display_sub_title,
-        'location': location,
         'latitude': latitude,
         'longitude': longitude,
         'map_html': map_html,
@@ -219,10 +218,6 @@ def home(request):
 
 def index(request, diocese_slug=None, city_slug: str = None, website_uuid: str = None,
           is_around_me: bool = False):
-    location = request.GET.get('location', '')
-    latitude = extract_float('latitude', request)
-    longitude = extract_float('longitude', request)
-
     min_lat = extract_float('minLat', request)
     min_lng = extract_float('minLng', request)
     max_lat = extract_float('maxLat', request)
@@ -272,8 +267,6 @@ def index(request, diocese_slug=None, city_slug: str = None, website_uuid: str =
         h1_title = f'{website.name}'
         meta_title = f"{h1_title} | {gettext('confessioTitle')}"
         display_sub_title = False
-    # before the latitude/longitude branch: the filter forms re-post every current GET parameter
-    # to action_path, so stale coordinates must never win over the slug
     elif city_slug:
         try:
             city = City.objects.get(slug=city_slug)
@@ -284,21 +277,9 @@ def index(request, diocese_slug=None, city_slug: str = None, website_uuid: str =
         search_result = get_churches_around(center, time_filter)
         search_result.too_many_results = False
         bounds = None
-        # prefills the search box, like the location query param does for around_place
-        location = city.name
 
         h1_title = f'Se confesser {city_and_prefix(city.name)}'
         meta_title = f"{h1_title} | {gettext('confessioTitle')}"
-        display_sub_title = False
-    elif latitude and longitude:
-        center = [latitude, longitude]
-        search_result = get_churches_around(center, time_filter)
-        search_result.too_many_results = False
-        bounds = None
-
-        if location:
-            h1_title = f'Se confesser {city_and_prefix(location)}'
-            meta_title = f"{h1_title} | {gettext('confessioTitle')}"
         display_sub_title = False
     elif diocese_slug:
         try:
@@ -344,7 +325,7 @@ Merci de nous remonter d'éventuelles erreurs. Bonne confession !"""
 
     return render_map(request, center, search_result,
                       h1_title, meta_title, display_sub_title,
-                      bounds, location, is_around_me,
+                      bounds, is_around_me,
                       time_filter, website, success_message, welcome_message,
                       display_quick_search_cities)
 

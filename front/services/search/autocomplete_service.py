@@ -96,15 +96,6 @@ class AutocompleteResult:
     # which is the default for every type that has no popularity signal yet.
     popularity: float = 1.0
 
-    @property
-    def dedup_key(self) -> tuple:
-        """What makes two suggestions the same result.
-
-        The destination url, for every type: several parishes, websites or churches legitimately
-        point at the same website page, and each municipality has its own /ville/<slug> route.
-        """
-        return 'url', self.url
-
     @classmethod
     def from_parish(cls, parish: Parish) -> 'AutocompleteResult':
         # TODO save context in parish, and create a command to fill it
@@ -418,10 +409,10 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
         municipality_results + website_by_name_results
         + parish_by_name_results + church_by_name_results)
 
-    seen_keys = set()
+    seen_urls = set()
     unique_results = [
         r for r in sorted_results
-        if r.dedup_key not in seen_keys and not seen_keys.add(r.dedup_key)
+        if r.url not in seen_urls and not seen_urls.add(r.url)
     ]
     unique_results = restore_municipality_order(unique_results, municipality_results)
 
