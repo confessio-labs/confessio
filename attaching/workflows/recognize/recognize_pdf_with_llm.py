@@ -4,10 +4,6 @@ import os
 from attaching.workflows.recognize.recognize_image_with_llm import remove_triple_quotes
 from core.utils.llm_utils import LLMProvider
 
-# openai (~0.24 s) and pymupdf (~0.06 s) are imported lazily: this module is worker-only but is
-# reachable from the server startup path (attaching.signals -> attaching.public_service ->
-# worker_recognize_service).
-
 
 def get_pdf_prompt() -> str:
     return """Convert this PDF (given as one image per page) to HTML. Just output a valid HTML.

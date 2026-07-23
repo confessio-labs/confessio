@@ -2,9 +2,6 @@ import os
 
 from core.utils.llm_utils import LLMProvider
 
-# openai (~0.24 s) is imported lazily: this module is worker-only but is reachable from the
-# server startup path (attaching.signals -> attaching.public_service -> worker_recognize_service).
-
 
 def get_prompt() -> str:
     return """Convert this image to HTML. Just output a valid HTML. Do not include any additional

@@ -1,8 +1,5 @@
 import string
 
-# pymupdf (~0.06 s) is imported lazily, inside the two functions that open a document, to keep it
-# off the server startup path.
-
 
 def has_bad_encoding(text: str) -> bool:
     words = text.split()

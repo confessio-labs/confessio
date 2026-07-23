@@ -3,9 +3,9 @@ from attaching.services.image_service import get_image_html
 from attaching.services.upload_image_service import get_image_public_url
 from attaching.workflows.recognize.recognize_image_with_llm import (get_html_from_image, get_prompt,
                                                                     get_llm_model)
-from attaching.workflows.recognize.recognize_image_with_pdf import (get_html_from_pdf,
-                                                                    get_pdf_prompt,
-                                                                    get_pdf_llm_model)
+from attaching.workflows.recognize.recognize_pdf_with_llm import (get_html_from_pdf,
+                                                                  get_pdf_prompt,
+                                                                  get_pdf_llm_model)
 from core.utils.llm_utils import LLMProvider
 from crawling.public_workflow import crawling_get_extracted_v2_html_list
 from scheduling.public_service import scheduling_create_pruning
