@@ -18,4 +18,4 @@ def get_church_by_id(churches: list[Church]) -> dict[int, Church]:
 
 
 def churches_have_desc_conflict(churches: list[Church]):
-    return len(get_church_desc_list(churches)) != churches
+    return len(get_church_desc_list(churches)) != len(churches)
