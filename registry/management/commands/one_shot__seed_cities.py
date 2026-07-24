@@ -1,5 +1,7 @@
 from core.management.abstract_command import AbstractCommand
-from registry.services.city_service import build_city, refresh_city_slugs, upsert_cities
+from registry.management.commands.update_city_locations import print_city_location_stats
+from registry.services.city_service import (build_city, refresh_city_slugs,
+                                            update_city_locations, upsert_cities)
 from registry.utils.gouv_fr_utils import fetch_communes
 
 
@@ -29,3 +31,7 @@ class Command(AbstractCommand):
         self.info('Refreshing city slugs...')
         nb_cities, nb_changed = refresh_city_slugs()
         self.success(f'Successfully computed {nb_cities} city slugs, {nb_changed} updated.')
+
+        self.info('Moving cities to their OSM admin centre (town center)...')
+        stats = update_city_locations(log=self.info)
+        print_city_location_stats(self, stats)

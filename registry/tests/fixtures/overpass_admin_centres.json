@@ -1,0 +1,73 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.8",
+  "elements": [
+    {
+      "type": "relation",
+      "id": 78854,
+      "members": [
+        {"type": "way", "ref": 1111, "role": "outer"},
+        {"type": "node", "ref": 346931791, "role": "admin_centre"}
+      ],
+      "tags": {
+        "admin_level": "8",
+        "boundary": "administrative",
+        "name": "Saint-Colomban",
+        "ref:INSEE": "44155"
+      }
+    },
+    {
+      "type": "relation",
+      "id": 200,
+      "members": [
+        {"type": "way", "ref": 1112, "role": "outer"},
+        {"type": "node", "ref": 501, "role": "label"}
+      ],
+      "tags": {"admin_level": "8", "name": "Label-Only-Ville", "ref:INSEE": "44001"}
+    },
+    {
+      "type": "relation",
+      "id": 300,
+      "members": [
+        {"type": "node", "ref": 502, "role": "label"},
+        {"type": "node", "ref": 503, "role": "admin_centre"}
+      ],
+      "tags": {"admin_level": "8", "name": "Both-Roles-Ville", "ref:INSEE": "44002"}
+    },
+    {
+      "type": "relation",
+      "id": 400,
+      "members": [
+        {"type": "way", "ref": 1113, "role": "outer"}
+      ],
+      "tags": {"admin_level": "8", "name": "No-Node-Ville", "ref:INSEE": "44003"}
+    },
+    {
+      "type": "relation",
+      "id": 500,
+      "members": [
+        {"type": "node", "ref": 504, "role": "admin_centre"}
+      ],
+      "tags": {"admin_level": "8", "name": "No-Insee-Ville"}
+    },
+    {
+      "type": "relation",
+      "id": 600,
+      "members": [
+        {"type": "node", "ref": 999999, "role": "admin_centre"}
+      ],
+      "tags": {"admin_level": "8", "name": "Node-Missing-Ville", "ref:INSEE": "44004"}
+    },
+    {
+      "type": "node",
+      "id": 346931791,
+      "lat": 47.0098098,
+      "lon": -1.5833651,
+      "tags": {"name": "Saint-Colomban", "place": "village"}
+    },
+    {"type": "node", "id": 501, "lat": 47.1, "lon": -1.1},
+    {"type": "node", "id": 502, "lat": 47.2, "lon": -1.2},
+    {"type": "node", "id": 503, "lat": 47.3, "lon": -1.3},
+    {"type": "node", "id": 504, "lat": 47.4, "lon": -1.4}
+  ]
+}

@@ -38,7 +38,13 @@ run = "flake8 ."
 
 [tasks.test]
 description = "Run unit tests (no Django loading)"
-run = "python -m unittest discover -s scheduling/tests -s crawling/tests"
+# One discover per suite: repeated -s flags override each other (last one wins), so the
+# historical single command only ran crawling/tests. scheduling/tests stays out for now: it has
+# 4 failing llm-parsing subtests (stale fixtures) and calls the paid OpenAI API on cache misses.
+run = [
+  "python -m unittest discover -s crawling/tests",
+  "python -m unittest discover -s registry/tests",
+]
 
 [tasks.check-deps]
 description = "Validate module dependencies (tach)"

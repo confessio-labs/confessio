@@ -1,4 +1,7 @@
+import time
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Callable
 from uuid import UUID
 
 from django.contrib.gis.geos import Point
@@ -7,7 +10,9 @@ from django.db import transaction
 from front.utils.department_utils import get_department
 from registry.models import City
 from registry.utils.city_name_utils import slugify_city_name
+from registry.utils.geo_utils import get_geo_distance
 from registry.utils.gouv_fr_utils import GouvFrCommune
+from registry.utils.overpass_utils import fetch_admin_centres
 
 # Paris, Marseille and Lyon are returned with all their arrondissement zipcodes: use the
 # conventional generic code instead of the first arrondissement's.
@@ -67,6 +72,88 @@ def upsert_cities(cities: list[City]):
         update_conflicts=True,
         unique_fields=['insee_code'],
         update_fields=['name', 'zipcode', 'population', 'location'],
+    )
+
+
+# Pause between two Overpass queries: the public instance rate-limits back-to-back requests.
+OVERPASS_SLEEP_SECONDS = 5
+
+# Below this distance the OSM position and the stored one are considered the same point.
+SAME_POINT_METERS = 1
+
+
+@dataclass
+class CityLocationUpdateStats:
+    nb_cities: int
+    nb_matched: int
+    nb_unmatched: int
+    nb_moved: int
+    nb_moved_over_1km: int
+    nb_moved_over_5km: int
+    top_movers: list[tuple[str, str, float]]  # (insee_code, name, distance in meters)
+    failed_prefixes: list[str]
+
+
+def update_city_locations(departments: list[str] | None = None, dry_run: bool = False,
+                          log: Callable[[str], None] = print) -> CityLocationUpdateStats:
+    """Move every city to the OSM admin centre (town center) of its commune.
+
+    Cities without an OSM admin centre keep their current location (the commune centroid
+    from geo.api.gouv.fr) and are only counted.
+    """
+    cities = list(City.objects.all())
+    if departments:
+        cities = [c for c in cities if get_department(c.insee_code) in departments]
+
+    prefixes = sorted(set(get_department(city.insee_code) for city in cities))
+    osm_positions = {}
+    failed_prefixes = []
+    for i, prefix in enumerate(prefixes):
+        if i > 0:
+            time.sleep(OVERPASS_SLEEP_SECONDS)
+        admin_centres = fetch_admin_centres(prefix)
+        if admin_centres is None:
+            failed_prefixes.append(prefix)
+            log(f'prefix {prefix}: overpass query failed ({i + 1}/{len(prefixes)})')
+            continue
+
+        osm_positions.update(admin_centres)
+        log(f'prefix {prefix}: {len(admin_centres)} admin centres ({i + 1}/{len(prefixes)})')
+
+    moved = []
+    distances = []
+    nb_matched = 0
+    nb_unmatched = 0
+    for city in cities:
+        if city.insee_code not in osm_positions:
+            # cities of a failed prefix are neither matched nor unmatched
+            if get_department(city.insee_code) not in failed_prefixes:
+                nb_unmatched += 1
+            continue
+
+        nb_matched += 1
+        latitude, longitude = osm_positions[city.insee_code]
+        new_location = Point(longitude, latitude, srid=4326)
+        distance = get_geo_distance(city.location, new_location)
+        if distance < SAME_POINT_METERS:
+            continue
+
+        distances.append((city.insee_code, city.name, distance))
+        city.location = new_location
+        moved.append(city)
+
+    if not dry_run and moved:
+        City.objects.bulk_update(moved, ['location'], batch_size=1000)
+
+    return CityLocationUpdateStats(
+        nb_cities=len(cities),
+        nb_matched=nb_matched,
+        nb_unmatched=nb_unmatched,
+        nb_moved=len(moved),
+        nb_moved_over_1km=sum(1 for _, _, d in distances if d > 1000),
+        nb_moved_over_5km=sum(1 for _, _, d in distances if d > 5000),
+        top_movers=sorted(distances, key=lambda t: -t[2])[:10],
+        failed_prefixes=failed_prefixes,
     )
 
 
