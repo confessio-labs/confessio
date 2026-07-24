@@ -39,9 +39,5 @@ jobs:
       run: uv run flake8 .
     - name: Check module dependencies
       run: uv run python scripts/check_dependencies.py
-    # Repeated -s flags override each other (last one wins), so the historical
-    # "-s scheduling/tests -s crawling/tests" command only ran crawling/tests. scheduling/tests
-    # stays out for now: it has 4 failing llm-parsing subtests (stale fixtures) and calls the
-    # OpenAI API on cache misses.
     - name: Run unittests
       run: uv run python -m unittest discover -s crawling/tests
