@@ -24,10 +24,7 @@ flake8 .
 
 ### Test
 ```bash
-# scheduling/tests is excluded for now: 4 failing llm-parsing subtests (stale fixtures) and it
-# calls the paid OpenAI API on cache misses. (Repeated -s flags override each other, so the
-# historical "-s scheduling/tests -s crawling/tests" command only ran crawling/tests anyway.)
-python -m unittest discover -s crawling/tests
+uv run python -m unittest discover -s scheduling/tests -s crawling/tests
 # or: mise run test
 ```
 
