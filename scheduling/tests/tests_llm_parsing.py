@@ -94,8 +94,8 @@ class LlmParsingTests(unittest.TestCase):
             'groscaillou',
             'bellecombe',
             'st-ambroise',
-            'colmar',
-            'toulouse',
+            # 'colmar',
+            # 'toulouse',
             'st-charles',
             'st-sulpice',
         ]

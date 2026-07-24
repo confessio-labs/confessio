@@ -24,7 +24,7 @@ flake8 .
 
 ### Test
 ```bash
-python -m unittest discover -s scheduling/tests -s crawling/tests
+uv run python -m unittest discover -s scheduling/tests -s crawling/tests
 # or: mise run test
 ```
 
