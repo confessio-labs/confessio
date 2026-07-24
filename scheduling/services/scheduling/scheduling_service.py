@@ -8,7 +8,7 @@ from attaching.models import Image
 from crawling.models import Scraping
 from fetching.models import OClocherSchedule, OClocherMatching, OClocherLocation
 from registry.models import Website, Church
-from scheduling.models import ParsingModeration, Parsing, IndexEvent
+from scheduling.models import ParsingModeration, Parsing, IndexEvent, SchedulingModeration
 from scheduling.models import Scheduling, SchedulingHistoricalOClocherMatching
 from scheduling.models.pruning_models import Pruning
 from scheduling.public_model import SourcedSchedulesList
@@ -180,7 +180,9 @@ def build_resources_hash(scheduling: Scheduling,
                          sourced_schedules_list: SourcedSchedulesList,
                          church_uuid_by_id: dict[int, str],
                          index_events: list[IndexEvent],
-                         schedules_match_with_validated: bool | None) -> str:
+                         schedules_match_with_validated: bool | None,
+                         moderation_category: SchedulingModeration.Category,
+                         moderation_validated: bool) -> str:
     elements_to_hash = []
 
     # Churches
@@ -246,6 +248,7 @@ def build_resources_hash(scheduling: Scheduling,
     ))
     # schedules_match_with_validated
     elements_to_hash += [schedules_match_with_validated]
+    elements_to_hash += [moderation_category, moderation_validated]
 
     return hash_string_to_hex(''.join(map(str, elements_to_hash)))
 
