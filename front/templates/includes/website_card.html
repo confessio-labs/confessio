@@ -91,6 +91,17 @@
                                         </div>
                                         {% endif %}
                                     {% endwith %}
+                                    {% with pending_crawling=pending_crawling_by_website|get_item:website.uuid %}
+                                        {% if pending_crawling %}
+                                        <div class="d-inline-block">
+                                            {% if pending_crawling == 'in_progress' %}
+                                                <span class="border rounded px-2 py-1">Crawling in progress... 🕷️</span>
+                                            {% else %}
+                                                <span class="border rounded px-2 py-1">Crawling enqueued... ⏳</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endwith %}
                                     <div class="d-inline-block">
                                         <form method="post" action="{% url 'validate_schedules' website.uuid %}">
                                             {% csrf_token %}
