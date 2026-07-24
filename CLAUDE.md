@@ -24,12 +24,11 @@ flake8 .
 
 ### Test
 ```bash
-# One discover per suite: repeated -s flags override each other (last one wins).
 # scheduling/tests is excluded for now: 4 failing llm-parsing subtests (stale fixtures) and it
-# calls the paid OpenAI API on cache misses.
+# calls the paid OpenAI API on cache misses. (Repeated -s flags override each other, so the
+# historical "-s scheduling/tests -s crawling/tests" command only ran crawling/tests anyway.)
 python -m unittest discover -s crawling/tests
-python -m unittest discover -s registry/tests
-# or both: mise run test
+# or: mise run test
 ```
 
 ### Check module dependencies
