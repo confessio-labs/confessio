@@ -181,8 +181,9 @@ def get_links(element: el, home_url: str, aliases_domains: set[str],
               forbidden_outer_paths: set[str],
               path_redirection: dict[str, str],
               forbidden_paths: set[str]
-              ) -> set[str]:
-    results = set()
+              ) -> list[str]:
+    # dict used as an ordered set: keep DOM discovery order while still deduplicating
+    results = {}
 
     for link in get_a_tags(element):
         if not link.has_attr('href'):
@@ -235,20 +236,20 @@ def get_links(element: el, home_url: str, aliases_domains: set[str],
             continue
 
         if might_be_confession_link(url_parsed.path, text):
-            results.add(full_url)
+            results[full_url] = None
 
-    return results
+    return list(results)
 
 
 def parse_content_links(content, home_url: str, aliases_domains: set[str],
                         forbidden_outer_paths: set[str], path_redirection: dict[str, str],
                         forbidden_paths: set[str]
-                        ) -> set[str]:
+                        ) -> list[str]:
     try:
         element = BeautifulSoup(content, 'html.parser', parse_only=SoupStrainer('a'))
     except Exception as e:
         print(e)
-        return set()
+        return []
 
     links = get_links(element, home_url, aliases_domains, forbidden_outer_paths,
                       path_redirection, forbidden_paths)

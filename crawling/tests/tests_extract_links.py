@@ -31,7 +31,7 @@ class TestExtractLinks(unittest.TestCase):
                 links = parse_content_links(content, home_url, {get_domain(home_url)},
                                             set(forbidden_outer_paths), {}, set())
                 # print(json.dumps(list(links), indent=2))
-                self.assertSetEqual(links, set(expected_links), f'Failed for {file_name}')
+                self.assertSetEqual(set(links), set(expected_links), f'Failed for {file_name}')
 
 
 if __name__ == '__main__':

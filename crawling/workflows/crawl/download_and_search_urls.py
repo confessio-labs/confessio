@@ -3,7 +3,8 @@ import time
 from pydantic import BaseModel, Field
 
 from core.utils.ram_utils import print_memory_usage
-from crawling.utils.url_utils import get_clean_full_url, get_path, get_full_path
+from crawling.utils.url_utils import get_clean_full_url, get_path, get_full_path, \
+    select_next_link_to_visit
 from crawling.workflows.crawl.extract_links import parse_content_links, remove_http_https_duplicate
 from crawling.workflows.crawl.extract_widgets import extract_widgets, BaseWidget, \
     detect_google_calendar_urls, parse_html
@@ -82,7 +83,8 @@ def search_for_confession_pages(home_url, aliases_domains: set[str],
     deadline = time.time() + (1 + MAX_VISITED_LINKS) * (1 + DOWNLOAD_TIMEOUT)
 
     visited_links = set()
-    links_to_visit = {home_url}
+    # dict used as an ordered set: preserves first-discovery order (FIFO) for the selection policy
+    links_to_visit = {home_url: None}
     extracted_html_seen = set()
 
     error_detail = None
@@ -95,7 +97,8 @@ def search_for_confession_pages(home_url, aliases_domains: set[str],
 
         print_memory_usage()
 
-        link = links_to_visit.pop()
+        link = select_next_link_to_visit(links_to_visit, visited_links)
+        del links_to_visit[link]
         visited_links.add(link)
 
         content = get_content_from_url(link)
@@ -132,11 +135,11 @@ def search_for_confession_pages(home_url, aliases_domains: set[str],
         if page_soup is not None:
             for calendar_url in detect_google_calendar_urls(page_soup):
                 if calendar_url not in visited_links:
-                    links_to_visit.add(calendar_url)
+                    links_to_visit[calendar_url] = None
 
         for new_link in new_links:
             if new_link not in visited_links:
-                links_to_visit.add(new_link)
+                links_to_visit[new_link] = None
 
     if len(visited_links) == MAX_VISITED_LINKS:
         error_detail = f'Reached limit of {MAX_VISITED_LINKS} visited links.'
