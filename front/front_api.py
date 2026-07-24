@@ -182,12 +182,14 @@ class ReportOut(Schema):
 class ImageOut(Schema):
     image_uuid: UUID
     public_url: str
+    comment: str | None
 
     @classmethod
     def from_image(cls, image: Image) -> 'ImageOut':
         return cls(
             image_uuid=image.uuid,
             public_url=attaching_get_image_public_url(image),
+            comment=image.comment,
         )
 
 
