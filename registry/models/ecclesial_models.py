@@ -1,10 +1,30 @@
 from django.contrib.gis.db import models as gis_models
 from django.contrib.postgres.fields import ArrayField
-from django.contrib.postgres.indexes import GistIndex
+from django.contrib.postgres.indexes import GinIndex, GistIndex
 from django.db import models
+from django.db.models import Value
+from django.db.models.functions import Lower, Replace
 from simple_history.models import HistoricalRecords
 
 from core.models.base_models import TimeStampMixin
+from core.models.db_functions import ImmutableUnaccent
+
+
+def build_name_norm_field() -> models.GeneratedField:
+    """Normalized name column used by autocomplete, identical on Website/Parish/Church/City.
+
+    Keep in sync with registry.utils.city_name_utils.normalize_city_name.
+    simple_history can not mirror a GeneratedField, so models using it must declare
+    HistoricalRecords(excluded_fields=['name_norm']).
+    """
+    return models.GeneratedField(
+        expression=Replace(
+            Replace(Lower(ImmutableUnaccent('name')), Value('-'), Value(' ')),
+            Value("'"), Value(' '),
+        ),
+        output_field=models.TextField(),
+        db_persist=True,
+    )
 
 
 class Diocese(TimeStampMixin):
@@ -36,7 +56,14 @@ class Website(TimeStampMixin):
     nb_recent_hits = models.PositiveSmallIntegerField(default=0)
     is_best_diocese_hit = models.BooleanField(default=False)
     contact_emails = ArrayField(models.CharField(max_length=100), null=True, blank=True)
-    history = HistoricalRecords()
+    name_norm = build_name_norm_field()
+    history = HistoricalRecords(excluded_fields=['name_norm'])
+
+    class Meta:
+        indexes = [
+            GinIndex(name='website_name_norm_trgm', fields=['name_norm'],
+                     opclasses=['gin_trgm_ops']),
+        ]
 
     def __str__(self):
         return self.name
@@ -66,7 +93,14 @@ class Parish(TimeStampMixin):
     website = models.ForeignKey('Website', on_delete=models.CASCADE, related_name='parishes',
                                 null=True, blank=True)
     diocese = models.ForeignKey('Diocese', on_delete=models.CASCADE, related_name='parishes')
-    history = HistoricalRecords()
+    name_norm = build_name_norm_field()
+    history = HistoricalRecords(excluded_fields=['name_norm'])
+
+    class Meta:
+        indexes = [
+            GinIndex(name='parish_name_norm_trgm', fields=['name_norm'],
+                     opclasses=['gin_trgm_ops']),
+        ]
 
     def __str__(self):
         return self.name
@@ -90,11 +124,14 @@ class Church(TimeStampMixin):
     parish = models.ForeignKey('Parish', on_delete=models.CASCADE,
                                related_name='churches')
     is_active = models.BooleanField(default=True)
-    history = HistoricalRecords()
+    name_norm = build_name_norm_field()
+    history = HistoricalRecords(excluded_fields=['name_norm'])
 
     class Meta:
         indexes = [
             GistIndex(fields=['location']),
+            GinIndex(name='church_name_norm_trgm', fields=['name_norm'],
+                     opclasses=['gin_trgm_ops']),
         ]
 
     def get_desc(self) -> str:

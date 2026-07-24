@@ -8,77 +8,48 @@ from uuid import UUID
 from django.contrib.gis.db.models import Collect
 from django.contrib.gis.db.models.functions import Distance, Centroid
 from django.contrib.gis.geos import Point
-from django.contrib.postgres.lookups import Unaccent
-from django.contrib.postgres.search import TrigramSimilarity
+from django.contrib.postgres.search import TrigramSimilarity, TrigramWordSimilarity
 from django.db.models import Case, ExpressionWrapper, FloatField, Q, When
 from django.db.models import F
 from django.db.models import Value
-from django.db.models.functions import Greatest, Ln, Replace, Lower
+from django.db.models.functions import Coalesce, Exp, Greatest, Ln
 from django.urls import reverse
 
 from front.utils.department_utils import get_departments_context
-from front.utils.distance_utils import distance
 from registry.models import City, Parish, Church, Website
 from registry.utils.city_name_utils import normalize_city_name
-from registry.utils.string_utils import get_string_similarity
-from scheduling.utils.string_search import unhyphen_content, normalize_content
 
 MAX_AUTOCOMPLETE_RESULTS = 15
-# Distance at which a result's score halves. At the previous 5 km, proximity overwhelmed name
-# matching at national scale: the query 'toulouse' from the centre of France ranked Pelouse above
-# Toulouse purely because Pelouse was 220 km away instead of 300 km.
-# Measured on 2088 recorded autocomplete hits (front_autocompletehit), 5 km -> 50 km is neutral
-# overall (top-1 54.5% -> 55.0%, top-3 75.6% -> 74.1%, MRR 0.671 -> 0.666) while fixing that case.
-# It must stay a single value for every type: a per-type half-life was tried and measured worse
-# (top-1 51.9%, MRR 0.619) because it makes scores incomparable across types, so the type with the
-# slowest decay crowds out the others.
-HALF_LIFE_DISTANCE = 50000
 
-# Weights of the City ranking score. Tuned on 62 labelled (query, user location) -> expected city
-# cases: population had to be raised (8 -> 20) and trigram similarity lowered (30 -> 10), because
-# similarity mechanically penalizes long names ('aix en provence' scores 0.25 against the query
-# 'aix', while a 352-inhabitant hamlet named 'Aix' scores 1.0).
+# Weights of the shared ranking score, computed in SQL for all four sources so their results are
+# directly comparable. Grid-searched on 4143 recorded autocomplete hits (front_autocompletehit,
+# Apr-Jul 2026) replayed through the retrieval, with a time-split validation (tune <= Jun 15,
+# validate after). Baseline (previous two-scorer ranking) vs this score, top-1/MRR on all hits:
+# overall .756/.824 -> .758/.826, municipality .867/.902 -> .865/.899, parish .215/.450 ->
+# .248/.502, church .355/.525 -> .355/.506; on the validation split parish top-1 goes
+# .297 -> .441 and municipality .865 -> .877.
 PREFIX_WEIGHT = 50.0
-SIMILARITY_WEIGHT = 10.0
-GEO_WEIGHT = 12.0
+# Exact-substring bonus: parish and church names are long ('Paroisse Saint-Leger en
+# Saint-Maixentais'), where trigram similarity is mechanically low for a short query.
+SUBSTRING_WEIGHT = 10.0
+SIMILARITY_WEIGHT = 6.0
+# word_similarity() scores the query against the best-matching word span, so it is the string
+# signal that works on long names ('saint maixentais' scores 1.0 vs 0.49 plain similarity).
+WORD_SIMILARITY_WEIGHT = 15.0
+GEO_WEIGHT = 18.0
 POPULATION_WEIGHT = 20.0
 # ln(2_500_000), a bit above the most populated commune, so that s_pop stays in [0, 1]
 MAX_LN_POPULATION = 14.73
-# Municipality popularity multiplier used by get_score(): neutral up to the floor, then growing
-# with log(population). Grid-searched on 2088 recorded autocomplete hits.
-POPULARITY_FLOOR_POPULATION = 10000
-POPULARITY_SCALE = 0.7
-# Distance at which the proximity score halves. Django's Distance() on this geometry compiles to
-# ST_DistanceSphere, which returns METERS, so a raw 1/(1+d) would pin s_geo to ~0 everywhere
-# (1/144886 at 145 km) and waste the whole geo term.
-GEO_HALF_LIFE_METERS = 50000.0
-
-
-def get_normalized_similarity(query: str, name: str) -> float:
-    """Name similarity that ignores case, accents and hyphens.
-
-    Raw SequenceMatcher scores 'saint etienne' against 'Saint-Étienne' at only 0.769 although it
-    is a perfect match. get_string_similarity() itself is left alone: it is also used to match
-    names in sync_parishes_service and church_name_service.
-    """
-    return get_string_similarity(unhyphen_content(normalize_content(query)),
-                                 unhyphen_content(normalize_content(name)))
-
-
-def popularity_of_population(population: int | None) -> float:
-    """Popularity multiplier of a municipality, from its inhabitants.
-
-    Neutral (1.0) for every result by default, so a small commune is never penalised: only towns
-    above the floor get a boost, growing with the log of their population.
-
-    Counterparts for the other types are not written yet: a website-backed result (parish, church,
-    website) would derive its popularity from Website.nb_recent_hits, which
-    front.services.search.popularity_service already maintains from the last 14 days of traffic.
-    """
-    if not population or population <= POPULARITY_FLOOR_POPULATION:
-        return 1.0
-
-    return 1.0 + POPULARITY_SCALE * log(population / POPULARITY_FLOOR_POPULATION)
+# Geo proximity is an ADDITIVE bonus with a fast exponential decay: score halves every 30 km.
+# The previous ranking MULTIPLIED name similarity by 50km/(50km+d), which buried far exact
+# matches: 34% of recorded picks are >50 km away and 26% >200 km (trips, home towns), and
+# rank>0 picks were measurably farther than rank-0 picks (median 30.6 km vs 19.4 km). Additive
+# geo can never bury an exact name match; it acts as a local tie-breaker.
+GEO_HALF_LIFE_METERS = 30000.0
+# Per-type additive boosts, same grid search. Municipalities need none (prefix + population
+# already carry them); parishes and churches were systematically outranked before (parish picks
+# landed at rank 0 only 40% of the time, vs 88% for municipalities).
+TYPE_BOOSTS = {'municipality': 0.0, 'parish': 5.0, 'church': 4.0}
 
 
 @dataclass
@@ -91,10 +62,6 @@ class AutocompleteResult:
     longitude: Optional[float] = None
     uuid: UUID | None = None
     church_uuid: UUID | None = None
-    # Score multiplier for how prominent this result is within its own kind: inhabitants for a
-    # municipality, recent page hits for anything backed by a website. 1.0 means "no opinion",
-    # which is the default for every type that has no popularity signal yet.
-    popularity: float = 1.0
 
     @classmethod
     def from_parish(cls, parish: Parish) -> 'AutocompleteResult':
@@ -215,205 +182,159 @@ class AutocompleteResult:
             longitude=city.location.x,
             url=reverse('city_view', kwargs={'city_slug': city.slug}),
             uuid=city.uuid,
-            popularity=popularity_of_population(city.population),
         )
 
 
-async def get_city_response(query: str, latitude: float | None, longitude: float | None
-                            ) -> list[AutocompleteResult]:
-    """Municipality autocomplete from the local City table, replacing get_data_gouv_response().
+def annotate_search_score(qs, query_term: str, user_point: Point | None, geo_field: str,
+                          type_boost: float, pop_expression=None):
+    """Annotate the shared autocomplete ranking score, computed entirely in SQL.
 
-    Not wired in yet: it returns nothing until one_shot__seed_cities has run, so it is switched
-    on from get_aggregated_response() only once the target database has been seeded.
+    All four sources get the exact same formula so their `final_score` values are comparable
+    and the merge is a plain sort. `geo_field` names a geometry column or annotation
+    ('location', or a pre-annotated 'centroid'); `pop_expression` is only set for City today.
     """
-    if not query or len(query) > 200 or len(query) < 3 or not query[0].isalnum():
-        return []
-
-    query_term = normalize_city_name(query)
-
-    cities = City.objects.filter(
-        Q(name_norm__trigram_similar=query_term) | Q(name_norm__startswith=query_term)
-    ).annotate(
+    qs = qs.annotate(
         s_prefix=Case(
             When(name_norm__startswith=query_term, then=Value(1.0)),
             default=Value(0.0),
             output_field=FloatField(),
         ),
-        s_sim=TrigramSimilarity('name_norm', query_term),
-        s_pop=ExpressionWrapper(
-            Ln(Greatest(F('population'), Value(1))) / Value(MAX_LN_POPULATION),
+        s_substr=Case(
+            When(name_norm__contains=query_term, then=Value(1.0)),
+            default=Value(0.0),
             output_field=FloatField(),
         ),
+        s_sim=TrigramSimilarity('name_norm', query_term),
+        s_word=TrigramWordSimilarity(query_term, 'name_norm'),
+        s_pop=pop_expression if pop_expression is not None
+        else Value(0.0, output_field=FloatField()),
     )
 
-    if latitude is not None and longitude is not None:
-        user_location = Point(longitude, latitude, srid=4326)
-        cities = cities.annotate(
-            distance=Distance('location', user_location),
+    if user_point is not None:
+        # Distance() on these geometries compiles to ST_DistanceSphere -> METERS. Coalesce
+        # guards NULL geometries (parish without churches): NULL would poison the whole sum.
+        qs = qs.annotate(
+            distance=Distance(geo_field, user_point),
         ).annotate(
-            s_geo=ExpressionWrapper(
-                Value(1.0) / (Value(1.0) + F('distance') / Value(GEO_HALF_LIFE_METERS)),
+            s_geo=Coalesce(
+                Exp(ExpressionWrapper(
+                    F('distance') * Value(-log(2) / GEO_HALF_LIFE_METERS),
+                    output_field=FloatField(),
+                )),
+                Value(0.0),
                 output_field=FloatField(),
             ),
         )
     else:
-        cities = cities.annotate(s_geo=Value(0.0, output_field=FloatField()))
+        qs = qs.annotate(s_geo=Value(0.0, output_field=FloatField()))
 
-    cities = cities.annotate(
+    return qs.annotate(
         final_score=ExpressionWrapper(
             F('s_prefix') * Value(PREFIX_WEIGHT)
+            + F('s_substr') * Value(SUBSTRING_WEIGHT)
             + F('s_sim') * Value(SIMILARITY_WEIGHT)
+            + F('s_word') * Value(WORD_SIMILARITY_WEIGHT)
             + F('s_geo') * Value(GEO_WEIGHT)
-            + F('s_pop') * Value(POPULATION_WEIGHT),
+            + F('s_pop') * Value(POPULATION_WEIGHT)
+            + Value(type_boost),
             output_field=FloatField(),
         )
-    ).order_by('-final_score')[:MAX_AUTOCOMPLETE_RESULTS]
-
-    return [AutocompleteResult.from_city(city) async for city in cities]
+    ).order_by('-final_score')
 
 
-async def get_parish_by_name_response(query, latitude: float | None,
-                                      longitude: float | None) -> list[AutocompleteResult]:
-    query_term = unhyphen_content(normalize_content(query))
-    parishes = Parish.objects.select_related('website').prefetch_related('churches').annotate(
-        search_name=Replace(Unaccent(Lower('name')), Value('-'), Value(' '))
-    ).filter(website__is_active=True, search_name__contains=query_term) \
-        .only("name",
-              "website__uuid",
-              )
-
-    if latitude is not None and longitude is not None:
-        user_location = Point(longitude, latitude, srid=4326)
-        parishes = parishes.annotate(
-            centroid=Centroid(Collect('churches__location')),
-        ).annotate(
-            distance=Distance('centroid', user_location),
-        ).order_by(F('distance').asc(nulls_last=True))
-
-    parishes = parishes[:MAX_AUTOCOMPLETE_RESULTS]
-
-    return [AutocompleteResult.from_parish(parish) async for parish in parishes]
+ScoredResults = list[tuple[float, AutocompleteResult]]
 
 
-async def get_website_by_name_response(query, latitude: float | None,
-                                       longitude: float | None) -> list[AutocompleteResult]:
-    query_term = unhyphen_content(normalize_content(query))
-    websites = Website.objects.prefetch_related('parishes__churches').annotate(
-        search_name=Replace(Unaccent(Lower('name')), Value('-'), Value(' '))
-    ).filter(is_active=True, search_name__contains=query_term) \
-        .only("name",
-              "uuid",
-              )
+async def get_city_response(query_term: str, user_point: Point | None) -> ScoredResults:
+    cities = City.objects.filter(
+        Q(name_norm__trigram_similar=query_term) | Q(name_norm__startswith=query_term)
+    )
+    cities = annotate_search_score(
+        cities, query_term, user_point, 'location', TYPE_BOOSTS['municipality'],
+        pop_expression=ExpressionWrapper(
+            Ln(Greatest(F('population'), Value(1))) / Value(MAX_LN_POPULATION),
+            output_field=FloatField(),
+        ),
+    )[:MAX_AUTOCOMPLETE_RESULTS]
 
-    if latitude is not None and longitude is not None:
-        user_location = Point(longitude, latitude, srid=4326)
-        websites = websites.annotate(
-            centroid=Centroid(Collect('parishes__churches__location')),
-        ).annotate(
-            distance=Distance('centroid', user_location),
-        ).order_by(F('distance').asc(nulls_last=True))
-
-    websites = websites[:MAX_AUTOCOMPLETE_RESULTS]
-
-    return [AutocompleteResult.from_website(website) async for website in websites]
+    return [(city.final_score, AutocompleteResult.from_city(city)) async for city in cities]
 
 
-async def get_church_by_name_response(query, latitude: float | None,
-                                      longitude: float | None) -> list[AutocompleteResult]:
-    query_term = unhyphen_content(normalize_content(query))
-    churches = Church.objects.select_related('parish__website').annotate(
-        search_name=Replace(Unaccent(Lower('name')), Value('-'), Value(' '))
-    ).filter(is_active=True, parish__website__is_active=True,
-             search_name__contains=query_term) \
-        .only("name",
-              "city",
-              "zipcode",
-              "location",
-              "parish__website__uuid",
-              )
+def long_name_predicate(query_term: str) -> Q:
+    """Retrieval for long names (parish, website, church).
 
-    if latitude is not None and longitude is not None:
-        user_location = Point(longitude, latitude, srid=4326)
-        churches = churches.annotate(
-            distance=Distance('location', user_location)
-        ).order_by(F('distance').asc(nulls_last=True))
-
-    churches = churches[:MAX_AUTOCOMPLETE_RESULTS]
-
-    return [AutocompleteResult.from_church(church) async for church in churches]
-
-
-def get_score(query, latitude: float | None, longitude: float | None,
-              result: AutocompleteResult) -> float:
-    string_similarity = get_normalized_similarity(query, result.name)
-    d = 0.0
-    if latitude is not None and longitude is not None \
-            and result.latitude is not None and result.longitude is not None:
-        d = distance(latitude, longitude, result.latitude, result.longitude)
-
-    # result.popularity is deliberately NOT applied here, see restore_municipality_order()
-    return string_similarity * HALF_LIFE_DISTANCE / (HALF_LIFE_DISTANCE + d)
-
-
-def sort_results(query, latitude: float | None, longitude: float | None,
-                 results: list[AutocompleteResult]) -> list[AutocompleteResult]:
-    if not results:
-        return []
-
-    tuples = zip(map(lambda r: get_score(query, latitude, longitude, r), results), results)
-    sorted_tuples = sorted(tuples, key=lambda t: t[0], reverse=True)
-    _, sorted_values = zip(*sorted_tuples)
-
-    return sorted_values
-
-
-def restore_municipality_order(results: list[AutocompleteResult],
-                               municipality_results: list[AutocompleteResult]
-                               ) -> list[AutocompleteResult]:
-    """Put the municipality slots back in the order their source produced them.
-
-    get_score() ranks every type on name similarity and distance only. It has no popularity term,
-    so among municipalities it puts any hamlet that happens to be nearby above a major city: from
-    Paris, 'saint etienne' scored Saint-Étienne-Roilaye (301 inhabitants, 70 km) at 0.238 against
-    0.083 for Saint-Étienne (173k inhabitants, 400 km). Municipalities already arrive ranked by
-    the tuned SQL score, which does weigh population, so get_score() is only allowed to decide
-    *where* the municipality slots sit among the other types, not which city fills them.
-
-    Multiplying get_score() by AutocompleteResult.popularity instead was grid-searched on 2088
-    recorded hits (population floor 1..50000 x scale 0.3..1.5, with the accent-insensitive
-    similarity above) and does not replace this. Best was floor=2000, scale=0.7 at 60.7% top-1 /
-    0.704 MRR, against 67.9% / 0.761 here; applying it *on top* is worse still (66.3% / 0.743),
-    because it moves the whole municipality block rather than reordering it. Population is already
-    weighed where it belongs, in the SQL score that ranks the cities.
+    `contains` keeps the exact-substring matches long names need (plain trigram similarity can
+    not fire for a short query against a 40-char name); `trigram_word_similar` adds the fuzzy
+    matches: 26% of recorded municipality picks were trigram-only matches, a match type these
+    sources could not produce before.
     """
-    source_order = iter(municipality_results)
+    return Q(name_norm__contains=query_term) | Q(name_norm__trigram_word_similar=query_term)
 
-    return [next(source_order, r) if r.type == 'municipality' else r for r in results]
+
+async def get_parish_by_name_response(query_term: str,
+                                      user_point: Point | None) -> ScoredResults:
+    parishes = Parish.objects.select_related('website').prefetch_related('churches') \
+        .filter(website__is_active=True).filter(long_name_predicate(query_term)) \
+        .annotate(centroid=Centroid(Collect('churches__location')))
+    parishes = annotate_search_score(
+        parishes, query_term, user_point, 'centroid', TYPE_BOOSTS['parish'],
+    )[:MAX_AUTOCOMPLETE_RESULTS]
+
+    return [(parish.final_score, AutocompleteResult.from_parish(parish))
+            async for parish in parishes]
+
+
+async def get_website_by_name_response(query_term: str,
+                                       user_point: Point | None) -> ScoredResults:
+    websites = Website.objects.prefetch_related('parishes__churches') \
+        .filter(is_active=True).filter(long_name_predicate(query_term)) \
+        .annotate(centroid=Centroid(Collect('parishes__churches__location')))
+    websites = annotate_search_score(
+        websites, query_term, user_point, 'centroid', TYPE_BOOSTS['parish'],
+    )[:MAX_AUTOCOMPLETE_RESULTS]
+
+    return [(website.final_score, AutocompleteResult.from_website(website))
+            async for website in websites]
+
+
+async def get_church_by_name_response(query_term: str,
+                                      user_point: Point | None) -> ScoredResults:
+    churches = Church.objects.select_related('parish__website') \
+        .filter(is_active=True, parish__website__is_active=True) \
+        .filter(long_name_predicate(query_term))
+    churches = annotate_search_score(
+        churches, query_term, user_point, 'location', TYPE_BOOSTS['church'],
+    )[:MAX_AUTOCOMPLETE_RESULTS]
+
+    return [(church.final_score, AutocompleteResult.from_church(church))
+            async for church in churches]
 
 
 async def get_aggregated_response(query, latitude: float | None, longitude: float | None
                                   ) -> list[AutocompleteResult]:
-    # To switch to the local City table, call get_city_response() here instead. Do it only once
-    # one_shot__seed_cities has run on the target database, otherwise municipality suggestions
-    # silently disappear until it does.
-    municipality_results, website_by_name_results, parish_by_name_results, church_by_name_results \
-        = await asyncio.gather(
-            get_city_response(query, latitude, longitude),
-            get_website_by_name_response(query, latitude, longitude),
-            get_parish_by_name_response(query, latitude, longitude),
-            get_church_by_name_response(query, latitude, longitude),
-        )
+    if not query or len(query) > 200 or len(query) < 3 or not query[0].isalnum():
+        return []
 
-    sorted_results = sort_results(
-        query, latitude, longitude,
-        municipality_results + website_by_name_results
-        + parish_by_name_results + church_by_name_results)
+    query_term = normalize_city_name(query)
+    user_point = None
+    if latitude is not None and longitude is not None:
+        user_point = Point(longitude, latitude, srid=4326)
+
+    all_scored = await asyncio.gather(
+        get_city_response(query_term, user_point),
+        get_website_by_name_response(query_term, user_point),
+        get_parish_by_name_response(query_term, user_point),
+        get_church_by_name_response(query_term, user_point),
+    )
+
+    scored = [scored_result for source in all_scored for scored_result in source]
+    scored.sort(key=lambda t: t[0], reverse=True)
 
     seen_urls = set()
-    unique_results = [
-        r for r in sorted_results
-        if r.url not in seen_urls and not seen_urls.add(r.url)
-    ]
-    unique_results = restore_municipality_order(unique_results, municipality_results)
+    unique_results = []
+    for _score, result in scored:
+        if result.url not in seen_urls:
+            seen_urls.add(result.url)
+            unique_results.append(result)
 
     return unique_results[:MAX_AUTOCOMPLETE_RESULTS]
