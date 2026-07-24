@@ -1,3 +1,4 @@
+from collections import Counter
 from urllib.parse import urlparse, ParseResult
 
 from crawling.utils.string_utils import remove_unsafe_chars
@@ -23,6 +24,33 @@ def get_full_path(url):
     if url_parsed.query:
         return f"{url_parsed.path if url_parsed.path else '/'}?{url_parsed.query}"
     return url_parsed.path
+
+
+def path_key(url: str) -> str:
+    # group query-param variants of the same page; treat /a and /a/ as one path
+    return get_path(url).rstrip('/')
+
+
+def select_next_link_to_visit(links_to_visit, visited_links) -> str:
+    """Return the next queued link, round-robin across paths (query string ignored).
+
+    Primary key: how many pages of that path we have *already visited* (ascending), so every
+    distinct path is visited once before any path's query-param variants are revisited — no single
+    group (e.g. `/agenda/?mois=...`) can monopolise the visit budget. Secondary key: how many
+    variants of that path are still *queued* (ascending), so among equally-visited paths the rarer
+    one comes first. Ties break FIFO: `min` is stable and `links_to_visit` iterates in insertion
+    order, so the earliest-queued link wins.
+
+    `links_to_visit` must be an order-preserving iterable (a dict used as an ordered set);
+    `visited_links` is the set of already-visited links (must not yet include the returned link).
+    """
+    visited_path_counts = Counter(path_key(link) for link in visited_links)
+    queued_path_counts = Counter(path_key(link) for link in links_to_visit)
+    return min(
+        links_to_visit,
+        key=lambda link: (visited_path_counts[path_key(link)],
+                          queued_path_counts[path_key(link)]),
+    )
 
 
 def replace_scheme_and_hostname(url_parsed: ParseResult, new_url: str) -> str:
