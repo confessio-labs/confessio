@@ -1,7 +1,8 @@
 from uuid import UUID
 
+from core.services.background_task_service import TaskStatus
 from crawling.models import CrawlingModeration
-from crawling.public_service import crawling_get_crawling_status_by_website_uuid, CrawlingStatus
+from crawling.public_service import crawling_get_crawling_status_by_website_uuid
 from registry.models import Website
 from scheduling.models import SchedulingModeration, ValidatedSchedulesModeration, Scheduling
 
@@ -12,7 +13,7 @@ def get_all_website_moderations(websites: list[Website]
     dict[UUID, CrawlingModeration],
     dict[UUID, ValidatedSchedulesModeration],
     dict[UUID, Scheduling],
-    dict[UUID, CrawlingStatus],
+    dict[UUID, TaskStatus],
 ]:
     all_scheduling_moderations = SchedulingModeration.objects.filter(website__in=websites).all()
     scheduling_moderation_by_website = {}

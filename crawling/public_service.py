@@ -1,9 +1,7 @@
-from crawling.services.crawling_progress_service import CrawlingStatus, \
-    get_crawling_status_by_website_uuid
+from core.services.background_task_service import TaskStatus
+from crawling.services.crawling_progress_service import get_crawling_status_by_website_uuid
 from crawling.tasks import worker_crawl_website
 from registry.models import Website
-
-__all__ = ['CrawlingStatus']
 
 
 def crawling_crawl_website(website: Website):
@@ -11,7 +9,7 @@ def crawling_crawl_website(website: Website):
 
 
 def crawling_get_crawling_status_by_website_uuid(website_uuids: set[str]
-                                                 ) -> dict[str, CrawlingStatus]:
+                                                 ) -> dict[str, TaskStatus]:
     return get_crawling_status_by_website_uuid(website_uuids)
 
 
