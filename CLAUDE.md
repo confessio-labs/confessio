@@ -24,8 +24,10 @@ flake8 .
 
 ### Test
 ```bash
-uv run python -m unittest discover -s scheduling/tests -s crawling/tests
-# or: mise run test
+# NB: repeated -s flags override each other, so each directory needs its own command
+uv run python -m unittest discover -s scheduling/tests
+uv run python -m unittest discover -s crawling/tests
+# or both: mise run test
 ```
 
 ### Check module dependencies

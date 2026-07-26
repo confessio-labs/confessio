@@ -38,7 +38,12 @@ run = "flake8 ."
 
 [tasks.test]
 description = "Run unit tests (no Django loading)"
-run = "uv run python -m unittest discover -s scheduling/tests -s crawling/tests"
+# NB: repeated -s flags override each other in unittest discover, so each test
+# directory needs its own command.
+run = [
+  "uv run python -m unittest discover -s scheduling/tests",
+  "uv run python -m unittest discover -s crawling/tests",
+]
 
 [tasks.check-deps]
 description = "Validate module dependencies (tach)"

@@ -207,7 +207,9 @@ $ python manage.py process_tasks --queue main --sleep 1 --dev
 ### Testing
 ```shell
 # without django loading
-python -m unittest discover -s scheduling/tests -s crawling/tests
+# NB: repeated -s flags override each other, so each directory needs its own command
+python -m unittest discover -s scheduling/tests
+python -m unittest discover -s crawling/tests
 # OR with django loading
 python manage.py test
 ```
@@ -234,7 +236,14 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Running unit tests..."
-python -m unittest discover -s scheduling/tests -s crawling/tests
+# NB: repeated -s flags override each other, so each directory needs its own command
+python -m unittest discover -s scheduling/tests
+if [ $? -ne 0 ]; then
+    echo "Unit tests failed. Please fix the above issues before committing."
+    exit 1
+fi
+
+python -m unittest discover -s crawling/tests
 if [ $? -ne 0 ]; then
     echo "Unit tests failed. Please fix the above issues before committing."
     exit 1
