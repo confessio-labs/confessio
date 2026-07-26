@@ -78,6 +78,10 @@ def upsert_cities(cities: list[City]):
 # Pause between two Overpass queries: the public instance rate-limits back-to-back requests.
 OVERPASS_SLEEP_SECONDS = 5
 
+# The busy spells of the public instance last a minute or two: let it breathe before the second
+# pass over the prefixes that failed.
+OVERPASS_COOLDOWN_SECONDS = 60
+
 # Below this distance the OSM position and the stored one are considered the same point.
 SAME_POINT_METERS = 1
 
@@ -94,6 +98,25 @@ class CityLocationUpdateStats:
     failed_prefixes: list[str]
 
 
+def _fetch_admin_centres_by_prefix(prefixes: list[str], log: Callable[[str], None]
+                                   ) -> tuple[dict[str, tuple[float, float]], list[str]]:
+    osm_positions = {}
+    failed_prefixes = []
+    for i, prefix in enumerate(prefixes):
+        if i > 0:
+            time.sleep(OVERPASS_SLEEP_SECONDS)
+        admin_centres = fetch_admin_centres(prefix, log=log)
+        if admin_centres is None:
+            failed_prefixes.append(prefix)
+            log(f'prefix {prefix}: overpass query failed ({i + 1}/{len(prefixes)})')
+            continue
+
+        osm_positions.update(admin_centres)
+        log(f'prefix {prefix}: {len(admin_centres)} admin centres ({i + 1}/{len(prefixes)})')
+
+    return osm_positions, failed_prefixes
+
+
 def update_city_locations(departments: list[str] | None = None, dry_run: bool = False,
                           log: Callable[[str], None] = print) -> CityLocationUpdateStats:
     """Move every city to the OSM admin centre (town center) of its commune.
@@ -106,19 +129,13 @@ def update_city_locations(departments: list[str] | None = None, dry_run: bool = 
         cities = [c for c in cities if get_department(c.insee_code) in departments]
 
     prefixes = sorted(set(get_department(city.insee_code) for city in cities))
-    osm_positions = {}
-    failed_prefixes = []
-    for i, prefix in enumerate(prefixes):
-        if i > 0:
-            time.sleep(OVERPASS_SLEEP_SECONDS)
-        admin_centres = fetch_admin_centres(prefix)
-        if admin_centres is None:
-            failed_prefixes.append(prefix)
-            log(f'prefix {prefix}: overpass query failed ({i + 1}/{len(prefixes)})')
-            continue
-
-        osm_positions.update(admin_centres)
-        log(f'prefix {prefix}: {len(admin_centres)} admin centres ({i + 1}/{len(prefixes)})')
+    osm_positions, failed_prefixes = _fetch_admin_centres_by_prefix(prefixes, log)
+    if failed_prefixes:
+        log(f'{len(failed_prefixes)} prefixes failed ({" ".join(failed_prefixes)}), retrying them '
+            f'in {OVERPASS_COOLDOWN_SECONDS}s...')
+        time.sleep(OVERPASS_COOLDOWN_SECONDS)
+        retried_positions, failed_prefixes = _fetch_admin_centres_by_prefix(failed_prefixes, log)
+        osm_positions.update(retried_positions)
 
     moved = []
     distances = []
