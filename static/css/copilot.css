@@ -50,6 +50,10 @@
 }
 .copilot-args dt { font-weight: 600; color: #6c757d; }
 .copilot-args dd { margin: 0; word-break: break-word; }
+.copilot-args .copilot-old { color: #b02a37; text-decoration: line-through; opacity: .75; }
+.copilot-args .copilot-arrow { color: #6c757d; margin: 0 .15rem; }
+.copilot-args .copilot-new { color: #146c43; font-weight: 600; }
+.copilot-args--snapshot dd { color: #6c757d; }
 .copilot-pre {
   background: #0f172a0a;
   padding: .5rem;

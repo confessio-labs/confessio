@@ -14,6 +14,7 @@ from core.utils.async_utils import run_and_close
 from crawling.utils.string_utils import remove_unsafe_chars
 from front.models import CopilotDiscussion, CopilotDiscussionItem
 from front.services.copilot.agent import CopilotDeps, agent, build_provider_and_model
+from front.services.copilot.before_values import snapshot_before_values
 from front.services.copilot.items import add_item, build_history_from_items
 from front.services.copilot.serialization import (TOOL_DENIED_MESSAGE, deferred_tool_call_ids,
                                                   dump_messages, load_messages)
@@ -98,11 +99,14 @@ def _finalize(discussion: CopilotDiscussion, result) -> None:
     output = result.output
     if isinstance(output, DeferredToolRequests):
         for call in output.approvals:
+            args = _safe_args(call)
             add_item(
                 discussion,
                 ItemType.PROPOSED_TOOL_CALL,
                 tool_name=call.tool_name,
-                tool_args=_safe_args(call),
+                tool_args=args,
+                # Snapshot NOW: once approved and executed the DB holds the new value.
+                tool_args_before=snapshot_before_values(discussion, call.tool_name, args),
                 tool_call_id=call.tool_call_id,
                 approval_status=ApprovalStatus.PENDING,
             )
