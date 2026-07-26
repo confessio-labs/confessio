@@ -40,4 +40,8 @@ jobs:
     - name: Check module dependencies
       run: uv run python scripts/check_dependencies.py
     - name: Run unittests
-      run: uv run python -m unittest discover -s scheduling/tests -s crawling/tests
+      # NB: repeated -s flags override each other in unittest discover, so each test
+      # directory needs its own command.
+      run: |
+        uv run python -m unittest discover -s scheduling/tests
+        uv run python -m unittest discover -s crawling/tests

@@ -48,7 +48,7 @@
           "end_time_iso8601": null
         },
         {
-          "church_id": 0,
+          "church_id": -1,
           "date_rule": {
             "year": 2025,
             "month": 10,
@@ -100,7 +100,7 @@
           "end_time_iso8601": null
         },
         {
-          "church_id": 0,
+          "church_id": -1,
           "date_rule": {
             "year": 2025,
             "month": 11,
@@ -165,7 +165,7 @@
           "end_time_iso8601": null
         },
         {
-          "church_id": 0,
+          "church_id": -1,
           "date_rule": {
             "year": 2025,
             "month": 11,
@@ -204,7 +204,7 @@
           "end_time_iso8601": null
         },
         {
-          "church_id": 0,
+          "church_id": -1,
           "date_rule": {
             "year": 2025,
             "month": 11,
@@ -256,7 +256,7 @@
           "end_time_iso8601": null
         },
         {
-          "church_id": 0,
+          "church_id": -1,
           "date_rule": {
             "year": 2025,
             "month": 11,

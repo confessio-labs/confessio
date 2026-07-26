@@ -94,8 +94,8 @@ class LlmParsingTests(unittest.TestCase):
             'groscaillou',
             'bellecombe',
             'st-ambroise',
-            # 'colmar',
-            # 'toulouse',
+            'colmar',
+            # 'toulouse',  # stale end_time: model returns null, fixture expects 19:00:00
             'st-charles',
             'st-sulpice',
         ]
