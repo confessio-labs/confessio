@@ -48,6 +48,12 @@ class CopilotDiscussionItem(TimeStampMixin):
     text = models.TextField(blank=True)
     tool_name = models.CharField(max_length=100, blank=True)
     tool_args = models.JSONField(null=True, blank=True)
+    # Deterministic snapshot (computed in Python, never by the LLM) of the values a proposed
+    # mutating tool is about to overwrite or delete, frozen at proposal time: once the action is
+    # approved and executed the database holds the NEW value, so reading it back at render time
+    # would show old == new. Display-only: deliberately kept out of _HISTORY_FIELDS, so it never
+    # enters the agent's context.
+    tool_args_before = models.JSONField(null=True, blank=True)
     tool_result = models.JSONField(null=True, blank=True)
     # PydanticAI tool call id, used to remap an approval into DeferredToolResults on resume.
     tool_call_id = models.CharField(max_length=100, blank=True)
