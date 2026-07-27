@@ -52,7 +52,6 @@ class Command(AbstractCleaningCommand):
         self.info('Starting removing orphan sentences')
         orphan_sentences = Sentence.objects.filter(
             prunings__isnull=True,
-            source__exact='ml',
             human_temporal__isnull=True,
             human_confession__isnull=True,
         ).all()
