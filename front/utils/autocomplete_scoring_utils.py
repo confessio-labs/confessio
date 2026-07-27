@@ -8,7 +8,7 @@ keeping first, truncate to 15). Both must stay in sync: `autocomplete_tuning --m
 import math
 from dataclasses import dataclass
 
-MAX_RESULTS = 15
+from front.utils.autocomplete_constants import MAX_AUTOCOMPLETE_RESULTS as MAX_RESULTS
 
 
 @dataclass(frozen=True)

@@ -12,9 +12,9 @@ Validation numbers (post-split hits) are reported alongside to expose overfittin
 from dataclasses import replace
 from typing import Callable
 
-from registry.utils.autocomplete_metrics_utils import (ResolvedHit, outcomes_from_ranked,
-                                                       render, summarize)
-from registry.utils.autocomplete_scoring_utils import ScoringConfig, rank_pools
+from front.utils.autocomplete_metrics_utils import (ResolvedHit, outcomes_from_ranked,
+                                                    render, summarize)
+from front.utils.autocomplete_scoring_utils import ScoringConfig, rank_pools
 
 STAGES = [
     # (stage name, [(field, values)]) — full product within a stage, best carried forward.

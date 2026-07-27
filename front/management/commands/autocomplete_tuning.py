@@ -18,14 +18,15 @@ from datetime import datetime
 from django.utils import timezone
 
 from core.management.abstract_command import AbstractCommand
-from front.public_service import (AUTOCOMPLETE_GEO_HALF_LIFE_METERS, AUTOCOMPLETE_TYPE_BOOSTS,
-                                  AUTOCOMPLETE_WEIGHTS)
-from registry.services.autocomplete_pool_service import (build_pools, report_pool_recall)
-from registry.services.autocomplete_replay_service import (load_and_resolve_hits, replay_live,
-                                                           report_agreement)
-from registry.utils.autocomplete_metrics_utils import (outcomes_from_ranked, render, summarize)
-from registry.utils.autocomplete_scoring_utils import ScoringConfig, rank_pools
-from registry.workflows.autocomplete_grid_search_workflow import run_grid_search
+from front.services.search.autocomplete_pool_service import build_pools, report_pool_recall
+from front.services.search.autocomplete_replay_service import (load_and_resolve_hits,
+                                                               replay_live, report_agreement)
+from front.utils.autocomplete_constants import (
+    GEO_HALF_LIFE_METERS, GEO_WEIGHT, POPULATION_WEIGHT, PREFIX_WEIGHT, SIMILARITY_WEIGHT,
+    SUBSTRING_WEIGHT, TYPE_BOOSTS, WORD_SIMILARITY_WEIGHT)
+from front.utils.autocomplete_metrics_utils import outcomes_from_ranked, render, summarize
+from front.utils.autocomplete_scoring_utils import ScoringConfig, rank_pools
+from front.workflows.autocomplete_grid_search_workflow import run_grid_search
 
 REPLAY_CACHE = 'replay.pkl'
 POOLS_CACHE = 'pools.pkl'
@@ -42,23 +43,19 @@ class Command(AbstractCommand):
         parser.add_argument('--split-date', default=None,
                             help='train/validation split (ISO date); default: hits 80th'
                                  ' percentile by created_at')
-        parser.add_argument('--prefix-weight', type=float,
-                            default=AUTOCOMPLETE_WEIGHTS['prefix'])
-        parser.add_argument('--substr-weight', type=float,
-                            default=AUTOCOMPLETE_WEIGHTS['substr'])
-        parser.add_argument('--sim-weight', type=float, default=AUTOCOMPLETE_WEIGHTS['sim'])
-        parser.add_argument('--word-weight', type=float, default=AUTOCOMPLETE_WEIGHTS['word'])
-        parser.add_argument('--geo-weight', type=float, default=AUTOCOMPLETE_WEIGHTS['geo'])
-        parser.add_argument('--pop-weight', type=float, default=AUTOCOMPLETE_WEIGHTS['pop'])
+        parser.add_argument('--prefix-weight', type=float, default=PREFIX_WEIGHT)
+        parser.add_argument('--substr-weight', type=float, default=SUBSTRING_WEIGHT)
+        parser.add_argument('--sim-weight', type=float, default=SIMILARITY_WEIGHT)
+        parser.add_argument('--word-weight', type=float, default=WORD_SIMILARITY_WEIGHT)
+        parser.add_argument('--geo-weight', type=float, default=GEO_WEIGHT)
+        parser.add_argument('--pop-weight', type=float, default=POPULATION_WEIGHT)
         parser.add_argument('--geo-half-life-km', type=float,
-                            default=AUTOCOMPLETE_GEO_HALF_LIFE_METERS / 1000.0)
+                            default=GEO_HALF_LIFE_METERS / 1000.0)
         parser.add_argument('--geo-shape', choices=['inv', 'exp'], default='exp')
         parser.add_argument('--boost-municipality', type=float,
-                            default=AUTOCOMPLETE_TYPE_BOOSTS['municipality'])
-        parser.add_argument('--boost-parish', type=float,
-                            default=AUTOCOMPLETE_TYPE_BOOSTS['parish'])
-        parser.add_argument('--boost-church', type=float,
-                            default=AUTOCOMPLETE_TYPE_BOOSTS['church'])
+                            default=TYPE_BOOSTS['municipality'])
+        parser.add_argument('--boost-parish', type=float, default=TYPE_BOOSTS['parish'])
+        parser.add_argument('--boost-church', type=float, default=TYPE_BOOSTS['church'])
 
     def handle(self, *args, **options):
         self.cache_dir = options['cache_dir']

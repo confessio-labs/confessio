@@ -1,8 +1,6 @@
 """Resolve recorded autocomplete hits and replay them through the live service.
 
-Feeds the `autocomplete_tuning` management command. Hits come from
-front.models.AutocompleteHit (models are a permitted cross-module import); the live replay
-goes through front.public_service.
+Feeds the `autocomplete_tuning` management command.
 """
 import asyncio
 from typing import Callable
@@ -10,9 +8,9 @@ from typing import Callable
 from django.urls import reverse
 
 from front.models import AutocompleteHit
-from front.public_service import front_get_autocomplete_response
+from front.services.search.autocomplete_service import get_aggregated_response
+from front.utils.autocomplete_metrics_utils import ResolvedHit
 from registry.models import City, Parish, Church, Website
-from registry.utils.autocomplete_metrics_utils import ResolvedHit
 from registry.utils.city_name_utils import normalize_city_name
 
 
@@ -105,7 +103,7 @@ def replay_live(keys: list[tuple], already_ranked: dict[tuple, list[str]],
         async def one(key):
             query, latitude, longitude = key
             async with sem:
-                results = await front_get_autocomplete_response(query, latitude, longitude)
+                results = await get_aggregated_response(query, latitude, longitude)
             return key, [r.url for r in results]
 
         for i in range(0, len(todo), 200):
