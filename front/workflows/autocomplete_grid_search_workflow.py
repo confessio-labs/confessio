@@ -28,9 +28,11 @@ STAGES = [
                 ('boost_parish', [0.0, 2.0, 4.0]),
                 ('boost_church', [0.0, 2.0, 4.0])]),
     ('pop', [('pop_w', [10.0, 20.0, 30.0])]),
+    ('gate', [('gate_threshold', [0.0, 0.3, 0.45, 0.5, 0.6])]),
 ]
 REFINED_FIELDS = ('geo_w', 'half_life_km', 'sim_w', 'word_w', 'substr_w',
-                  'boost_municipality', 'boost_parish', 'boost_church', 'pop_w')
+                  'boost_municipality', 'boost_parish', 'boost_church', 'pop_w',
+                  'gate_threshold')
 
 
 def evaluate(config: ScoringConfig, hits: list[ResolvedHit], pools: dict) -> dict[str, dict]:

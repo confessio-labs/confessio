@@ -22,8 +22,8 @@ from front.services.search.autocomplete_pool_service import build_pools, report_
 from front.services.search.autocomplete_replay_service import (load_and_resolve_hits,
                                                                replay_live, report_agreement)
 from front.utils.autocomplete_constants import (
-    GEO_HALF_LIFE_METERS, GEO_WEIGHT, POPULATION_WEIGHT, PREFIX_WEIGHT, SIMILARITY_WEIGHT,
-    SUBSTRING_WEIGHT, TYPE_BOOSTS, WORD_SIMILARITY_WEIGHT)
+    GEO_HALF_LIFE_METERS, GEO_POP_GATE_THRESHOLD, GEO_WEIGHT, POPULATION_WEIGHT, PREFIX_WEIGHT,
+    SIMILARITY_WEIGHT, SUBSTRING_WEIGHT, TYPE_BOOSTS, WORD_SIMILARITY_WEIGHT)
 from front.utils.autocomplete_metrics_utils import outcomes_from_ranked, render, summarize
 from front.utils.autocomplete_scoring_utils import ScoringConfig, rank_pools
 from front.workflows.autocomplete_grid_search_workflow import run_grid_search
@@ -52,6 +52,9 @@ class Command(AbstractCommand):
         parser.add_argument('--geo-half-life-km', type=float,
                             default=GEO_HALF_LIFE_METERS / 1000.0)
         parser.add_argument('--geo-shape', choices=['inv', 'exp'], default='exp')
+        parser.add_argument('--gate-threshold', type=float, default=GEO_POP_GATE_THRESHOLD,
+                            help='geo+pop are scaled by min(1, best_string_signal / T);'
+                                 ' 0 disables the gate')
         parser.add_argument('--boost-municipality', type=float,
                             default=TYPE_BOOSTS['municipality'])
         parser.add_argument('--boost-parish', type=float, default=TYPE_BOOSTS['parish'])
@@ -79,6 +82,7 @@ class Command(AbstractCommand):
             sim_w=options['sim_weight'], word_w=options['word_weight'],
             geo_w=options['geo_weight'], pop_w=options['pop_weight'],
             half_life_km=options['geo_half_life_km'], geo_shape=options['geo_shape'],
+            gate_threshold=options['gate_threshold'],
             boost_municipality=options['boost_municipality'],
             boost_parish=options['boost_parish'], boost_church=options['boost_church'])
 

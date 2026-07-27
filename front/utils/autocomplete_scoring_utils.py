@@ -8,6 +8,7 @@ keeping first, truncate to 15). Both must stay in sync: `autocomplete_tuning --m
 import math
 from dataclasses import dataclass
 
+from front.utils.autocomplete_constants import GEO_POP_GATE_THRESHOLD
 from front.utils.autocomplete_constants import MAX_AUTOCOMPLETE_RESULTS as MAX_RESULTS
 
 
@@ -24,6 +25,8 @@ class ScoringConfig:
     boost_municipality: float = 0.0
     boost_parish: float = 0.0   # applies to parish AND website rows (both shown as 'parish')
     boost_church: float = 0.0
+    # geo+pop are multiplied by min(1, best_string_signal / gate_threshold); <= 0 disables
+    gate_threshold: float = GEO_POP_GATE_THRESHOLD
 
 
 def geo_score(distance_m: float | None, config: ScoringConfig) -> float:
@@ -38,12 +41,15 @@ def geo_score(distance_m: float | None, config: ScoringConfig) -> float:
 def row_score(row: dict, config: ScoringConfig) -> float:
     boost = {'municipality': config.boost_municipality, 'parish': config.boost_parish,
              'church': config.boost_church}[row['type']]
+    quality = max(row['s_prefix'], row['s_substr'], row['s_word'])
+    gate = 1.0 if config.gate_threshold <= 0 \
+        else min(1.0, quality / config.gate_threshold)
     return (config.prefix_w * row['s_prefix']
             + config.substr_w * row['s_substr']
             + config.sim_w * row['s_sim']
             + config.word_w * row['s_word']
-            + config.geo_w * geo_score(row['distance_m'], config)
-            + config.pop_w * row['s_pop']
+            + (config.geo_w * geo_score(row['distance_m'], config)
+               + config.pop_w * row['s_pop']) * gate
             + boost)
 
 

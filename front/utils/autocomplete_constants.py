@@ -32,6 +32,17 @@ MAX_LN_POPULATION = 14.73
 # rank>0 picks were measurably farther than rank-0 picks (median 30.6 km vs 19.4 km). Additive
 # geo can never bury an exact name match; it acts as a local tie-breaker.
 GEO_HALF_LIFE_METERS = 30000.0
+# Geo and population are multiplied by min(1, best_string_signal / threshold), where
+# best_string_signal = max(s_prefix, s_substr, s_word): location and size break ties among good
+# matches but cannot outvote them. Without the gate a nearby metropolis with a junk trigram
+# match (word similarity 0.38) collected its full ~35 geo+pop points and beat any perfect
+# non-prefix match, which caps around 34 ('saint yves de la mer' typed in Paris ranked the
+# exact-matching parish 5th behind Saint-Denis). Short prefix queries are untouched (prefix or
+# word similarity is 1.0 there). Measured on the recorded hits: parish/church metrics and
+# recall@15 unchanged, municipality top-1 -0.005 — over half of the changed contexts are
+# parish-intent queries ('rouen cathedrale', 'paroisse athis') whose parish now outranks the
+# picked city. 0.45 fixed the Paris showcase by only 0.2 points, 0.5 wins it by 3: hence 0.5.
+GEO_POP_GATE_THRESHOLD = 0.5
 # Per-type additive boosts, same grid search. Municipalities need none (prefix + population
 # already carry them); parishes and churches were systematically outranked before (parish picks
 # landed at rank 0 only 40% of the time, vs 88% for municipalities). Keyed by DISPLAYED result

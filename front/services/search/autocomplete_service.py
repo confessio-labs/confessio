@@ -13,13 +13,13 @@ from django.db import connections
 from django.db.models import Case, ExpressionWrapper, FloatField, Q, When
 from django.db.models import F
 from django.db.models import Value
-from django.db.models.functions import Coalesce, Exp, Greatest, Ln
+from django.db.models.functions import Coalesce, Exp, Greatest, Least, Ln
 from django.urls import reverse
 
 from front.utils.autocomplete_constants import (
-    GEO_HALF_LIFE_METERS, GEO_WEIGHT, MAX_AUTOCOMPLETE_RESULTS, MAX_LN_POPULATION,
-    POPULATION_WEIGHT, PREFIX_WEIGHT, SIMILARITY_WEIGHT, SUBSTRING_WEIGHT, TYPE_BOOSTS,
-    WORD_SIMILARITY_WEIGHT)
+    GEO_HALF_LIFE_METERS, GEO_POP_GATE_THRESHOLD, GEO_WEIGHT, MAX_AUTOCOMPLETE_RESULTS,
+    MAX_LN_POPULATION, POPULATION_WEIGHT, PREFIX_WEIGHT, SIMILARITY_WEIGHT, SUBSTRING_WEIGHT,
+    TYPE_BOOSTS, WORD_SIMILARITY_WEIGHT)
 from front.utils.department_utils import get_departments_context
 from registry.models import City, Parish, Church, Website
 from registry.utils.city_name_utils import normalize_city_name
@@ -201,14 +201,21 @@ def annotate_search_score(qs, query_term: str, user_point: Point | None, geo_fie
     else:
         qs = qs.annotate(s_geo=Value(0.0, output_field=FloatField()))
 
+    # Geo and population count in proportion to string-match quality (full weight once the best
+    # string signal reaches GEO_POP_GATE_THRESHOLD): tie-breakers among good matches, never a
+    # substitute for matching.
+    quality_gate = Least(
+        Value(1.0),
+        Greatest(F('s_prefix'), F('s_substr'), F('s_word')) / Value(GEO_POP_GATE_THRESHOLD),
+    )
     return qs.annotate(
         final_score=ExpressionWrapper(
             F('s_prefix') * Value(PREFIX_WEIGHT)
             + F('s_substr') * Value(SUBSTRING_WEIGHT)
             + F('s_sim') * Value(SIMILARITY_WEIGHT)
             + F('s_word') * Value(WORD_SIMILARITY_WEIGHT)
-            + F('s_geo') * Value(GEO_WEIGHT)
-            + F('s_pop') * Value(POPULATION_WEIGHT)
+            + (F('s_geo') * Value(GEO_WEIGHT) + F('s_pop') * Value(POPULATION_WEIGHT))
+            * quality_gate
             + Value(type_boost),
             output_field=FloatField(),
         )
