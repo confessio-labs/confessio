@@ -9,6 +9,7 @@ from django.contrib.gis.db.models import Collect
 from django.contrib.gis.db.models.functions import Distance, Centroid
 from django.contrib.gis.geos import Point
 from django.contrib.postgres.search import TrigramSimilarity, TrigramWordSimilarity
+from django.db import connections
 from django.db.models import Case, ExpressionWrapper, FloatField, Q, When
 from django.db.models import F
 from django.db.models import Value
@@ -245,7 +246,21 @@ def annotate_search_score(qs, query_term: str, user_point: Point | None, geo_fie
 ScoredResults = list[tuple[float, AutocompleteResult]]
 
 
-async def get_city_response(query_term: str, user_point: Point | None) -> ScoredResults:
+def _scored_then_hydrated(scoring_qs, hydration_qs, factory) -> ScoredResults:
+    """Rank on a narrow projection, then load only the kept rows.
+
+    The scoring query evaluates every matching row; selecting full joined rows there made broad
+    queries sort megabytes before the LIMIT ('saint' matches 21k churches, and the joined rows
+    are ~4 KB wide). Fetch (uuid, final_score) first, then hydrate the 15 winners with the
+    relations and .only() column set the AutocompleteResult factories need.
+    """
+    scored = list(scoring_qs.values_list('uuid', 'final_score')[:MAX_AUTOCOMPLETE_RESULTS])
+    rows = {obj.uuid: obj for obj in hydration_qs.filter(uuid__in=[u for u, _ in scored])}
+    return [(score, factory(rows[uuid])) for uuid, score in scored if uuid in rows]
+
+
+def get_city_response(query_term: str, user_point: Point | None) -> ScoredResults:
+    # Single-phase: one table, no join amplification (62 ms on the broadest real query).
     cities = City.objects.filter(
         Q(name_norm__trigram_similar=query_term) | Q(name_norm__startswith=query_term)
     )
@@ -257,7 +272,7 @@ async def get_city_response(query_term: str, user_point: Point | None) -> Scored
         ),
     )[:MAX_AUTOCOMPLETE_RESULTS]
 
-    return [(city.final_score, AutocompleteResult.from_city(city)) async for city in cities]
+    return [(city.final_score, AutocompleteResult.from_city(city)) for city in cities]
 
 
 def long_name_predicate(query_term: str) -> Q:
@@ -271,43 +286,52 @@ def long_name_predicate(query_term: str) -> Q:
     return Q(name_norm__contains=query_term) | Q(name_norm__trigram_word_similar=query_term)
 
 
-async def get_parish_by_name_response(query_term: str,
-                                      user_point: Point | None) -> ScoredResults:
-    parishes = Parish.objects.select_related('website').prefetch_related('churches') \
-        .filter(website__is_active=True).filter(long_name_predicate(query_term)) \
-        .annotate(centroid=Centroid(Collect('churches__location')))
-    parishes = annotate_search_score(
-        parishes, query_term, user_point, 'centroid', TYPE_BOOSTS['parish'],
-    )[:MAX_AUTOCOMPLETE_RESULTS]
-
-    return [(parish.final_score, AutocompleteResult.from_parish(parish))
-            async for parish in parishes]
-
-
-async def get_website_by_name_response(query_term: str,
-                                       user_point: Point | None) -> ScoredResults:
-    websites = Website.objects.prefetch_related('parishes__churches') \
-        .filter(is_active=True).filter(long_name_predicate(query_term)) \
-        .annotate(centroid=Centroid(Collect('parishes__churches__location')))
-    websites = annotate_search_score(
-        websites, query_term, user_point, 'centroid', TYPE_BOOSTS['parish'],
-    )[:MAX_AUTOCOMPLETE_RESULTS]
-
-    return [(website.final_score, AutocompleteResult.from_website(website))
-            async for website in websites]
-
-
-async def get_church_by_name_response(query_term: str,
-                                      user_point: Point | None) -> ScoredResults:
-    churches = Church.objects.select_related('parish__website') \
-        .filter(is_active=True, parish__website__is_active=True) \
+def get_parish_by_name_response(query_term: str,
+                                user_point: Point | None) -> ScoredResults:
+    scoring = annotate_search_score(
+        Parish.objects.filter(website__is_active=True)
         .filter(long_name_predicate(query_term))
-    churches = annotate_search_score(
-        churches, query_term, user_point, 'location', TYPE_BOOSTS['church'],
-    )[:MAX_AUTOCOMPLETE_RESULTS]
+        .annotate(centroid=Centroid(Collect('churches__location'))),
+        query_term, user_point, 'centroid', TYPE_BOOSTS['parish'])
+    hydration = Parish.objects.select_related('website').prefetch_related('churches') \
+        .only('name', 'website__uuid')
 
-    return [(church.final_score, AutocompleteResult.from_church(church))
-            async for church in churches]
+    return _scored_then_hydrated(scoring, hydration, AutocompleteResult.from_parish)
+
+
+def get_website_by_name_response(query_term: str,
+                                 user_point: Point | None) -> ScoredResults:
+    scoring = annotate_search_score(
+        Website.objects.filter(is_active=True).filter(long_name_predicate(query_term))
+        .annotate(centroid=Centroid(Collect('parishes__churches__location'))),
+        query_term, user_point, 'centroid', TYPE_BOOSTS['parish'])
+    hydration = Website.objects.prefetch_related('parishes__churches').only('name', 'uuid')
+
+    return _scored_then_hydrated(scoring, hydration, AutocompleteResult.from_website)
+
+
+def get_church_by_name_response(query_term: str,
+                                user_point: Point | None) -> ScoredResults:
+    scoring = annotate_search_score(
+        Church.objects.filter(is_active=True, parish__website__is_active=True)
+        .filter(long_name_predicate(query_term)),
+        query_term, user_point, 'location', TYPE_BOOSTS['church'])
+    hydration = Church.objects.select_related('parish__website') \
+        .only('name', 'city', 'zipcode', 'location', 'parish__website__uuid')
+
+    return _scored_then_hydrated(scoring, hydration, AutocompleteResult.from_church)
+
+
+def _fetch_in_thread(fetcher, query_term: str, user_point: Point | None) -> ScoredResults:
+    # Each fetcher runs in its own thread: Django's async ORM would serialize the four queries
+    # through its single sync_to_async executor thread, making the endpoint latency the SUM of
+    # the four queries instead of their max. Threads keep their own DB connection; drop stale
+    # ones so the executor threads do not accumulate dead connections.
+    try:
+        return fetcher(query_term, user_point)
+    finally:
+        for conn in connections.all():
+            conn.close_if_unusable_or_obsolete()
 
 
 async def get_aggregated_response(query, latitude: float | None, longitude: float | None
@@ -320,12 +344,10 @@ async def get_aggregated_response(query, latitude: float | None, longitude: floa
     if latitude is not None and longitude is not None:
         user_point = Point(longitude, latitude, srid=4326)
 
-    all_scored = await asyncio.gather(
-        get_city_response(query_term, user_point),
-        get_website_by_name_response(query_term, user_point),
-        get_parish_by_name_response(query_term, user_point),
-        get_church_by_name_response(query_term, user_point),
-    )
+    all_scored = await asyncio.gather(*(
+        asyncio.to_thread(_fetch_in_thread, fetcher, query_term, user_point)
+        for fetcher in (get_city_response, get_website_by_name_response,
+                        get_parish_by_name_response, get_church_by_name_response)))
 
     scored = [scored_result for source in all_scored for scored_result in source]
     scored.sort(key=lambda t: t[0], reverse=True)
