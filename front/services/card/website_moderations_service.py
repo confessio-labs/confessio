@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from attaching.public_service import attaching_get_image_recognition_status_by_website_uuid
 from core.services.background_task_service import TaskStatus
 from crawling.models import CrawlingModeration
 from crawling.public_service import crawling_get_crawling_status_by_website_uuid
@@ -13,6 +14,7 @@ def get_all_website_moderations(websites: list[Website]
     dict[UUID, CrawlingModeration],
     dict[UUID, ValidatedSchedulesModeration],
     dict[UUID, Scheduling],
+    dict[UUID, TaskStatus],
     dict[UUID, TaskStatus],
 ]:
     all_scheduling_moderations = SchedulingModeration.objects.filter(website__in=websites).all()
@@ -38,14 +40,22 @@ def get_all_website_moderations(websites: list[Website]
     for pending_scheduling in all_pending_schedulings:
         pending_scheduling_by_website[pending_scheduling.website.uuid] = pending_scheduling
 
-    crawling_status_by_uuid = crawling_get_crawling_status_by_website_uuid(
-        {str(w.uuid) for w in websites})
+    website_uuids = {str(w.uuid) for w in websites}
+
+    crawling_status_by_uuid = crawling_get_crawling_status_by_website_uuid(website_uuids)
     pending_crawling_by_website = {}
     for website in websites:
         crawling_status = crawling_status_by_uuid.get(str(website.uuid))
         if crawling_status:
             pending_crawling_by_website[website.uuid] = crawling_status
 
+    image_status_by_uuid = attaching_get_image_recognition_status_by_website_uuid(website_uuids)
+    pending_image_by_website = {}
+    for website in websites:
+        image_status = image_status_by_uuid.get(str(website.uuid))
+        if image_status:
+            pending_image_by_website[website.uuid] = image_status
+
     return scheduling_moderation_by_website, crawling_moderation_by_website, \
         validated_schedules_moderation_by_website, pending_scheduling_by_website, \
-        pending_crawling_by_website
+        pending_crawling_by_website, pending_image_by_website

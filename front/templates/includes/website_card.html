@@ -102,6 +102,17 @@
                                         </div>
                                         {% endif %}
                                     {% endwith %}
+                                    {% with pending_image=pending_image_by_website|get_item:website.uuid %}
+                                        {% if pending_image %}
+                                        <div class="d-inline-block">
+                                            {% if pending_image == 'in_progress' %}
+                                                <span class="border rounded px-2 py-1">Image recognition in progress... 🖼️</span>
+                                            {% else %}
+                                                <span class="border rounded px-2 py-1">Image recognition enqueued... ⏳</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endwith %}
                                     <div class="d-inline-block">
                                         <form method="post" action="{% url 'validate_schedules' website.uuid %}">
                                             {% csrf_token %}
