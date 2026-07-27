@@ -1,70 +1,23 @@
-"""Shared plumbing for the autocomplete tuning harness (throwaway, not committed).
+"""Resolve recorded autocomplete hits and replay them through the live service.
 
-Resolves each recorded AutocompleteHit to the URL the pick leads to, so a replayed ranking can
-be checked for it. One resolution path per type, unmatched hits are skip-counted and reported.
+Feeds the `autocomplete_tuning` management command. Hits come from
+front.models.AutocompleteHit (models are a permitted cross-module import); the live replay
+goes through front.public_service.
 """
-import os
-import pickle
-import sys
-from dataclasses import dataclass
-from datetime import datetime
+import asyncio
+from typing import Callable
 
-EXPERIMENT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_DIR = os.path.dirname(os.path.dirname(EXPERIMENT_DIR))
-CACHE_DIR = os.path.join(EXPERIMENT_DIR, 'cache')
+from django.urls import reverse
 
-# Train/validation time split for the grid search (tune on <=, validate on >).
-SPLIT_DATE = datetime.fromisoformat('2026-06-15T23:59:59+00:00')
-
-
-def django_setup():
-    sys.path.insert(0, REPO_DIR)
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
-    import django
-    django.setup()
-
-
-def cache_path(name: str) -> str:
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    return os.path.join(CACHE_DIR, name)
-
-
-def cache_load(name: str):
-    path = cache_path(name)
-    if os.path.exists(path):
-        with open(path, 'rb') as f:
-            return pickle.load(f)
-    return None
-
-
-def cache_save(name: str, obj) -> None:
-    with open(cache_path(name), 'wb') as f:
-        pickle.dump(obj, f)
-
-
-@dataclass
-class ResolvedHit:
-    query: str
-    latitude: float
-    longitude: float
-    item_type: str        # 'municipality' | 'parish' | 'church' ('parish' covers websites too)
-    # URL of the picked item; ranking match is URL-based (post-dedupe a result list has at most
-    # one row per URL)
-    target_url: str
-    recorded_rank: int    # 0-based rank the user picked under the ranking live at the time
-    created_at: datetime
-
-    @property
-    def key(self) -> tuple:
-        return self.query, round(self.latitude, 6), round(self.longitude, 6)
+from front.models import AutocompleteHit
+from front.public_service import front_get_autocomplete_response
+from registry.models import City, Parish, Church, Website
+from registry.utils.autocomplete_metrics_utils import ResolvedHit
+from registry.utils.city_name_utils import normalize_city_name
 
 
 def load_and_resolve_hits() -> tuple[list[ResolvedHit], dict[str, int]]:
-    from django.urls import reverse
-    from front.models import AutocompleteHit
-    from registry.models import City, Parish, Church, Website
-    from registry.utils.city_name_utils import normalize_city_name
-
+    """One resolution path per type; unmatched hits are skip-counted, never guessed."""
     cities_by_name: dict[str, list] = {}
     for c in City.objects.all().only('zipcode', 'name_norm', 'slug', 'population'):
         cities_by_name.setdefault(c.name_norm, []).append(c)
@@ -133,3 +86,49 @@ def load_and_resolve_hits() -> tuple[list[ResolvedHit], dict[str, int]]:
         ))
 
     return resolved, skips
+
+
+def replay_live(keys: list[tuple], already_ranked: dict[tuple, list[str]],
+                on_batch: Callable[[dict[tuple, list[str]], int, int], None],
+                ) -> dict[tuple, list[str]]:
+    """Replay each (query, lat, lng) through the LIVE autocomplete service.
+
+    Skips keys present in already_ranked; calls on_batch(ranked, done, total) after each
+    batch so the caller can checkpoint its cache.
+    """
+    ranked = dict(already_ranked)
+    todo = [k for k in keys if k not in ranked]
+
+    async def run():
+        sem = asyncio.Semaphore(8)
+
+        async def one(key):
+            query, latitude, longitude = key
+            async with sem:
+                results = await front_get_autocomplete_response(query, latitude, longitude)
+            return key, [r.url for r in results]
+
+        for i in range(0, len(todo), 200):
+            batch = todo[i:i + 200]
+            for key, urls in await asyncio.gather(*(one(k) for k in batch)):
+                ranked[key] = urls
+            on_batch(ranked, min(i + 200, len(todo)), len(todo))
+
+    asyncio.run(run())
+    return ranked
+
+
+def report_agreement(hits: list[ResolvedHit], ranked: dict[tuple, list[str]]) -> str:
+    """Sanity check: replayed rank vs the rank recorded at pick time."""
+    same = close = matched = 0
+    for hit in hits:
+        urls = ranked.get(hit.key, [])
+        if hit.target_url in urls:
+            matched += 1
+            rank0 = urls.index(hit.target_url)
+            same += rank0 == hit.recorded_rank
+            close += abs(rank0 - hit.recorded_rank) <= 1
+    if not matched:
+        return 'agreement with recorded ranks: no matched hits'
+    return (f'agreement with recorded ranks: exact {same / matched:.1%},'
+            f' ±1 {close / matched:.1%} (on {matched} matched hits)')

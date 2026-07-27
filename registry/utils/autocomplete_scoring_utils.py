@@ -1,30 +1,32 @@
-"""Pure-Python candidate scorer over cached pools — the exact formula the service will get.
+"""Pure-Python mirror of the autocomplete SQL score, applied to cached candidate pools.
 
-Replicates the merge semantics of get_aggregated_response: each source truncated to 15 by
-score, then global sort, dedupe by url keeping first, truncate to 15.
+Mirrors front.services.search.autocomplete_service.annotate_search_score and the merge of
+get_aggregated_response (each source truncated to 15 by score, global sort, dedupe by url
+keeping first, truncate to 15). Both must stay in sync: `autocomplete_tuning --mode replay`
+(live service) vs `--mode candidate` with the prod weights is the drift check.
 """
 import math
-from dataclasses import dataclass, replace  # noqa: F401  (replace used by grid_search)
+from dataclasses import dataclass
 
 MAX_RESULTS = 15
 
 
 @dataclass(frozen=True)
-class Config:
-    prefix_w: float = 50.0
-    substr_w: float = 0.0
-    sim_w: float = 10.0
-    word_w: float = 0.0
-    geo_w: float = 12.0
-    pop_w: float = 20.0
-    half_life_km: float = 50.0
-    geo_shape: str = 'inv'      # 'inv' = 1/(1+d/h) ; 'exp' = exp(-d*ln2/h)
+class ScoringConfig:
+    prefix_w: float
+    substr_w: float
+    sim_w: float
+    word_w: float
+    geo_w: float
+    pop_w: float
+    half_life_km: float
+    geo_shape: str = 'exp'      # 'exp' = exp(-d*ln2/h) ; 'inv' = 1/(1+d/h)
     boost_municipality: float = 0.0
     boost_parish: float = 0.0   # applies to parish AND website rows (both shown as 'parish')
     boost_church: float = 0.0
 
 
-def geo_score(distance_m: float | None, config: Config) -> float:
+def geo_score(distance_m: float | None, config: ScoringConfig) -> float:
     if distance_m is None:
         return 0.0
     h = config.half_life_km * 1000.0
@@ -33,7 +35,7 @@ def geo_score(distance_m: float | None, config: Config) -> float:
     return 1.0 / (1.0 + distance_m / h)
 
 
-def row_score(row: dict, config: Config) -> float:
+def row_score(row: dict, config: ScoringConfig) -> float:
     boost = {'municipality': config.boost_municipality, 'parish': config.boost_parish,
              'church': config.boost_church}[row['type']]
     return (config.prefix_w * row['s_prefix']
@@ -45,7 +47,7 @@ def row_score(row: dict, config: Config) -> float:
             + boost)
 
 
-def rank_pools(pools_for_key: dict[str, list[dict]], config: Config) -> list[str]:
+def rank_pools(pools_for_key: dict[str, list[dict]], config: ScoringConfig) -> list[str]:
     """Ordered result URLs for one replay context under `config`."""
     merged = []
     for source_rows in pools_for_key.values():

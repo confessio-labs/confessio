@@ -1,12 +1,41 @@
-"""Ranking metrics + table rendering for the autocomplete tuning harness."""
+"""Ranking metrics and shared data structures for the autocomplete_tuning command."""
 from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass
+class ResolvedHit:
+    """A recorded AutocompleteHit resolved to the URL its pick leads to.
+
+    Ranking match is URL-based: after dedupe a result list has at most one row per URL.
+    """
+    query: str
+    latitude: float
+    longitude: float
+    item_type: str        # 'municipality' | 'parish' | 'church' ('parish' covers websites too)
+    target_url: str
+    recorded_rank: int    # 0-based rank the user picked under the ranking live at the time
+    created_at: datetime
+
+    @property
+    def key(self) -> tuple:
+        return self.query, round(self.latitude, 6), round(self.longitude, 6)
 
 
 @dataclass
 class HitOutcome:
     item_type: str
     rank: int | None      # 1-based rank of the target URL in the replayed list, None if absent
-    in_train: bool
+
+
+def outcomes_from_ranked(hits: list[ResolvedHit],
+                         ranked: dict[tuple, list[str]]) -> list[HitOutcome]:
+    outcomes = []
+    for hit in hits:
+        urls = ranked.get(hit.key, [])
+        rank = urls.index(hit.target_url) + 1 if hit.target_url in urls else None
+        outcomes.append(HitOutcome(item_type=hit.item_type, rank=rank))
+    return outcomes
 
 
 def _row(outcomes: list[HitOutcome]) -> dict:

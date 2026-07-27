@@ -29,3 +29,6 @@ mise.local.toml
 
 # Locally-saved fine-tuned encoder weights (pushed to HF)
 .encoder_weights/
+
+# Pickle caches of `manage.py autocomplete_tuning` (safe to delete)
+autocomplete_tuning_cache/
