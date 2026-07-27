@@ -49,7 +49,10 @@ MAX_LN_POPULATION = 14.73
 GEO_HALF_LIFE_METERS = 30000.0
 # Per-type additive boosts, same grid search. Municipalities need none (prefix + population
 # already carry them); parishes and churches were systematically outranked before (parish picks
-# landed at rank 0 only 40% of the time, vs 88% for municipalities).
+# landed at rank 0 only 40% of the time, vs 88% for municipalities). Keyed by DISPLAYED result
+# type: website results are emitted with type='parish' (from_website) and get the parish boost —
+# the recorded hits only distinguish these three types, so a separate website boost could not
+# be tuned anyway.
 TYPE_BOOSTS = {'municipality': 0.0, 'parish': 5.0, 'church': 4.0}
 
 
