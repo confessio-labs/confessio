@@ -86,17 +86,6 @@ msgstr "Made in 🇫🇷 with ✝️ without 🍪"
 msgid "navContact"
 msgstr "Contact"
 
-#: templates/includes/navigation.html:36 templates/pages/dioceses.html:11
-#: templates/pages/index.html:130
-msgid "donateUrl"
-msgstr ""
-"https://www.leetchi.com/fr/c/confessio--participation-aux-frais-de-"
-"serveur-3379251"
-
-#: templates/includes/navigation.html:36 templates/pages/index.html:130
-msgid "navDonate"
-msgstr "Nous soutenir 💙"
-
 #: templates/includes/navigation.html:53
 msgid "navLogout"
 msgstr "Se déconnecter"

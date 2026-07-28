@@ -8,5 +8,4 @@
     {% for diocese in dioceses %}
         <p><a href="{% url 'diocese_view' diocese.slug %}">{{ diocese.name }}</a></p>
     {% endfor %}
-    <div class="mt-5">🚀 Nous avons ouvert une <a href="{% trans 'donateUrl' %}"><strong>cagnotte</strong></a> pour financer l'expansion territoriale de Confessio.</div>
 {% endblock card %}
