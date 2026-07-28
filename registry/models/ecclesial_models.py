@@ -53,6 +53,8 @@ class Website(TimeStampMixin):
     pruning_validation_counter = models.SmallIntegerField(default=0)
     pruning_last_validated_at = models.DateTimeField(null=True, blank=True)
     unreliability_reason = models.CharField(choices=UnreliabilityReason, null=True, blank=True)
+    # Rolling traffic popularity, rewritten nightly by front.popularity_service: website page
+    # views plus autocomplete picks. Church views count for the church, not for its website.
     nb_recent_hits = models.PositiveSmallIntegerField(default=0)
     is_best_diocese_hit = models.BooleanField(default=False)
     contact_emails = ArrayField(models.CharField(max_length=100), null=True, blank=True)
@@ -93,6 +95,9 @@ class Parish(TimeStampMixin):
     website = models.ForeignKey('Website', on_delete=models.CASCADE, related_name='parishes',
                                 null=True, blank=True)
     diocese = models.ForeignKey('Diocese', on_delete=models.CASCADE, related_name='parishes')
+    # Rolling traffic popularity, rewritten nightly by front.popularity_service. A parish is only
+    # ever reached through an autocomplete pick, so this is much sparser than the two others.
+    nb_recent_hits = models.PositiveSmallIntegerField(default=0)
     name_norm = build_name_norm_field()
     history = HistoricalRecords(excluded_fields=['name_norm'])
 
@@ -124,6 +129,9 @@ class Church(TimeStampMixin):
     parish = models.ForeignKey('Parish', on_delete=models.CASCADE,
                                related_name='churches')
     is_active = models.BooleanField(default=True)
+    # Rolling traffic popularity, rewritten nightly by front.popularity_service: church detail
+    # views plus autocomplete picks. Never folded into the parish or the website.
+    nb_recent_hits = models.PositiveSmallIntegerField(default=0)
     name_norm = build_name_norm_field()
     history = HistoricalRecords(excluded_fields=['name_norm'])
 

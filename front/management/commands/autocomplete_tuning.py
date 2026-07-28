@@ -9,11 +9,11 @@ Modes:
                       for the non-regression gates).
 
 Caches (pickles, safe to delete) live in --cache-dir. The scoring weights come from
-front.public_service so the defaults always match prod.
+front.utils.autocomplete_constants so the defaults always match prod.
 """
 import os
 import pickle
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.utils import timezone
 
@@ -22,14 +22,18 @@ from front.services.search.autocomplete_pool_service import build_pools, report_
 from front.services.search.autocomplete_replay_service import (load_and_resolve_hits,
                                                                replay_live, report_agreement)
 from front.utils.autocomplete_constants import (
-    GEO_HALF_LIFE_METERS, GEO_POP_GATE_THRESHOLD, GEO_WEIGHT, POPULATION_WEIGHT, PREFIX_WEIGHT,
-    SIMILARITY_WEIGHT, SUBSTRING_WEIGHT, TYPE_BOOSTS, WORD_SIMILARITY_WEIGHT)
+    GEO_HALF_LIFE_METERS, GEO_POP_GATE_THRESHOLD, GEO_WEIGHT, POPULARITY_WEIGHT,
+    POPULATION_WEIGHT, PREFIX_WEIGHT, SIMILARITY_WEIGHT, SUBSTRING_WEIGHT, TYPE_BOOSTS,
+    WORD_SIMILARITY_WEIGHT)
 from front.utils.autocomplete_metrics_utils import outcomes_from_ranked, render, summarize
 from front.utils.autocomplete_scoring_utils import ScoringConfig, rank_pools
+from front.utils.popularity_constants import POPULARITY_WINDOW_DAYS
 from front.workflows.autocomplete_grid_search_workflow import run_grid_search
 
 REPLAY_CACHE = 'replay.pkl'
-POOLS_CACHE = 'pools.pkl'
+# v2: pool rows carry s_population and s_popularity instead of a single s_pop. A stale v1 file
+# would raise a KeyError rather than mislead, but rebuilding is what we actually want.
+POOLS_CACHE = 'pools_v2.pkl'
 
 
 class Command(AbstractCommand):
@@ -43,12 +47,20 @@ class Command(AbstractCommand):
         parser.add_argument('--split-date', default=None,
                             help='train/validation split (ISO date); default: hits 80th'
                                  ' percentile by created_at')
+        parser.add_argument('--hit-cutoff-days', type=int, default=POPULARITY_WINDOW_DAYS,
+                            help='drop hits newer than now - N days: they sit inside the rolling'
+                                 ' nb_recent_hits window and caused the popularity that would'
+                                 ' rank them, which leaks into s_popularity. 0 disables it')
         parser.add_argument('--prefix-weight', type=float, default=PREFIX_WEIGHT)
         parser.add_argument('--substr-weight', type=float, default=SUBSTRING_WEIGHT)
         parser.add_argument('--sim-weight', type=float, default=SIMILARITY_WEIGHT)
         parser.add_argument('--word-weight', type=float, default=WORD_SIMILARITY_WEIGHT)
         parser.add_argument('--geo-weight', type=float, default=GEO_WEIGHT)
-        parser.add_argument('--pop-weight', type=float, default=POPULATION_WEIGHT)
+        parser.add_argument('--population-weight', type=float, default=POPULATION_WEIGHT,
+                            help='weight of City.population, on municipality rows only')
+        parser.add_argument('--popularity-weight', type=float, default=POPULARITY_WEIGHT,
+                            help='weight of nb_recent_hits, on parish/website/church rows'
+                                 ' only')
         parser.add_argument('--geo-half-life-km', type=float,
                             default=GEO_HALF_LIFE_METERS / 1000.0)
         parser.add_argument('--geo-shape', choices=['inv', 'exp'], default='exp')
@@ -64,9 +76,27 @@ class Command(AbstractCommand):
         self.cache_dir = options['cache_dir']
         os.makedirs(self.cache_dir, exist_ok=True)
 
+        cutoff = None
+        if options['hit_cutoff_days']:
+            cutoff = timezone.now() - timedelta(days=options['hit_cutoff_days'])
+            self.info(f'corpus cutoff {cutoff:%Y-%m-%d %H:%M}: dropping the hits recorded inside'
+                      f" the {options['hit_cutoff_days']}-day nb_recent_hits window")
+
         self.info('Resolving recorded hits...')
-        hits, skips = load_and_resolve_hits()
+        hits, skips = load_and_resolve_hits(max_created_at=cutoff)
         self.info(f'{len(hits)} hits resolved, {sum(skips.values())} skipped ({skips})')
+        if not hits:
+            self.error('No hit left to evaluate on.')
+            return
+
+        # The cutoff scales with the popularity window, so a wide window can quietly leave too
+        # few hits to conclude anything. Say so rather than print confident metrics on a stub.
+        nb_dropped = skips.get('inside-popularity-window', 0)
+        if nb_dropped > len(hits):
+            self.error(f'The cutoff dropped {nb_dropped} hits and kept only {len(hits)}: the'
+                       f' popularity window is nearly as long as the recorded history. Per-type'
+                       f' metrics below are computed on very few hits — pass --hit-cutoff-days'
+                       f' explicitly if you want to trade leakage for corpus size.')
 
         if options['mode'] == 'replay':
             self.handle_replay(hits, skips)
@@ -80,7 +110,8 @@ class Command(AbstractCommand):
         return ScoringConfig(
             prefix_w=options['prefix_weight'], substr_w=options['substr_weight'],
             sim_w=options['sim_weight'], word_w=options['word_weight'],
-            geo_w=options['geo_weight'], pop_w=options['pop_weight'],
+            geo_w=options['geo_weight'], population_w=options['population_weight'],
+            popularity_w=options['popularity_weight'],
             half_life_km=options['geo_half_life_km'], geo_shape=options['geo_shape'],
             gate_threshold=options['gate_threshold'],
             boost_municipality=options['boost_municipality'],
@@ -136,6 +167,9 @@ class Command(AbstractCommand):
             split = dates[int(len(dates) * 0.8)]
         train = [h for h in hits if h.created_at < split]
         val = [h for h in hits if h.created_at >= split]
+        if not val:
+            self.error(f'Empty validation split: --split-date {split:%Y-%m-%d} is at or after'
+                       ' the corpus cutoff, so the validation numbers below mean nothing.')
         return train, val, split
 
     def handle_replay(self, hits, skips):

@@ -19,7 +19,8 @@ class ScoringConfig:
     sim_w: float
     word_w: float
     geo_w: float
-    pop_w: float
+    population_w: float      # City.population, municipality rows only
+    popularity_w: float      # nb_recent_hits, parish/website/church rows only
     half_life_km: float
     geo_shape: str = 'exp'      # 'exp' = exp(-d*ln2/h) ; 'inv' = 1/(1+d/h)
     boost_municipality: float = 0.0
@@ -44,12 +45,15 @@ def row_score(row: dict, config: ScoringConfig) -> float:
     quality = max(row['s_prefix'], row['s_substr'], row['s_word'])
     gate = 1.0 if config.gate_threshold <= 0 \
         else min(1.0, quality / config.gate_threshold)
+    # A row carries at most one of the two size signals — population on municipality rows,
+    # traffic on the other three — so both terms can simply be added.
     return (config.prefix_w * row['s_prefix']
             + config.substr_w * row['s_substr']
             + config.sim_w * row['s_sim']
             + config.word_w * row['s_word']
             + (config.geo_w * geo_score(row['distance_m'], config)
-               + config.pop_w * row['s_pop']) * gate
+               + config.population_w * row['s_population']
+               + config.popularity_w * row['s_popularity']) * gate
             + boost)
 
 
