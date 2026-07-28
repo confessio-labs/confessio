@@ -55,6 +55,18 @@
       "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20201231T100000Z"]
     },
     {
+      "status": "confirmed",
+      "summary": "Confessions Ste Jeanne d'Arc",
+      "start": {"dateTime": "2020-02-29T17:30:00+01:00", "timeZone": "Europe/Paris"},
+      "recurrence": ["RRULE:FREQ=WEEKLY;WKST=MO;COUNT=5;BYDAY=SA"]
+    },
+    {
+      "status": "confirmed",
+      "summary": "Confessions de Careme",
+      "start": {"dateTime": "2026-02-21T17:00:00+01:00", "timeZone": "Europe/Paris"},
+      "recurrence": ["RRULE:FREQ=WEEKLY;WKST=MO;COUNT=6;BYDAY=SA"]
+    },
+    {
       "status": "cancelled",
       "summary": "Annulé",
       "start": {"dateTime": "2026-03-10T10:00:00+01:00", "timeZone": "Europe/Paris"}
