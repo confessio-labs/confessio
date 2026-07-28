@@ -79,29 +79,27 @@ def count_requests_by_uuid(path_filter: Q, since: datetime, uuid_path_index: int
     return counts, nb_unparseable
 
 
-def fold_church_counts_into_websites(count_by_church_uuid: dict[UUID, int],
-                                     count_by_website_uuid: dict[UUID, int]) -> int:
-    """Add each church's views to its website's total. Returns the nb of unattributed views."""
-    website_by_church_uuid = dict(
-        Church.objects.filter(uuid__in=count_by_church_uuid)
-        .values_list('uuid', 'parish__website_id'))
+def drop_unknown_uuids(model: type, count_by_uuid: dict[UUID, int]) -> int:
+    """Discard counts whose uuid names no live row. Returns the nb of discarded views.
 
-    nb_unattributed = 0
-    for church_uuid, count in count_by_church_uuid.items():
-        website_uuid = website_by_church_uuid.get(church_uuid)
-        if website_uuid is None:
-            nb_unattributed += count
-            continue
-        count_by_website_uuid[website_uuid] = count_by_website_uuid.get(website_uuid, 0) + count
-    return nb_unattributed
+    A path can point at an entity that has since been deleted; keeping it would inflate the
+    'with traffic' totals and the attribution coverage.
+    """
+    known = set(model.objects.filter(uuid__in=count_by_uuid).values_list('uuid', flat=True))
+    nb_dropped = 0
+    for entity_uuid in [u for u in count_by_uuid if u not in known]:
+        nb_dropped += count_by_uuid.pop(entity_uuid)
+    return nb_dropped
 
 
-def add_autocomplete_picks(since: datetime, count_by_website_uuid: dict[UUID, int]
+def add_autocomplete_picks(since: datetime, count_by_uuid_per_model: dict[type, dict[UUID, int]]
                            ) -> tuple[int, int]:
-    """Count each explicit autocomplete pick as one hit. Returns (nb_added, nb_unattributed).
+    """Credit each explicit autocomplete pick to the entity it designates.
 
-    Volume is tiny next to the request log, so this mostly moves the long tail. Note that a pick
-    also produces the pageview it navigates to, which is counted separately.
+    Returns (nb_added, nb_unattributed). A pick lands on whatever the user actually chose — a
+    Church pick stays on the church — so this is the only source Parish popularity ever gets.
+    Municipality picks are deliberately absent from WEBSITE_ITEM_TYPES: a city's standing comes
+    from its population alone, and picking it must never make it more popular.
     """
     hits = list(AutocompleteHit.objects.filter(
         created_at__gt=since, item_type__in=WEBSITE_ITEM_TYPES).exclude(item_uuid=None))
@@ -109,34 +107,35 @@ def add_autocomplete_picks(since: datetime, count_by_website_uuid: dict[UUID, in
 
     nb_added = nb_unattributed = 0
     for hit in hits:
-        website, _ = resolver.resolve_website(hit.item_type, hit.item_uuid)
-        if website is None:
+        target, _ = resolver.resolve_target(hit.item_type, hit.item_uuid)
+        if target is None:
             nb_unattributed += 1
             continue
-        count_by_website_uuid[website.uuid] = count_by_website_uuid.get(website.uuid, 0) + 1
+        counts = count_by_uuid_per_model[type(target)]
+        counts[target.uuid] = counts.get(target.uuid, 0) + 1
         nb_added += 1
     return nb_added, nb_unattributed
 
 
-def persist_nb_recent_hits(count_by_website_uuid: dict[UUID, int]) -> tuple[int, int]:
-    """Write the counts and zero out everyone else. Returns (nb_updated, nb_reset).
+def persist_counts(model: type, count_by_uuid: dict[UUID, int]) -> tuple[int, int]:
+    """Write one model's counts and zero out every other row. Returns (nb_updated, nb_reset).
 
     bulk_update deliberately: it writes no simple_history row and leaves `updated_at` alone.
-    A nightly counter is not an edit to the website, and `updated_at` is the cursor of the
-    public /websites API (front/api.py), which would otherwise report every popular website as
-    modified every night.
+    A nightly counter is not an edit to the entity, and `updated_at` is the cursor of the public
+    /websites API (front/api.py), which would otherwise report every popular row as modified
+    every night.
     """
     to_update = []
-    for website in Website.objects.filter(uuid__in=count_by_website_uuid):
-        count = count_by_website_uuid[website.uuid]
-        if count != website.nb_recent_hits:
-            website.nb_recent_hits = count
-            to_update.append(website)
-    Website.objects.bulk_update(to_update, ['nb_recent_hits'])
+    for obj in model.objects.filter(uuid__in=count_by_uuid):
+        count = count_by_uuid[obj.uuid]
+        if count != obj.nb_recent_hits:
+            obj.nb_recent_hits = count
+            to_update.append(obj)
+    model.objects.bulk_update(to_update, ['nb_recent_hits'])
 
-    # Websites that lost all their traffic are absent from the counts, so they need an explicit
+    # Rows that lost all their traffic are absent from the counts, so they need an explicit
     # reset: without it a stale value survives forever.
-    nb_reset = Website.objects.exclude(uuid__in=count_by_website_uuid) \
+    nb_reset = model.objects.exclude(uuid__in=count_by_uuid) \
         .filter(nb_recent_hits__gt=0).update(nb_recent_hits=0)
     return len(to_update), nb_reset
 
@@ -217,32 +216,46 @@ def report_attribution_coverage(since: datetime, nb_attributed: int) -> None:
         print(f'    unattributed: {shape} ({nb})')
 
 
-def update_popularity_of_websites():
+def update_popularity():
+    """Recompute the three per-entity popularity counters over the rolling window.
+
+    Each entity keeps the traffic it earned: a church detail view credits the church, never its
+    parish or its website. Folding them upwards, as this used to do, gave every church of a
+    website the same popularity and made the church rankings unable to tell them apart.
+    """
     since = make_aware(datetime.now() - timedelta(days=POPULARITY_WINDOW_DAYS))
 
     count_by_website_uuid, nb_bad_website_paths = count_requests_by_uuid(
         paths_starting_with(*WEBSITE_PATH_PREFIXES), since, WEBSITE_UUID_PATH_INDEX)
+    nb_gone_website_views = drop_unknown_uuids(Website, count_by_website_uuid)
     nb_website_views = sum(count_by_website_uuid.values())
 
     count_by_church_uuid, nb_bad_church_paths = count_requests_by_uuid(
         paths_starting_with(CHURCH_API_PATH_PREFIX), since, CHURCH_UUID_PATH_INDEX)
+    nb_gone_church_views = drop_unknown_uuids(Church, count_by_church_uuid)
     nb_church_views = sum(count_by_church_uuid.values())
-    nb_orphan_church_views = fold_church_counts_into_websites(count_by_church_uuid,
-                                                              count_by_website_uuid)
 
-    nb_picks, nb_orphan_picks = add_autocomplete_picks(since, count_by_website_uuid)
+    count_by_parish_uuid: dict[UUID, int] = {}
+    nb_picks, nb_orphan_picks = add_autocomplete_picks(since, {
+        Website: count_by_website_uuid,
+        Parish: count_by_parish_uuid,
+        Church: count_by_church_uuid,
+    })
 
-    print(f'{nb_website_views} website page views ({nb_bad_website_paths} with an invalid uuid)')
+    print(f'{nb_website_views} website page views ({nb_bad_website_paths} with an invalid uuid,'
+          f' {nb_gone_website_views} on a deleted website)')
     print(f'{nb_church_views} church api views ({nb_bad_church_paths} with an invalid uuid,'
-          f' {nb_orphan_church_views} on a church without website)')
+          f' {nb_gone_church_views} on a deleted church)')
     print(f'{nb_picks} autocomplete picks ({nb_orphan_picks} unresolved)')
 
-    nb_updated, nb_reset = persist_nb_recent_hits(count_by_website_uuid)
-    print(f'{len(count_by_website_uuid)} websites with traffic, {nb_updated} counts changed,'
-          f' {nb_reset} stale counts reset to zero')
+    for model, count_by_uuid in ((Website, count_by_website_uuid),
+                                 (Parish, count_by_parish_uuid),
+                                 (Church, count_by_church_uuid)):
+        nb_updated, nb_reset = persist_counts(model, count_by_uuid)
+        print(f'{len(count_by_uuid)} {model.__name__.lower()}s with traffic,'
+              f' {nb_updated} counts changed, {nb_reset} stale counts reset to zero')
 
     nb_best = update_best_diocese_hits(count_by_website_uuid)
     print(f'{nb_best} dioceses with a best website')
 
-    report_attribution_coverage(since,
-                                nb_website_views + nb_church_views - nb_orphan_church_views)
+    report_attribution_coverage(since, nb_website_views + nb_church_views)

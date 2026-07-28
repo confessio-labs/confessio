@@ -218,7 +218,7 @@ def get_churches_in_box(min_lat, min_long, max_lat, max_long, time_filter: TimeF
         .annotate(has_event=Exists(build_event_subquery(time_filter)))\
         .order_by(
         '-has_event',
-        '-parish__website__nb_recent_hits'
+        '-nb_recent_hits'
     )
 
     return truncate_results(church_query, time_filter)
@@ -253,7 +253,7 @@ def get_churches_by_diocese(
         .filter(parish__diocese=diocese)\
         .order_by(
         '-has_event',
-        '-parish__website__nb_recent_hits'
+        '-nb_recent_hits'
     )
 
     return truncate_results(church_query, time_filter)
@@ -268,7 +268,7 @@ def get_popular_churches(min_lat, min_long, max_lat, max_long, time_filter: Time
         .order_by(
         '-has_event',
         '-parish__website__is_best_diocese_hit',
-        '-parish__website__nb_recent_hits',
+        '-nb_recent_hits',
     )
 
     return truncate_results(church_query, time_filter)

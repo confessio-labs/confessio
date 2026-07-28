@@ -40,24 +40,40 @@ class AutocompleteHitResolver:
         self.website_by_uuid = {str(w.uuid): w for w in websites}
         self.church_by_uuid = {str(c.uuid): c for c in churches}
 
-    def resolve_website(self, item_type: str, item_uuid: str | None
-                        ) -> tuple[Website | None, str | None]:
-        """Return (website, skip_reason) — exactly one of the two is None."""
+    def resolve_target(self, item_type: str, item_uuid: str | None
+                       ) -> tuple[Parish | Website | Church | None, str | None]:
+        """The entity the pick designates, and the website it belongs to.
+
+        Returns (target, skip_reason) — exactly one of the two is None. Popularity credits the
+        target itself, so a church pick must stay on the church rather than climb to its website.
+        """
         if item_type == 'parish':
             # Parish and Website results are both displayed as type='parish', so item_uuid is a
             # Parish uuid for some hits and a Website uuid for others: try both.
-            parish = self.parish_by_uuid.get(item_uuid)
-            website = parish.website if parish else self.website_by_uuid.get(item_uuid)
-            if website is None:
+            target = self.parish_by_uuid.get(item_uuid) or self.website_by_uuid.get(item_uuid)
+            if target is None or self._website_of(target) is None:
                 return None, 'parish-uuid-not-found'
         elif item_type == 'church':
-            church = self.church_by_uuid.get(item_uuid)
-            if church is None or church.parish.website is None:
+            target = self.church_by_uuid.get(item_uuid)
+            if target is None or self._website_of(target) is None:
                 return None, 'church-uuid-not-found'
-            website = church.parish.website
         else:
             return None, f'unknown-type-{item_type}'
 
-        if not website.is_active:
+        if not self._website_of(target).is_active:
             return None, 'website-now-inactive'
-        return website, None
+        return target, None
+
+    def resolve_website(self, item_type: str, item_uuid: str | None
+                        ) -> tuple[Website | None, str | None]:
+        """The website the pick leads to — what the replay needs to build its target URL."""
+        target, reason = self.resolve_target(item_type, item_uuid)
+        return (None, reason) if target is None else (self._website_of(target), None)
+
+    @staticmethod
+    def _website_of(target: Parish | Website | Church) -> Website | None:
+        if isinstance(target, Website):
+            return target
+        if isinstance(target, Parish):
+            return target.website
+        return target.parish.website

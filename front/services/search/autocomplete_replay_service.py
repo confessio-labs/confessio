@@ -36,7 +36,7 @@ def load_and_resolve_hits(max_created_at: datetime | None = None
     for hit in AutocompleteHit.objects.all().order_by('created_at'):
         # Such a hit caused part of the popularity that would rank it: the pick navigates to
         # /paroisse/<uuid>, which update_popularity_of_websites counts. Scoring it with the
-        # current snapshot leaks the label into s_pop.
+        # current snapshot leaks the label into s_popularity.
         if max_created_at is not None and hit.created_at >= max_created_at:
             skip('inside-popularity-window')
             continue

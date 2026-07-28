@@ -19,8 +19,8 @@ class ScoringConfig:
     sim_w: float
     word_w: float
     geo_w: float
-    pop_w: float             # City.population, municipality rows only
-    hits_w: float            # Website.nb_recent_hits, parish/website/church rows only
+    population_w: float      # City.population, municipality rows only
+    popularity_w: float      # nb_recent_hits, parish/website/church rows only
     half_life_km: float
     geo_shape: str = 'exp'      # 'exp' = exp(-d*ln2/h) ; 'inv' = 1/(1+d/h)
     boost_municipality: float = 0.0
@@ -45,16 +45,15 @@ def row_score(row: dict, config: ScoringConfig) -> float:
     quality = max(row['s_prefix'], row['s_substr'], row['s_word'])
     gate = 1.0 if config.gate_threshold <= 0 \
         else min(1.0, quality / config.gate_threshold)
-    # s_pop holds the commune population on municipality rows and the website traffic on the
-    # other three, and the two never coexist on a row, so the type selects the weight. Mirrors
-    # the pop_weight argument of annotate_search_score.
-    pop_w = config.pop_w if row['type'] == 'municipality' else config.hits_w
+    # A row carries at most one of the two size signals — population on municipality rows,
+    # traffic on the other three — so both terms can simply be added.
     return (config.prefix_w * row['s_prefix']
             + config.substr_w * row['s_substr']
             + config.sim_w * row['s_sim']
             + config.word_w * row['s_word']
             + (config.geo_w * geo_score(row['distance_m'], config)
-               + pop_w * row['s_pop']) * gate
+               + config.population_w * row['s_population']
+               + config.popularity_w * row['s_popularity']) * gate
             + boost)
 
 
