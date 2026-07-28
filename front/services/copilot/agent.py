@@ -269,4 +269,5 @@ async def trigger_recrawl(ctx: RunContext[CopilotDeps], website_uuid: str) -> di
 @agent.tool(requires_approval=True)
 async def report_bug(ctx: RunContext[CopilotDeps], title: str, details: str) -> dict:
     """Report a bug for a developer to fix. For now this only records the report in the chat."""
-    return {'reported': True, 'title': title, 'details': details}
+    return await sync_to_async(_record_proposed)(
+        ctx.deps.discussion_uuid, ctx.tool_call_id, tools.do_report_bug, title, details)

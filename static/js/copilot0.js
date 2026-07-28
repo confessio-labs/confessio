@@ -98,8 +98,14 @@ $(function () {
         }
 
         $error.addClass("d-none");
-        post(urls.message, { text: text }).done(function () {
+        post(urls.message, { text: text }).done(function (resp) {
             $text.val("");
+            // Actions still awaiting approval are superseded by this message: swap in their
+            // re-rendered cards, since polling only ever returns items we have not seen yet.
+            $.each(resp.refused || [], function (_, ref) {
+                $messages.find(".copilot-item[data-item-uuid='" + ref.uuid + "']")
+                    .replaceWith(ref.html);
+            });
             // Optimistically show the user message immediately, then poll for the agent.
             lastPosition = computeLastPosition();
             startPolling();

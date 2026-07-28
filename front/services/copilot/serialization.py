@@ -11,6 +11,10 @@ from crawling.utils.string_utils import strip_null_bytes
 # runner's resume path uses the same constant for ToolDenied so the two stay in sync.
 TOOL_DENIED_MESSAGE = "L'admin a refusé cette action."
 
+# Fallback text for a proposed tool call that never got a result yet is no longer the trailing one
+# (see _trailing_unresolved_start): its outcome is genuinely unknown, but the call must be answered.
+TOOL_UNRESOLVED_MESSAGE = "Cette action n'a pas abouti : aucun résultat n'a été enregistré."
+
 
 def dump_messages(messages: list[ModelMessage]) -> list:
     """Serialize a PydanticAI message history to a JSON-able list for the JSONField.
@@ -47,6 +51,27 @@ def _tool_return_request(item: dict, call_id: str, content) -> ModelRequest:
         tool_name=item['tool_name'], content=content, tool_call_id=call_id)])
 
 
+def _is_unresolved_proposal(item: dict) -> bool:
+    """A proposed tool call with no result and no explicit refusal — nothing answers it yet."""
+    return (item['item_type'] == 'proposed_tool_call'
+            and item['tool_result'] is None
+            and item['approval_status'] != 'rejected')
+
+
+def _trailing_unresolved_start(items: list[dict]) -> int:
+    """Index where the trailing run of still-unanswered proposed calls begins.
+
+    Only that trailing batch may stay deferred — it is exactly what the resume path answers with
+    DeferredToolResults. An unanswered tool call with any item after it makes the whole history
+    invalid for the provider ("an assistant message with 'tool_calls' must be followed by tool
+    messages responding to each tool_call_id"), so everything before the trailing run is answered.
+    """
+    index = len(items)
+    while index > 0 and _is_unresolved_proposal(items[index - 1]):
+        index -= 1
+    return index
+
+
 def build_history_from_item_dicts(items: list[dict]) -> list[ModelMessage]:
     """Rebuild the agent's message history from ordered CopilotDiscussionItem values.
 
@@ -56,10 +81,12 @@ def build_history_from_item_dicts(items: list[dict]) -> list[ModelMessage]:
     ModelResponse/ModelRequest pair; PydanticAI's own `_clean_message_history` then merges them into
     the native grouped shape. Item dicts carry the raw CopilotDiscussionItem.ItemType /
     ApprovalStatus string values. Whether a proposed call is answered or left deferred is driven by
-    the presence of `tool_result`, not by `approval_status` alone.
+    the presence of `tool_result` and by position, not by `approval_status` alone: only the trailing
+    run of unresolved calls may stay unanswered (see _trailing_unresolved_start).
     """
     messages: list[ModelMessage] = []
-    for item in items:
+    deferred_from = _trailing_unresolved_start(items)
+    for index, item in enumerate(items):
         item_type = item['item_type']
         if item_type == 'user_message':
             messages.append(ModelRequest(parts=[UserPromptPart(content=item['text'])]))
@@ -77,7 +104,11 @@ def build_history_from_item_dicts(items: list[dict]) -> list[ModelMessage]:
                 messages.append(_tool_return_request(item, call_id, item['tool_result']))
             elif item['approval_status'] == 'rejected':
                 messages.append(_tool_return_request(item, call_id, TOOL_DENIED_MESSAGE))
-            # pending (no result yet) → leave the call unanswered (deferred trailing call)
+            elif index < deferred_from:
+                # Unresolved, but a later item followed it (a new human message superseded it, or
+                # the result was never written): answer it, or the whole history is rejected.
+                messages.append(_tool_return_request(item, call_id, TOOL_UNRESOLVED_MESSAGE))
+            # else: trailing pending batch → leave unanswered (answered on the resume path)
     return messages
 
 

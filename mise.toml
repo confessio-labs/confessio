@@ -43,6 +43,7 @@ description = "Run unit tests (no Django loading)"
 run = [
   "uv run python -m unittest discover -s scheduling/tests",
   "uv run python -m unittest discover -s crawling/tests",
+  "uv run python -m unittest discover -s front/services/copilot/tests -t .",
 ]
 
 [tasks.check-deps]
