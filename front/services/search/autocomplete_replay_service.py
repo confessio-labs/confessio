@@ -3,26 +3,30 @@
 Feeds the `autocomplete_tuning` management command.
 """
 import asyncio
+from datetime import datetime
 from typing import Callable
 
 from django.urls import reverse
 
 from front.models import AutocompleteHit
+from front.services.search.autocomplete_hit_service import AutocompleteHitResolver
 from front.services.search.autocomplete_service import get_aggregated_response
 from front.utils.autocomplete_metrics_utils import ResolvedHit
-from registry.models import City, Parish, Church, Website
+from registry.models import City
 from registry.utils.city_name_utils import normalize_city_name
 
 
-def load_and_resolve_hits() -> tuple[list[ResolvedHit], dict[str, int]]:
-    """One resolution path per type; unmatched hits are skip-counted, never guessed."""
+def load_and_resolve_hits(max_created_at: datetime | None = None
+                          ) -> tuple[list[ResolvedHit], dict[str, int]]:
+    """One resolution path per type; unmatched hits are skip-counted, never guessed.
+
+    `max_created_at` drops the hits recorded inside the nb_recent_hits window — see the
+    --hit-cutoff-days option of the autocomplete_tuning command.
+    """
     cities_by_name: dict[str, list] = {}
     for c in City.objects.all().only('zipcode', 'name_norm', 'slug', 'population'):
         cities_by_name.setdefault(c.name_norm, []).append(c)
-    parish_by_uuid = {str(p.uuid): p for p in Parish.objects.select_related('website')}
-    website_by_uuid = {str(w.uuid): w for w in Website.objects.all()}
-    church_by_uuid = {str(c.uuid): c
-                      for c in Church.objects.select_related('parish__website')}
+    website_resolver = AutocompleteHitResolver()
 
     resolved, skips = [], {}
 
@@ -30,6 +34,12 @@ def load_and_resolve_hits() -> tuple[list[ResolvedHit], dict[str, int]]:
         skips[reason] = skips.get(reason, 0) + 1
 
     for hit in AutocompleteHit.objects.all().order_by('created_at'):
+        # Such a hit caused part of the popularity that would rank it: the pick navigates to
+        # /paroisse/<uuid>, which update_popularity_of_websites counts. Scoring it with the
+        # current snapshot leaks the label into s_pop.
+        if max_created_at is not None and hit.created_at >= max_created_at:
+            skip('inside-popularity-window')
+            continue
         if hit.latitude is None or hit.longitude is None:
             skip('no-user-location')
             continue
@@ -53,29 +63,12 @@ def load_and_resolve_hits() -> tuple[list[ResolvedHit], dict[str, int]]:
                 skip('city-no-slug')
                 continue
             target_url = reverse('city_view', kwargs={'city_slug': candidates[0].slug})
-        elif hit.item_type == 'parish':
-            obj = parish_by_uuid.get(hit.item_uuid)
-            website = obj.website if obj else website_by_uuid.get(hit.item_uuid)
+        else:
+            website, reason = website_resolver.resolve_website(hit.item_type, hit.item_uuid)
             if website is None:
-                skip('parish-uuid-not-found')
-                continue
-            if not website.is_active:
-                skip('website-now-inactive')
+                skip(reason)
                 continue
             target_url = reverse('website_view', kwargs={'website_uuid': website.uuid})
-        elif hit.item_type == 'church':
-            church = church_by_uuid.get(hit.item_uuid)
-            if church is None or church.parish.website is None:
-                skip('church-uuid-not-found')
-                continue
-            if not church.parish.website.is_active:
-                skip('website-now-inactive')
-                continue
-            target_url = reverse('website_view',
-                                 kwargs={'website_uuid': church.parish.website.uuid})
-        else:
-            skip(f'unknown-type-{hit.item_type}')
-            continue
 
         resolved.append(ResolvedHit(
             query=hit.query, latitude=hit.latitude, longitude=hit.longitude,

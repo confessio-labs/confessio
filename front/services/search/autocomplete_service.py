@@ -17,9 +17,9 @@ from django.db.models.functions import Coalesce, Exp, Greatest, Least, Ln
 from django.urls import reverse
 
 from front.utils.autocomplete_constants import (
-    GEO_HALF_LIFE_METERS, GEO_POP_GATE_THRESHOLD, GEO_WEIGHT, MAX_AUTOCOMPLETE_RESULTS,
-    MAX_LN_POPULATION, POPULATION_WEIGHT, PREFIX_WEIGHT, SIMILARITY_WEIGHT, SUBSTRING_WEIGHT,
-    TYPE_BOOSTS, WORD_SIMILARITY_WEIGHT)
+    GEO_HALF_LIFE_METERS, GEO_POP_GATE_THRESHOLD, GEO_WEIGHT, HITS_WEIGHT,
+    MAX_AUTOCOMPLETE_RESULTS, MAX_LN_HITS, MAX_LN_POPULATION, POPULATION_WEIGHT, PREFIX_WEIGHT,
+    SIMILARITY_WEIGHT, SUBSTRING_WEIGHT, TYPE_BOOSTS, WORD_SIMILARITY_WEIGHT)
 from front.utils.department_utils import get_departments_context
 from registry.models import City, Parish, Church, Website
 from registry.utils.city_name_utils import normalize_city_name
@@ -158,13 +158,42 @@ class AutocompleteResult:
         )
 
 
+def _log_pop_expression(field: str, max_ln: float):
+    """Log-normalized popularity component, shared by the live fetchers and the tuning pools.
+
+    Coalesce and Greatest map NULL and 0 onto ln(1) = 0. Both are defensive rather than
+    load-bearing (neither column is nullable, and Postgres' GREATEST already ignores NULLs), but
+    they keep the expression correct if a caller ever drops the is_active filters that make the
+    website joins inner. Least caps the result at 1: unlike a commune's population, a rolling
+    traffic counter has no natural ceiling.
+    """
+    normalized = ExpressionWrapper(
+        Ln(Greatest(Coalesce(F(field), Value(0)), Value(1))) / Value(max_ln),
+        output_field=FloatField(),
+    )
+    return ExpressionWrapper(Least(Value(1.0), normalized), output_field=FloatField())
+
+
+def city_pop_expression():
+    """Demographic weight of a municipality."""
+    return _log_pop_expression('population', MAX_LN_POPULATION)
+
+
+def hits_pop_expression(field: str):
+    """Traffic weight of a parish/website/church, `field` pointing at Website.nb_recent_hits."""
+    return _log_pop_expression(field, MAX_LN_HITS)
+
+
 def annotate_search_score(qs, query_term: str, user_point: Point | None, geo_field: str,
-                          type_boost: float, pop_expression=None):
+                          type_boost: float, pop_expression=None,
+                          pop_weight: float = POPULATION_WEIGHT):
     """Annotate the shared autocomplete ranking score, computed entirely in SQL.
 
     All four sources get the exact same formula so their `final_score` values are comparable
     and the merge is a plain sort. `geo_field` names a geometry column or annotation
-    ('location', or a pre-annotated 'centroid'); `pop_expression` is only set for City today.
+    ('location', or a pre-annotated 'centroid'). `s_pop` carries a different signal per source —
+    commune population for City, website traffic for the other three — so `pop_weight` selects
+    the matching weight; the two never appear on the same row.
     """
     qs = qs.annotate(
         s_prefix=Case(
@@ -214,7 +243,7 @@ def annotate_search_score(qs, query_term: str, user_point: Point | None, geo_fie
             + F('s_substr') * Value(SUBSTRING_WEIGHT)
             + F('s_sim') * Value(SIMILARITY_WEIGHT)
             + F('s_word') * Value(WORD_SIMILARITY_WEIGHT)
-            + (F('s_geo') * Value(GEO_WEIGHT) + F('s_pop') * Value(POPULATION_WEIGHT))
+            + (F('s_geo') * Value(GEO_WEIGHT) + F('s_pop') * Value(pop_weight))
             * quality_gate
             + Value(type_boost),
             output_field=FloatField(),
@@ -245,10 +274,7 @@ def get_city_response(query_term: str, user_point: Point | None) -> ScoredResult
     )
     cities = annotate_search_score(
         cities, query_term, user_point, 'location', TYPE_BOOSTS['municipality'],
-        pop_expression=ExpressionWrapper(
-            Ln(Greatest(F('population'), Value(1))) / Value(MAX_LN_POPULATION),
-            output_field=FloatField(),
-        ),
+        pop_expression=city_pop_expression(),
     )[:MAX_AUTOCOMPLETE_RESULTS]
 
     return [(city.final_score, AutocompleteResult.from_city(city)) for city in cities]
@@ -271,7 +297,8 @@ def get_parish_by_name_response(query_term: str,
         Parish.objects.filter(website__is_active=True)
         .filter(long_name_predicate(query_term))
         .annotate(centroid=Centroid(Collect('churches__location'))),
-        query_term, user_point, 'centroid', TYPE_BOOSTS['parish'])
+        query_term, user_point, 'centroid', TYPE_BOOSTS['parish'],
+        pop_expression=hits_pop_expression('website__nb_recent_hits'), pop_weight=HITS_WEIGHT)
     hydration = Parish.objects.select_related('website').prefetch_related('churches') \
         .only('name', 'website__uuid')
 
@@ -283,7 +310,8 @@ def get_website_by_name_response(query_term: str,
     scoring = annotate_search_score(
         Website.objects.filter(is_active=True).filter(long_name_predicate(query_term))
         .annotate(centroid=Centroid(Collect('parishes__churches__location'))),
-        query_term, user_point, 'centroid', TYPE_BOOSTS['parish'])
+        query_term, user_point, 'centroid', TYPE_BOOSTS['parish'],
+        pop_expression=hits_pop_expression('nb_recent_hits'), pop_weight=HITS_WEIGHT)
     hydration = Website.objects.prefetch_related('parishes__churches').only('name', 'uuid')
 
     return _scored_then_hydrated(scoring, hydration, AutocompleteResult.from_website)
@@ -294,7 +322,9 @@ def get_church_by_name_response(query_term: str,
     scoring = annotate_search_score(
         Church.objects.filter(is_active=True, parish__website__is_active=True)
         .filter(long_name_predicate(query_term)),
-        query_term, user_point, 'location', TYPE_BOOSTS['church'])
+        query_term, user_point, 'location', TYPE_BOOSTS['church'],
+        pop_expression=hits_pop_expression('parish__website__nb_recent_hits'),
+        pop_weight=HITS_WEIGHT)
     hydration = Church.objects.select_related('parish__website') \
         .only('name', 'city', 'zipcode', 'location', 'parish__website__uuid')
 

@@ -4,7 +4,8 @@ For every unique (query, latitude, longitude) among the resolved hits, fetch up 
 candidates per source with the LIVE retrieval predicates and scoring annotations (imported
 from autocomplete_service, so predicates/components cannot drift from prod). Each pool row
 carries the RAW components (s_prefix, s_substr, s_sim, s_word, s_pop, distance_m) so the grid
-search can re-weight and change the geo decay without re-querying.
+search can re-weight and change the geo decay without re-querying. `s_pop` holds the commune
+population on municipality rows and the website traffic on the other three.
 """
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
@@ -13,13 +14,14 @@ from django.contrib.gis.db.models import Collect
 from django.contrib.gis.db.models.functions import Centroid
 from django.contrib.gis.geos import Point
 from django.db import connections
-from django.db.models import ExpressionWrapper, F, FloatField, Q, Value
-from django.db.models.functions import Greatest, Ln
+from django.db.models import F, Q
+from django.db.models.functions import Greatest
 from django.urls import reverse
 
 from front.services.search.autocomplete_service import (annotate_search_score,
+                                                        city_pop_expression,
+                                                        hits_pop_expression,
                                                         long_name_predicate)
-from front.utils.autocomplete_constants import MAX_LN_POPULATION
 from registry.models import City, Parish, Church, Website
 from registry.utils.city_name_utils import normalize_city_name
 
@@ -54,11 +56,11 @@ def build_pools_for_key(key: tuple) -> dict[str, list[dict]]:
 
     cities = City.objects.filter(
         Q(name_norm__trigram_similar=q) | Q(name_norm__startswith=q), slug__isnull=False)
+    # No type_boost and no pop_weight here on purpose: _rows ranks by `best`, the max of the four
+    # STRING signals, which no weight can change. That is what makes offline re-weighting of the
+    # cached rows valid — the pool is a retrieval set, not a ranking.
     cities = annotate_search_score(
-        cities, q, point, 'location', 0.0,
-        pop_expression=ExpressionWrapper(
-            Ln(Greatest(F('population'), Value(1))) / Value(MAX_LN_POPULATION),
-            output_field=FloatField()))
+        cities, q, point, 'location', 0.0, pop_expression=city_pop_expression())
     city_rows = _rows(
         cities, lambda c: reverse('city_view', kwargs={'city_slug': c.slug}), 'municipality')
 
@@ -68,19 +70,23 @@ def build_pools_for_key(key: tuple) -> dict[str, list[dict]]:
         .filter(website__is_active=True).filter(predicate) \
         .annotate(centroid=Centroid(Collect('churches__location')))
     parish_rows = _rows(
-        annotate_search_score(parishes, q, point, 'centroid', 0.0),
+        annotate_search_score(parishes, q, point, 'centroid', 0.0,
+                              pop_expression=hits_pop_expression('website__nb_recent_hits')),
         lambda p: reverse('website_view', kwargs={'website_uuid': p.website.uuid}), 'parish')
 
     websites = Website.objects.filter(is_active=True).filter(predicate) \
         .annotate(centroid=Centroid(Collect('parishes__churches__location')))
     website_rows = _rows(
-        annotate_search_score(websites, q, point, 'centroid', 0.0),
+        annotate_search_score(websites, q, point, 'centroid', 0.0,
+                              pop_expression=hits_pop_expression('nb_recent_hits')),
         lambda w: reverse('website_view', kwargs={'website_uuid': w.uuid}), 'parish')
 
     churches = Church.objects.select_related('parish__website') \
         .filter(is_active=True, parish__website__is_active=True).filter(predicate)
     church_rows = _rows(
-        annotate_search_score(churches, q, point, 'location', 0.0),
+        annotate_search_score(
+            churches, q, point, 'location', 0.0,
+            pop_expression=hits_pop_expression('parish__website__nb_recent_hits')),
         lambda c: reverse('website_view', kwargs={'website_uuid': c.parish.website.uuid}),
         'church')
 

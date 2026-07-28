@@ -26,6 +26,20 @@ GEO_WEIGHT = 18.0
 POPULATION_WEIGHT = 20.0
 # ln(2_500_000), a bit above the most populated commune, so that s_pop stays in [0, 1]
 MAX_LN_POPULATION = 14.73
+# Traffic popularity of parish/website/church rows (Website.nb_recent_hits), the analogue of
+# POPULATION_WEIGHT for the three non-city sources. A separate knob on purpose: no row carries
+# both signals, so nothing is lost by splitting them, whereas a shared weight would make every
+# parish-ranking adjustment silently reshuffle the municipality ranking — the very regression
+# the grid search gates against.
+# Ships at 0.0: the recorded hits that would tune it stop at 2026-06-27, when the Next.js front
+# took over `/` without ever calling POST /front/api/autocomplete/hits (weekly picks fell
+# 426 -> 27 while autocomplete queries rose 443 -> 8595). Set it from a grid search once the
+# beacon is restored and fresh hits have accumulated.
+HITS_WEIGHT = 0.0
+# ln(1000), about twice the largest observed nb_recent_hits (548, median 4), leaving headroom
+# for growth. Only the ratio HITS_WEIGHT / MAX_LN_HITS matters to the ranking, so this is a
+# readability choice rather than a tuning knob.
+MAX_LN_HITS = 6.91
 # Geo proximity is an ADDITIVE bonus with a fast exponential decay: score halves every 30 km.
 # The previous ranking MULTIPLIED name similarity by 50km/(50km+d), which buried far exact
 # matches: 34% of recorded picks are >50 km away and 26% >200 km (trips, home towns), and

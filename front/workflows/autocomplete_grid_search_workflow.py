@@ -24,14 +24,17 @@ STAGES = [
     ('string', [('sim_w', [0.0, 5.0, 10.0, 20.0, 30.0]),
                 ('word_w', [0.0, 10.0, 20.0, 30.0, 40.0]),
                 ('substr_w', [0.0, 5.0, 10.0, 20.0])]),
+    # Before the boosts: hits_w shifts every parish/website/church row by a per-row amount, so
+    # the type-level intercept the boosts represent can only be settled once it is fixed.
+    ('pop', [('pop_w', [10.0, 20.0, 30.0]),
+             ('hits_w', [0.0, 5.0, 10.0, 20.0, 30.0])]),
     ('boosts', [('boost_municipality', [0.0, 2.0, 4.0, 8.0]),
                 ('boost_parish', [0.0, 2.0, 4.0]),
                 ('boost_church', [0.0, 2.0, 4.0])]),
-    ('pop', [('pop_w', [10.0, 20.0, 30.0])]),
     ('gate', [('gate_threshold', [0.0, 0.3, 0.45, 0.5, 0.6])]),
 ]
 REFINED_FIELDS = ('geo_w', 'half_life_km', 'sim_w', 'word_w', 'substr_w',
-                  'boost_municipality', 'boost_parish', 'boost_church', 'pop_w',
+                  'boost_municipality', 'boost_parish', 'boost_church', 'pop_w', 'hits_w',
                   'gate_threshold')
 
 
@@ -107,5 +110,15 @@ def run_grid_search(start: ScoringConfig, train: list[ResolvedHit], val: list[Re
     log(f"  parish top-1 {winner_all['parish']['top1']:.3f} > "
         f"{replay_summary['parish']['top1']:.3f}: "
         f"{winner_all['parish']['top1'] > replay_summary['parish']['top1']}")
+
+    # Not gates, but the numbers to read before shipping a non-zero hits_w: every church of a
+    # popular website shares its s_pop, and each source is truncated to 15 BEFORE the dedupe by
+    # url, so one website's churches can crowd the church slots and collapse into a single
+    # result — which costs recall without showing up in top-1.
+    log('crowding watch (recall@15, winner vs live replay):')
+    for item_type in ('parish', 'church'):
+        if item_type in winner_all and item_type in replay_summary:
+            log(f"  {item_type} recall@15 {winner_all[item_type]['recall15']:.3f} vs "
+                f"{replay_summary[item_type]['recall15']:.3f}")
 
     return best
