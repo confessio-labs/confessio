@@ -102,7 +102,12 @@ def copilot_approve(request, discussion_uuid):
         CopilotDiscussionItem, uuid=request.POST.get('item_uuid'), discussion=discussion,
         item_type=ItemType.PROPOSED_TOOL_CALL)
     if item.approval_status != ApprovalStatus.PENDING:
-        return JsonResponse({'error': 'already_resolved'}, status=409)
+        # The card the admin clicked is stale: another tab decided it, or a newer message
+        # superseded it. Send the current card back so the client can show the real state.
+        return JsonResponse({
+            'error': 'already_resolved',
+            'item_html': render_to_string('partials/copilot_items.html', {'items': [item]}),
+        }, status=409)
     approved = request.POST.get('decision') == 'approve'
     item.approval_status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
     item.save(update_fields=['approval_status', 'updated_at'])

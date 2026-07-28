@@ -138,7 +138,16 @@ $(function () {
                 startPolling();
                 pollOnce();
             }
-        }).fail(function () {
+        }).fail(function (xhr) {
+            var resp = xhr.responseJSON || {};
+            if (resp.item_html) {
+                // Already decided server-side (superseded by a newer message, or another tab):
+                // show the real state instead of an error.
+                $messages.find(".copilot-item[data-item-uuid='" + itemUuid + "']")
+                    .replaceWith(resp.item_html);
+                lastPosition = computeLastPosition();
+                return;
+            }
             $btn.closest(".copilot-proposed-actions").find("button").prop("disabled", false);
             alert("Échec de la validation.");
         });
