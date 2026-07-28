@@ -5,6 +5,7 @@ from urllib.parse import urlparse, parse_qs, quote
 from zoneinfo import ZoneInfo
 
 import httpx
+from dateutil.rrule import rrulestr
 from icalendar.prop import vRecur
 
 from core.utils.log_utils import info
@@ -252,11 +253,31 @@ def parse_event_start(start: dict | None):
     return None
 
 
-def get_rrule(event: dict) -> vRecur | None:
+def get_rrule_line(event: dict) -> str | None:
     for line in event.get('recurrence') or []:
         if str(line).upper().startswith('RRULE:'):
-            return vRecur.from_ical(str(line)[len('RRULE:'):])
+            return str(line)
     return None
+
+
+def is_recurrence_over(rrule_line: str, rrule: vRecur, start, reference_date: date) -> bool:
+    """Whether the rule has no occurrence left on or after reference_date.
+
+    Google returns every event the calendar ever held, including finite series (a Lent
+    confession run, an Advent mass) that ended years ago. Recurrence text carries no absolute
+    date, so an expired series would otherwise read as a permanent weekly slot.
+    """
+    if not rrule.get('COUNT') and not rrule.get('UNTIL'):
+        return False  # unbounded rule: never over, and must not be expanded
+
+    dtstart = start if isinstance(start, datetime) else datetime.combine(start, time.min)
+    cutoff = datetime.combine(reference_date, time.min)
+    if dtstart.tzinfo is not None:
+        cutoff = cutoff.replace(tzinfo=dtstart.tzinfo)
+    try:
+        return rrulestr(rrule_line, dtstart=dtstart).after(cutoff, inc=True) is None
+    except (ValueError, TypeError):
+        return False  # unparseable rule: keep the event rather than drop it silently
 
 
 def render_event(event: dict, reference_date: date) -> tuple[date, bool, str] | None:
@@ -268,13 +289,11 @@ def render_event(event: dict, reference_date: date) -> tuple[date, bool, str] | 
     if start is None:
         return None
 
-    rrule = get_rrule(event)
-    if rrule:
-        until = _first(rrule.get('UNTIL'))
-        if until is not None:
-            until_date = until.date() if isinstance(until, datetime) else until
-            if until_date < reference_date:
-                return None  # recurrence has ended
+    rrule_line = get_rrule_line(event)
+    rrule = vRecur.from_ical(rrule_line[len('RRULE:'):]) if rrule_line else None
+    if rrule is not None:
+        if is_recurrence_over(rrule_line, rrule, start, reference_date):
+            return None
         when = render_recurrence(rrule, start)
     else:
         event_date = start.date() if isinstance(start, datetime) else start

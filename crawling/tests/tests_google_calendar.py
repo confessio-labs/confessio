@@ -71,6 +71,7 @@ class TestGoogleCalendar(unittest.TestCase):
                                        reference_date=REFERENCE_DATE)
         expected = (
             '<h2>Paroisse Test</h2>\n'
+            '<p>Confessions de Careme — tous les samedis à 17h00</p>\n'
             '<p>Confessions — tous les samedis à 17h00 — Saint-Martin</p>\n'
             '<p>Groupe de louange — le 3e jeudi du mois à 20h00</p>\n'
             '<p>Oraison — tous les mardis, mercredis, jeudis et vendredis à 7h00</p>\n'
@@ -80,6 +81,18 @@ class TestGoogleCalendar(unittest.TestCase):
             '<p>Messe de Paques — dimanche 5 avril 2026 à 10h30</p>'
         )
         self.assertEqual(result, expected)
+
+    def test_render_events_to_html_drops_expired_count_recurrence(self):
+        # A finite series (a Lent confession run) renders without any date, so once it is over
+        # it would otherwise read as a permanent weekly slot.
+        data = self.load_events_fixture()
+
+        result = render_events_to_html(data['summary'], data['items'],
+                                       reference_date=REFERENCE_DATE)
+        self.assertNotIn('Ste Jeanne d\'Arc', result)  # COUNT=5 series, ended in March 2020
+        self.assertNotIn('Recurrence terminee', result)  # UNTIL in the past
+        # ... but a finite series still running on the reference date is kept
+        self.assertIn('<p>Confessions de Careme — tous les samedis à 17h00</p>', result)
 
     def test_render_events_to_html_order_is_independent_of_input_order(self):
         # Google's paging order is unspecified; it must never leak into the hashed output.
