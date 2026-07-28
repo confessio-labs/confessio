@@ -269,3 +269,12 @@ def do_trigger_recrawl(website_uuid: str) -> dict:
     website = _get(Website, 'website', uuid=website_uuid)
     crawling_crawl_website(website)
     return {'recrawl_enqueued_for': str(website.uuid), 'website_name': website.name}
+
+
+def do_report_bug(title: str, details: str) -> dict:
+    """No-op sink: the report is durable as the proposed-tool item itself.
+
+    It still goes through _record_proposed like every other approval-gated tool, so the item gets a
+    tool_result and its tool call is never left unanswered in a later rebuilt history.
+    """
+    return {'reported': True, 'title': title, 'details': details}

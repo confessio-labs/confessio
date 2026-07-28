@@ -8,7 +8,7 @@ import unittest
 from pydantic_ai.messages import (ModelRequest, ModelResponse, TextPart, ToolCallPart,
                                   ToolReturnPart, UserPromptPart)
 
-from front.services.copilot.serialization import (TOOL_DENIED_MESSAGE,
+from front.services.copilot.serialization import (TOOL_DENIED_MESSAGE, TOOL_UNRESOLVED_MESSAGE,
                                                   build_history_from_item_dicts,
                                                   deferred_tool_call_ids, dump_messages,
                                                   load_messages)
@@ -85,6 +85,39 @@ class BuildHistoryTests(unittest.TestCase):
         # last message is an unanswered tool call -> exactly that id is deferred.
         self.assertIsInstance(history[-1], ModelResponse)
         self.assertEqual(deferred_tool_call_ids(history), {'real-1'})
+
+    def test_trailing_batch_of_several_pending_stays_deferred(self):
+        items = [_item(0, 'user_message', text='fais X et Y'),
+                 _item(1, 'proposed_tool_call', tool_name='add_church', tool_call_id='real-1',
+                       approval_status='pending'),
+                 _item(2, 'proposed_tool_call', tool_name='add_parish', tool_call_id='real-2',
+                       approval_status='pending')]
+        history = build_history_from_item_dicts(items)
+        # The whole trailing batch must stay unanswered: the resume path answers it at once.
+        self.assertEqual(deferred_tool_call_ids(history), {'real-1', 'real-2'})
+
+    def test_pending_proposal_followed_by_user_message_is_answered(self):
+        # The incident: a new human message posted while an action was awaiting approval left the
+        # proposed call unanswered in front of a user prompt -> provider 400.
+        items = [_item(0, 'user_message', text='fais X'),
+                 _item(1, 'proposed_tool_call', tool_name='delete_church',
+                       tool_call_id='call_XDGEH8mMb7RWgVXtZEfpjEd9', approval_status='pending'),
+                 _item(2, 'user_message', text='en fait, laisse tomber')]
+        history = build_history_from_item_dicts(items)
+        self.assertEqual(deferred_tool_call_ids(history), set())
+        self.assertIsInstance(_only_part(history[-1]), UserPromptPart)
+        self.assertEqual(_only_part(history[-1]).content, 'en fait, laisse tomber')
+
+    def test_approved_without_result_followed_by_items_is_answered(self):
+        # A proposed call approved but whose result was never written (e.g. the resume crashed)
+        # would otherwise poison every later turn of the discussion.
+        items = [_item(0, 'user_message', text='signale un bug'),
+                 _item(1, 'proposed_tool_call', tool_name='report_bug', tool_call_id='real-1',
+                       approval_status='approved'),
+                 _item(2, 'agent_message', text='c est noté')]
+        history = build_history_from_item_dicts(items)
+        self.assertEqual(deferred_tool_call_ids(history), set())
+        self.assertEqual(_only_part(history[2]).content, TOOL_UNRESOLVED_MESSAGE)
 
     def test_round_trips_through_serialization(self):
         items = [_item(0, 'user_message', text='q'),
