@@ -35,8 +35,7 @@ class Command(AbstractCleaningCommand):
         self.success(f'Done removing {counter} church moderation items')
 
         # Website history
-        self.delete_irrelevant_history(Website, {
-            'updated_at', 'nb_recent_hits', 'is_best_diocese_hit'})
+        self.delete_irrelevant_history(Website, {'updated_at'})
 
         # Website moderation history
         self.delete_irrelevant_history(WebsiteModeration, {'updated_at'})

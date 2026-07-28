@@ -50,11 +50,13 @@
       hour: "23"
       minute: 10
       memory_max: "800M"
-    - name: daily_website_popularity
-      command: "update_website_popularity"
-      hour: "23"
-      minute: 15
-      memory_max: "800M"
+
+- name: Remove obsolete crons
+  cron:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - daily_website_popularity
 
 - name: Add cron to unlock dead tasks every minute
   cron:

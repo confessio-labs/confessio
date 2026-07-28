@@ -53,8 +53,6 @@ class Website(TimeStampMixin):
     pruning_validation_counter = models.SmallIntegerField(default=0)
     pruning_last_validated_at = models.DateTimeField(null=True, blank=True)
     unreliability_reason = models.CharField(choices=UnreliabilityReason, null=True, blank=True)
-    nb_recent_hits = models.PositiveSmallIntegerField(default=0)
-    is_best_diocese_hit = models.BooleanField(default=False)
     contact_emails = ArrayField(models.CharField(max_length=100), null=True, blank=True)
     name_norm = build_name_norm_field()
     history = HistoricalRecords(excluded_fields=['name_norm'])

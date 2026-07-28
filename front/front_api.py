@@ -21,7 +21,7 @@ from front.services.search.aggregation_service import get_search_results
 from front.services.search.autocomplete_service import get_aggregated_response, AutocompleteResult
 from front.services.search.search_service import TimeFilter, AggregationItem, BoundingBox, \
     get_dioceses_bounding_box, get_churches_by_uuid, get_churches_by_diocese, \
-    get_popular_churches, SearchResult, DEFAULT_LIMIT
+    get_churches_in_box, SearchResult, DEFAULT_LIMIT
 from registry.models import Church, Website, Diocese
 from scheduling.models import IndexEvent
 from scheduling.public_model import SourcedScheduleItem, BaseSource, ParsingSource, OClocherSource
@@ -390,7 +390,7 @@ def api_front_search_home(request,
         hour_max=hour_max,
         limit=limit,
     )
-    search_result = get_popular_churches(min_lat, min_lng, max_lat, max_lng, time_filter)
+    search_result = get_churches_in_box(min_lat, min_lng, max_lat, max_lng, time_filter)
     aggregations = []
 
     return SearchResultOut.from_result(search_result, aggregations)

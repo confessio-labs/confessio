@@ -21,7 +21,7 @@ from front.services.search.autocomplete_service import get_aggregated_response
 from front.services.search.filter_service import get_filter_days
 from front.services.search.map_service import prepare_map, get_center, get_cities_label
 from front.services.search.search_service import TimeFilter, get_churches_in_box, \
-    get_churches_by_website, get_churches_around, get_churches_by_diocese, get_popular_churches, \
+    get_churches_by_website, get_churches_around, get_churches_by_diocese, \
     fetch_events, DEFAULT_SEARCH_BOX, SearchResult
 from front.services.search.stat_service import new_search_hit
 from front.utils.web_utils import redirect_with_url_params
@@ -315,7 +315,7 @@ Merci de nous remonter d'éventuelles erreurs. Bonne confession !"""
 
     else:
         min_lat, max_lat, min_lng, max_lng = DEFAULT_SEARCH_BOX
-        search_result = get_popular_churches(min_lat, min_lng, max_lat, max_lng, time_filter)
+        search_result = get_churches_in_box(min_lat, min_lng, max_lat, max_lng, time_filter)
         if search_result.churches:
             center = get_center(search_result.churches)
         else:
