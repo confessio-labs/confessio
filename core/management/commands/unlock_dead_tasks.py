@@ -1,19 +1,13 @@
-from datetime import timedelta
-
-from background_task.models import Task
-from django.utils import timezone
-
-from core.settings import MAX_RUN_TIME
 from core.management.abstract_command import AbstractCommand
+from core.utils.task_utils import unlock_dead_tasks
 
 
 class Command(AbstractCommand):
-    help = "Unlock dead tasks that are locked for more than 5 minutes"
+    help = "Unlock tasks whose worker process is gone, so a live worker picks them up again"
 
     def handle(self, *args, **options):
         self.info(f'Starting unlocking dead tasks...')
-        # This is a bug in django-background-tasks that does not unlock tasks that crashed
-        # after MAX_RUN_TIME seconds
-        Task.objects.filter(locked_at__lte=timezone.now() - timedelta(seconds=MAX_RUN_TIME))\
-            .update(locked_at=None, locked_by=None)
-        self.success(f'Finished unlocking dead tasks')
+        # django-background-tasks never unlocks a task whose worker crashed: it just waits for
+        # MAX_RUN_TIME (40 min). Detecting the dead worker directly brings that down to ~2 min.
+        count = unlock_dead_tasks()
+        self.success(f'Finished unlocking dead tasks, {count} unlocked')

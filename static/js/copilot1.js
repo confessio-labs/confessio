@@ -18,6 +18,7 @@ $(function () {
     var $text = $("#copilot-text");
     var $send = $("#copilot-send");
     var $typing = $("#copilot-typing");
+    var $runState = $("#copilot-run-state");
     var $error = $("#copilot-error");
 
     var pollTimer = null;
@@ -48,6 +49,30 @@ $(function () {
     function setBusy(busy) {
         $send.prop("disabled", busy);
         $typing.toggleClass("d-none", !busy);
+        if (!busy) setRunState(null, null);
+    }
+
+    // Says whether the spinner means "working" or "the worker died, this turn is waiting to be
+    // picked up again" — a killed worker (deploy, OOM) otherwise looks exactly like thinking.
+    function setRunState(state, retryAt) {
+        var label = "";
+        var warn = false;
+        if (state === "running") {
+            label = "En cours";
+        } else if (state === "blocked") {
+            var until = retryAt ? new Date(retryAt) : null;
+            label = until && !isNaN(until)
+                ? "Bloqué (attendre jusqu'à " + until.toLocaleTimeString([], {
+                      hour: "2-digit", minute: "2-digit" }) + ")"
+                : "Bloqué";
+            warn = true;
+        } else if (state === "lost") {
+            label = "Bloqué (renvoie un message pour reprendre)";
+            warn = true;
+        }
+        $runState.text(label)
+            .toggleClass("text-warning", warn)
+            .toggleClass("text-muted", !warn);
     }
 
     function startPolling() {
@@ -74,6 +99,8 @@ $(function () {
             // Keep polling only while the agent is actively running.
             if (resp.status !== "running") {
                 stopPolling();
+            } else {
+                setRunState(resp.run_state, resp.retry_at);
             }
         }).fail(function () {
             // Transient failure: keep polling, the agent may still be working.
