@@ -12,9 +12,11 @@ def get_search_results(
         max_lat: float | None,
         max_lng: float | None,
         time_filter: TimeFilter,
+        order_by_distance: bool = True,
 ) -> tuple[SearchResult, list[AggregationItem]]:
     if min_lat and min_lng and max_lat and max_lng:
-        search_result = get_churches_in_box(min_lat, min_lng, max_lat, max_lng, time_filter)
+        search_result = get_churches_in_box(min_lat, min_lng, max_lat, max_lng, time_filter,
+                                            order_by_distance=order_by_distance)
         aggregations = []
         if len(search_result.churches) == time_filter.limit:
             diocese_count = len(set(church.parish.diocese_id for church in search_result.churches))
@@ -40,7 +42,8 @@ def get_search_results(
             singleton_aggregations = list(filter(lambda a: a.church_count == 1, aggregations))
             search_result = get_churches_in_area(singleton_aggregations,
                                                  min_lat, min_lng, max_lat, max_lng,
-                                                 time_filter)
+                                                 time_filter,
+                                                 order_by_distance=order_by_distance)
             aggregations = list(filter(lambda a: a.church_count > 1, aggregations))
     elif latitude and longitude:
         center = [latitude, longitude]
@@ -48,7 +51,9 @@ def get_search_results(
         aggregations = []
     else:
         min_lat, max_lat, min_lng, max_lng = DEFAULT_SEARCH_BOX
+        # The default box covers the whole country: sorting by distance would cluster all the
+        # results around its center.
         return get_search_results(latitude, longitude, min_lat, min_lng, max_lat, max_lng,
-                                  time_filter)
+                                  time_filter, order_by_distance=False)
 
     return search_result, aggregations
