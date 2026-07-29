@@ -57,9 +57,9 @@ $(function () {
     function setRunState(state, retryAt) {
         var label = "";
         var warn = false;
-        if (state === "running") {
+        if (state === "in_progress") {
             label = "En cours";
-        } else if (state === "queued") {
+        } else if (state === "enqueued") {
             label = "En file d'attente";
         } else if (state === "blocked") {
             var until = retryAt ? new Date(retryAt) : null;

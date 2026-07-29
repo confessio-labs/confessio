@@ -10,6 +10,7 @@ Rules:
   2. Utils and workflows files cannot import:
      - Service files (*/services/* or */public_service.py)
      - Django model files (app-level models)
+     - the ORM itself: a utils/workflows file must never query the database
   3. background_task imports are only allowed in tasks.py.
 
 Uses `tach map` to get the dependency graph.
@@ -147,6 +148,44 @@ def check_rule2(dep_map):
     return violations
 
 
+def check_rule2_orm_access():
+    """Rule 2, grep pass: utils/workflows must never query the database.
+
+    check_rule2 walks `tach map` and skips every dependency outside the project's own modules, so
+    importing an *external* app's models (background_task.models, ...) slipped through — and with
+    it, ORM queries inside a utils file. Matching the query itself catches that however the import
+    is written, and stays quiet on a model imported purely as a type annotation, or on a
+    workflow-internal models.py holding plain enums.
+    """
+    violations = []
+    result = subprocess.run(
+        [
+            'grep', '-rn', '-E', r'\.objects',
+            '--include=*.py',
+            '--exclude-dir=.venv',
+            '--exclude-dir=__pycache__',
+            '--exclude-dir=migrations',
+            '--exclude-dir=scripts',
+            '.',
+        ],
+        capture_output=True, text=True,
+    )
+    for line in result.stdout.strip().split('\n'):
+        if not line:
+            continue
+        filepath, _, statement = line.split(':', 2)
+        filepath = filepath.lstrip('./')
+        if not is_utils_or_workflow(filepath):
+            continue
+        violations.append({
+            'rule': 2,
+            'source': filepath,
+            'target': statement.strip(),
+            'message': 'Utils/workflows file queries the database',
+        })
+    return violations
+
+
 def check_rule3():
     """Rule 3: background_task imports only in tasks.py files."""
     violations = []
@@ -195,6 +234,7 @@ def main():
     violations = []
     violations.extend(check_rule1(dep_map))
     violations.extend(check_rule2(dep_map))
+    violations.extend(check_rule2_orm_access())
     violations.extend(check_rule3())
 
     if not violations:

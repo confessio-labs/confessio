@@ -1,5 +1,5 @@
 from core.management.abstract_command import AbstractCommand
-from core.utils.task_utils import unlock_dead_tasks
+from core.services.background_task_service import unlock_dead_tasks
 
 
 class Command(AbstractCommand):

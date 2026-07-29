@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from core.utils.task_utils import RunState, get_run_state
+from core.services.background_task_service import TaskStatus, get_task_run_state
 from front.models import CopilotDiscussion, CopilotDiscussionItem
 from front.services.copilot.items import add_item
 from front.tasks import worker_resume_copilot_turn, worker_run_copilot_turn
@@ -37,11 +37,11 @@ def _turn_state(discussion) -> tuple[str, datetime | None]:
     reaches the runner's except block, so the discussion keeps that status forever. The task row is
     the real evidence.
     """
-    state, retry_at = get_run_state(str(discussion.uuid))
-    if state == RunState.LOST:
+    state, retry_at = get_task_run_state(str(discussion.uuid))
+    if state == TaskStatus.LOST:
         touched_at = discussion.items.aggregate(m=Max('updated_at'))['m']
         if touched_at and touched_at > timezone.now() - _ENQUEUE_GRACE:
-            return RunState.QUEUED, None
+            return TaskStatus.ENQUEUED, None
     return state, retry_at
 
 
@@ -116,7 +116,7 @@ def copilot_message(request, discussion_uuid):
         # will ever finish it and the admin must be able to take the discussion back. A merely
         # blocked turn is left alone: its retry is already scheduled and would collide with a new
         # one (the UI says when it will resume).
-        if _turn_state(discussion)[0] != RunState.LOST:
+        if _turn_state(discussion)[0] != TaskStatus.LOST:
             return JsonResponse({'error': 'busy'}, status=409)
         CopilotDiscussion.objects.filter(uuid=discussion.uuid).update(
             status=Status.RUNNING, error_message='')
