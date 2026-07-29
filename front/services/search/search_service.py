@@ -188,6 +188,20 @@ def filter_in_box(church_query: QuerySet[Church], min_lat, min_long, max_lat, ma
     return church_query.filter(location__within=polygon)
 
 
+def get_box_center(min_lat, min_long, max_lat, max_long) -> Point:
+    return Point((min_long + max_long) / 2, (min_lat + max_lat) / 2, srid=4326)
+
+
+def order_by_distance_to_box_center(church_query: QuerySet[Church],
+                                    min_lat, min_long, max_lat, max_long,
+                                    *first_order_by: str) -> QuerySet[Church]:
+    center = get_box_center(min_lat, min_long, max_lat, max_long)
+
+    return church_query \
+        .annotate(distance_to_center=Distance('location', center)) \
+        .order_by(*first_order_by, 'distance_to_center')
+
+
 ###########
 # QUERIES #
 ###########
@@ -211,12 +225,18 @@ def get_churches_around(center, time_filter: TimeFilter,
     return truncate_results(church_query, time_filter)
 
 
-def get_churches_in_box(min_lat, min_long, max_lat, max_long, time_filter: TimeFilter
-                        ) -> SearchResult:
+def get_churches_in_box(min_lat, min_long, max_lat, max_long, time_filter: TimeFilter,
+                        order_by_distance: bool = True) -> SearchResult:
     church_query = filter_in_box(build_church_query(time_filter),
                                  min_lat, min_long, max_lat, max_long)\
-        .annotate(has_event=Exists(build_event_subquery(time_filter)))\
-        .order_by('-has_event')
+        .annotate(has_event=Exists(build_event_subquery(time_filter)))
+
+    if order_by_distance:
+        church_query = order_by_distance_to_box_center(church_query,
+                                                       min_lat, min_long, max_lat, max_long,
+                                                       '-has_event')
+    else:
+        church_query = church_query.order_by('-has_event')
 
     return truncate_results(church_query, time_filter)
 
@@ -377,7 +397,8 @@ def get_churches_in_area(aggregations: list[AggregationItem],
                          min_lng: float | None,
                          max_lat: float | None,
                          max_lng: float | None,
-                         time_filter: TimeFilter
+                         time_filter: TimeFilter,
+                         order_by_distance: bool = True
                          ) -> SearchResult:
     if not aggregations:
         return SearchResult(
@@ -412,6 +433,10 @@ def get_churches_in_area(aggregations: list[AggregationItem],
             city, zipcode = a.identifiers
             query |= Q(city=city, zipcode=zipcode)
         church_query = church_query.filter(query)
+
+    if order_by_distance:
+        church_query = order_by_distance_to_box_center(church_query,
+                                                       min_lat, min_lng, max_lat, max_lng)
 
     return truncate_results(church_query, time_filter)
 

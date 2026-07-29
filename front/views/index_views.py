@@ -22,7 +22,7 @@ from front.services.search.filter_service import get_filter_days
 from front.services.search.map_service import prepare_map, get_center, get_cities_label
 from front.services.search.search_service import TimeFilter, get_churches_in_box, \
     get_churches_by_website, get_churches_around, get_churches_by_diocese, \
-    fetch_events, DEFAULT_SEARCH_BOX, SearchResult
+    fetch_events, DEFAULT_SEARCH_BOX, SearchResult, get_box_center
 from front.services.search.stat_service import new_search_hit
 from front.utils.web_utils import redirect_with_url_params
 from registry.models import Website, Diocese, Church, City
@@ -239,7 +239,8 @@ def index(request, diocese_slug=None, city_slug: str = None, website_uuid: str =
 
     if min_lat and min_lng and max_lat and max_lng:
         bounds = (min_lat, max_lat, min_lng, max_lng)
-        center = [min_lat + max_lat / 2, min_lng + max_lng / 2]
+        box_center = get_box_center(min_lat, min_lng, max_lat, max_lng)
+        center = [box_center.y, box_center.x]
         search_result = get_churches_in_box(min_lat, min_lng, max_lat, max_lng, time_filter)
 
         display_sub_title = False
@@ -315,11 +316,15 @@ Merci de nous remonter d'éventuelles erreurs. Bonne confession !"""
 
     else:
         min_lat, max_lat, min_lng, max_lng = DEFAULT_SEARCH_BOX
-        search_result = get_churches_in_box(min_lat, min_lng, max_lat, max_lng, time_filter)
+        # The default box covers the whole country: sorting by distance would cluster all the
+        # results around its center.
+        search_result = get_churches_in_box(min_lat, min_lng, max_lat, max_lng, time_filter,
+                                            order_by_distance=False)
         if search_result.churches:
             center = get_center(search_result.churches)
         else:
-            center = [min_lat + max_lat / 2, min_lng + max_lng / 2]
+            box_center = get_box_center(min_lat, min_lng, max_lat, max_lng)
+            center = [box_center.y, box_center.x]
         bounds = None
 
         display_sub_title = True
