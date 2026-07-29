@@ -24,8 +24,14 @@ UNLOCK_PERIOD = timedelta(seconds=60)
 
 
 class RunState:
-    """How an in-flight task is doing, as reported to the UI."""
-    RUNNING = 'running'      # locked by a live worker, or queued and about to start
+    """How an in-flight task is doing, as reported to the UI.
+
+    QUEUED is not RUNNING: nothing has started yet because every BACKGROUND_TASK_ASYNC_THREADS
+    slot is taken, or because higher-priority tasks go first (find_available orders by -priority,
+    then run_at). A copilot turn enqueued during a nightly batch can sit there for a while.
+    """
+    RUNNING = 'running'      # locked by a live worker: work is actually happening
+    QUEUED = 'queued'        # accepted, but no worker has picked it up yet
     BLOCKED = 'blocked'      # its worker died, or it was rescheduled: it will be retried later
     LOST = 'lost'            # no task row at all — the run is gone for good
 
@@ -72,6 +78,8 @@ def get_run_state(task_params_needle: str) -> tuple[str, datetime | None]:
     if task.run_at > timezone.now():
         # Rescheduled after a failure: nothing will happen before run_at.
         return RunState.BLOCKED, task.run_at
-    if task.locked_at and not is_worker_alive(task.locked_by):
+    if task.locked_at is None:
+        return RunState.QUEUED, None
+    if not is_worker_alive(task.locked_by):
         return RunState.BLOCKED, task.locked_at + UNLOCK_GRACE + UNLOCK_PERIOD
     return RunState.RUNNING, None

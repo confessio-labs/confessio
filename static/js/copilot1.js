@@ -59,6 +59,8 @@ $(function () {
         var warn = false;
         if (state === "running") {
             label = "En cours";
+        } else if (state === "queued") {
+            label = "En file d'attente";
         } else if (state === "blocked") {
             var until = retryAt ? new Date(retryAt) : null;
             label = until && !isNaN(until)

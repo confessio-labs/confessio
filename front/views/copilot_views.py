@@ -41,7 +41,7 @@ def _turn_state(discussion) -> tuple[str, datetime | None]:
     if state == RunState.LOST:
         touched_at = discussion.items.aggregate(m=Max('updated_at'))['m']
         if touched_at and touched_at > timezone.now() - _ENQUEUE_GRACE:
-            return RunState.RUNNING, None
+            return RunState.QUEUED, None
     return state, retry_at
 
 
