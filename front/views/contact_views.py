@@ -99,6 +99,8 @@ def contact_mail_webhook(request):
     if not validate_token(token, timestamp, signature):
         return HttpResponse(status=403)
 
+    send_discord_alert(message=str(request.POST), channel=DiscordChanel.CONTACT_FORM)
+
     message_headers = request.POST.get('message-headers', '')
     recipient = request.POST.get('recipient', '')
     from_header = request.POST.get('from', '')
