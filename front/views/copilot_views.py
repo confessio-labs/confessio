@@ -1,10 +1,15 @@
+from datetime import datetime, timedelta
+
 from django.contrib.auth.decorators import login_required, permission_required
+from django.db.models import Max
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from core.utils.task_utils import RunState, get_run_state
 from front.models import CopilotDiscussion, CopilotDiscussionItem
 from front.services.copilot.items import add_item
 from front.tasks import worker_resume_copilot_turn, worker_run_copilot_turn
@@ -17,6 +22,27 @@ ApprovalStatus = CopilotDiscussionItem.ApprovalStatus
 # ERROR discussion is recoverable by talking to it again, and AWAITING_APPROVAL is superseded (see
 # _refuse_pending_proposals).
 _CLAIMABLE_STATUSES = (Status.IDLE, Status.AWAITING_APPROVAL, Status.ERROR)
+
+# The views flip a discussion to RUNNING *before* enqueueing its task, so a turn that has just been
+# claimed legitimately has no task row yet: don't call it lost during this window. Both entry
+# points touch an item right before enqueueing (a new user_message, or the item being approved), so
+# the freshest item is a reliable "a turn was just claimed" marker.
+_ENQUEUE_GRACE = timedelta(seconds=30)
+
+
+def _turn_state(discussion) -> tuple[str, datetime | None]:
+    """Is the in-flight turn progressing, waiting for a retry, or gone for good?
+
+    RUNNING on its own proves nothing: a worker SIGKILLed mid-turn (deploy restart, OOM) never
+    reaches the runner's except block, so the discussion keeps that status forever. The task row is
+    the real evidence.
+    """
+    state, retry_at = get_run_state(str(discussion.uuid))
+    if state == RunState.LOST:
+        touched_at = discussion.items.aggregate(m=Max('updated_at'))['m']
+        if touched_at and touched_at > timezone.now() - _ENQUEUE_GRACE:
+            return RunState.QUEUED, None
+    return state, retry_at
 
 
 def _discussions_for(user):
@@ -86,7 +112,14 @@ def copilot_message(request, discussion_uuid):
         uuid=discussion.uuid, status__in=_CLAIMABLE_STATUSES).update(
             status=Status.RUNNING, error_message='')
     if not claimed:
-        return JsonResponse({'error': 'busy'}, status=409)
+        # RUNNING, so normally busy — unless the turn lost its task for good, in which case nothing
+        # will ever finish it and the admin must be able to take the discussion back. A merely
+        # blocked turn is left alone: its retry is already scheduled and would collide with a new
+        # one (the UI says when it will resume).
+        if _turn_state(discussion)[0] != RunState.LOST:
+            return JsonResponse({'error': 'busy'}, status=409)
+        CopilotDiscussion.objects.filter(uuid=discussion.uuid).update(
+            status=Status.RUNNING, error_message='')
     refused = _refuse_pending_proposals(discussion)
     add_item(discussion, ItemType.USER_MESSAGE, text=text)
     worker_run_copilot_turn(str(discussion.uuid), text)
@@ -139,9 +172,13 @@ def copilot_items(request, discussion_uuid):
     new_items = discussion.items.filter(position__gt=since)
     html = render_to_string('partials/copilot_items.html', {'items': new_items})
     last = new_items.last()
+    run_state, retry_at = ((None, None) if discussion.status != Status.RUNNING
+                           else _turn_state(discussion))
     return JsonResponse({
         'status': discussion.status,
         'error_message': discussion.error_message,
+        'run_state': run_state,
+        'retry_at': retry_at.isoformat() if retry_at else None,
         'html': html,
         'last_position': last.position if last else since,
     })
