@@ -9,6 +9,7 @@ from django.shortcuts import render, redirect
 from django.utils.translation import gettext
 from django.views.decorators.csrf import csrf_exempt
 
+from core.services.admin_email_service import send_email_to_admin
 from core.utils.discord_utils import send_discord_alert, DiscordChanel
 from front.services.card.scraping_url_service import quote_path, unquote_path
 from front.utils.cloudflare_utils import verify_token
@@ -99,7 +100,7 @@ def contact_mail_webhook(request):
     if not validate_token(token, timestamp, signature):
         return HttpResponse(status=403)
 
-    send_discord_alert(message=str(request.POST), channel=DiscordChanel.CONTACT_FORM)
+    send_email_to_admin(subject="debug contact_mail_webhook", body=str(request.POST))
 
     message_headers = request.POST.get('message-headers', '')
     recipient = request.POST.get('recipient', '')
