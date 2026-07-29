@@ -102,14 +102,14 @@ def contact_mail_webhook(request):
 
     send_email_to_admin(subject="debug contact_mail_webhook", body=str(request.POST))
 
-    message_headers = request.POST.get('message-headers', '')
+    reply_to = request.POST.get('Reply-To', '')
     recipient = request.POST.get('recipient', '')
     from_header = request.POST.get('from', '')
     subject = request.POST.get('subject', '')
     body_plain = request.POST.get('body-plain', '')
     stripped_text = request.POST.get('stripped-text', '')
 
-    email_body = (f"FROM:{from_header}\nTO:{recipient}\nHEADERS:{message_headers}\n"
+    email_body = (f"FROM:{from_header}\nTO:{recipient}\nREPLY-TO:{reply_to}\n"
                   f"SUBJECT:{subject}\n\n{stripped_text or body_plain}"
                   )
 
