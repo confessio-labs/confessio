@@ -1,6 +1,9 @@
 import os
+from email.utils import formataddr
 
-from django.core.mail import send_mail, BadHeaderError
+from botocore.exceptions import ClientError
+from django.conf import settings
+from django.core.mail import EmailMessage, BadHeaderError
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect
 from django.utils.translation import gettext
@@ -14,13 +17,15 @@ from registry.models import Diocese, Website
 from scheduling.models import IndexEvent
 
 
-def contact(request, message=None, email=None, name_text=None, message_text=None):
+def contact(request, message=None, email=None, name_text=None,
+            message_subject=None, message_text=None):
     if request.method == "GET":
         cloudflare_turnstile_site_key = os.environ.get('CLOUDFLARE_TURNSTILE_SITE_KEY', '')
         return render(request, 'pages/contact.html',
                       {'message': message,
                        'name_text': unquote_path(name_text or ''),
                        'email': email or '',
+                       'message_subject': unquote_path(message_subject or ''),
                        'message_text': unquote_path(message_text or ''),
                        'meta_title': gettext('contactPageTitle'),
                        'cloudflare_turnstile_site_key': cloudflare_turnstile_site_key
@@ -28,33 +33,43 @@ def contact(request, message=None, email=None, name_text=None, message_text=None
     else:
         name = request.POST.get('name')
         from_email = request.POST.get('email')
+        subject = request.POST.get('subject', '')
         message = request.POST.get('message')
 
-        if not name or not from_email or not message:
+        if not name or not from_email or not subject or not message:
             return HttpResponseBadRequest("Missing required fields")
 
         cloudflare_token = request.POST.get('cf-turnstile-response')
         if not verify_token(cloudflare_token):
+            print(f"Invalid token: {cloudflare_token}")
             name_text = quote_path(name)
+            message_subject = quote_path(subject)
             message_text = quote_path(message)
             return redirect("contact_failure", message='failure',
-                            name_text=name_text, email=from_email, message_text=message_text)
+                            name_text=name_text, email=from_email,
+                            message_subject=message_subject, message_text=message_text)
 
-        email_body = f"{from_email}\n{name}\n\n{message}"
-        subject = f'New message from {name} on confessio'
+        # SES only accepts a verified identity as From, so we send from DEFAULT_FROM_EMAIL and
+        # put the visitor in Reply-To.
+        # We might want to put the sender first in the body because mailgun's stripped-text
+        # drops trailing signature-looking blocks before the webhook sees them.
+        email_body = f"{message}\n\n{name}"
         try:
-            send_mail(subject,
-                      email_body,
-                      None,  # Default to DEFAULT_FROM_EMAIL
-                      [os.environ.get('CONTACT_FORWARD_EMAIL')])
-        except BadHeaderError as e:
+            EmailMessage(
+                subject=subject,
+                body=email_body,
+                from_email=formataddr((f'{name} (via Confessio)', settings.DEFAULT_FROM_EMAIL)),
+                to=[os.environ.get('CONTACT_EMAIL')],
+                reply_to=[formataddr((name, from_email))],
+            ).send()
+        except (BadHeaderError, ClientError) as e:
             print(e)
             name_text = quote_path(name)
+            message_subject = quote_path(subject)
             message_text = quote_path(message)
             return redirect("contact_failure", message='failure',
-                            name_text=name_text, email=from_email, message_text=message_text)
-
-        send_discord_alert(message=email_body, channel=DiscordChanel.CONTACT_FORM)
+                            name_text=name_text, email=from_email,
+                            message_subject=message_subject, message_text=message_text)
 
         return redirect("contact_success", message='success')
 
@@ -84,14 +99,14 @@ def contact_mail_webhook(request):
     if not validate_token(token, timestamp, signature):
         return HttpResponse(status=403)
 
-    sender = request.POST.get('sender', '')
+    message_headers = request.POST.get('message-headers', '')
     recipient = request.POST.get('recipient', '')
     from_header = request.POST.get('from', '')
     subject = request.POST.get('subject', '')
     body_plain = request.POST.get('body-plain', '')
     stripped_text = request.POST.get('stripped-text', '')
 
-    email_body = (f"FROM:{from_header} <{sender}>\nTO:{recipient}\n"
+    email_body = (f"FROM:{from_header}\nTO:{recipient}\nHEADERS:{message_headers}\n"
                   f"SUBJECT:{subject}\n\n{stripped_text or body_plain}"
                   )
 

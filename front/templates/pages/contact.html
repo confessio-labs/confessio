@@ -59,6 +59,13 @@
                                         </div>
                                     </div>
                                     <div class="mb-4">
+                                        <label for="subject">L'objet de votre demande</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text" id="basic-addon3"><span class="fas fa-user-circle"></span></span>
+                                            <input type="text" class="form-control" placeholder="e.g. Confessions à Alençon" id="subject" name="subject" value="{{ message_subject }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="mb-4">
                                         <label for="message">Votre message</label>
                                         <textarea placeholder="Votre message" class="form-control" id="message" name="message" rows="4" required>{{ message_text }}</textarea>
                                     </div>
