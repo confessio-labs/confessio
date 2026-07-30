@@ -151,3 +151,7 @@ sudo -u postgres psql postgres -c "DROP DATABASE confessio;" && sudo -u postgres
 # Revoke superuser access
 sudo -u postgres psql -c "ALTER ROLE confessio NOSUPERUSER;"
 ```
+
+A backup taken before `registry.0020_immutable_unaccent_search_path` was applied fails with
+`ERROR: function unaccent(unknown, text) does not exist` and must be patched while restoring — see
+"Restoring a dump taken before migration 0020" in the root README.
