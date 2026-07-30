@@ -12,7 +12,7 @@ from scheduling.workflows.merging.merge_schedule_items import get_merged_sourced
 from scheduling.workflows.merging.sort_schedule_items import \
     get_sorted_sourced_schedule_items_by_church_id
 from scheduling.workflows.parsing.explain_schedule import get_explanation_from_schedule
-from scheduling.workflows.parsing.rrule_utils import get_events_from_schedule_item
+from scheduling.workflows.parsing.rrule_utils import has_upcoming_event
 
 MAX_SCHEDULES_PER_CHURCH = 30
 
@@ -41,7 +41,7 @@ def get_sourced_schedules_list(website: Website,
             continue
 
         for schedule_item in schedules_list.schedules:
-            if get_events_from_schedule_item(schedule_item, holiday_zone, max_events=1):
+            if has_upcoming_event(schedule_item, holiday_zone):
                 all_sourced_schedule_items.append(
                     SourcedScheduleItem(
                         item=schedule_item,
