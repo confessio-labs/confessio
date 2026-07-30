@@ -138,6 +138,16 @@ def get_events_from_schedule_item(schedule: ScheduleItem,
     return events
 
 
+def has_upcoming_event(schedule_item: ScheduleItem,
+                       holiday_zone: HolidayZoneEnum,
+                       start_date: date | None = None,
+                       default_year: int | None = None) -> bool:
+    """Whether the item still has at least one occurrence to come. start_date and default_year are
+    only meant to be pinned by tests: production relies on the defaults, i.e. today."""
+    return bool(get_events_from_schedule_item(schedule_item, holiday_zone, start_date, default_year,
+                                              max_events=1))
+
+
 def get_events_from_schedule_items(schedules: list[ScheduleItem],
                                    start_date: date,
                                    default_year: int,

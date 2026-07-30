@@ -8,6 +8,8 @@ from scheduling.services.merging.sourced_schedules_service import retrieve_sched
 from scheduling.services.scheduling.scheduling_service import get_indexed_scheduling
 from scheduling.workflows.merging.compare_explanations import ValidatedSchedulesComparison, \
     build_validated_schedules_comparison as build_comparison
+from scheduling.workflows.merging.filter_schedule_items import remove_over_dated_items
+from scheduling.workflows.parsing.holidays import HolidayZoneEnum
 from scheduling.workflows.parsing.schedules import ScheduleItem, canonicalize_item_times
 
 
@@ -74,13 +76,29 @@ def get_schedule_items(sourced_schedules_list: SourcedSchedulesList) -> set[Sche
 
 
 def check_schedules_match(website: Website,
-                          sourced_schedules_list: SourcedSchedulesList) -> bool | None:
+                          sourced_schedules_list: SourcedSchedulesList,
+                          holiday_zone: HolidayZoneEnum) -> bool | None:
     validated_sourced_schedules_list = retrieve_validated_schedule(website)
     if validated_sourced_schedules_list is None:
         return None
 
-    return get_schedule_items(validated_sourced_schedules_list) == \
-        get_schedule_items(sourced_schedules_list)
+    schedule_items = get_schedule_items(sourced_schedules_list)
+    if get_schedule_items(validated_sourced_schedules_list) == schedule_items:
+        return True
+
+    # An item whose occurrences are all over is dropped from the newly built schedules, so it would
+    # differ forever: we remove it from the validated schedules for good, then compare again.
+    upcoming_validated_sourced_schedules_list = remove_over_dated_items(
+        validated_sourced_schedules_list, holiday_zone)
+    if upcoming_validated_sourced_schedules_list is None:
+        return False
+
+    validated_schedules = website.validated_schedules
+    validated_schedules.validated_sourced_schedules_list = \
+        upcoming_validated_sourced_schedules_list.model_dump(mode='json')
+    validated_schedules.save()
+
+    return get_schedule_items(upcoming_validated_sourced_schedules_list) == schedule_items
 
 
 ###############################################

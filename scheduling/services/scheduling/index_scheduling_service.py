@@ -5,6 +5,7 @@ from scheduling.models import Scheduling, IndexEvent
 from scheduling.public_model import SourcedSchedulesList
 from scheduling.services.merging.index_events_service import \
     build_sourced_schedules_and_index_events
+from scheduling.services.merging.holiday_zone_service import get_website_holiday_zone
 from scheduling.services.merging.validated_schedules_service import check_schedules_match
 from scheduling.services.merging.sourced_schedules_service import build_scheduling_elements
 from scheduling.services.parsing.parse_pruning_service import remove_useless_moderation_for_parsing
@@ -32,8 +33,10 @@ def do_index_scheduling(scheduling: Scheduling) -> SchedulingIndexingObjects:
                          in scheduling_elements.church_by_id.items()}
 
     # We check if schedules differs from validated schedules for website
+    holiday_zone = get_website_holiday_zone(scheduling.website,
+                                            list(scheduling_elements.church_by_id.values()))
     schedules_match_with_validated = check_schedules_match(
-        scheduling.website, scheduling_elements.sourced_schedules_list)
+        scheduling.website, scheduling_elements.sourced_schedules_list, holiday_zone)
 
     # Build index events
     index_events = build_sourced_schedules_and_index_events(scheduling.website, scheduling,
