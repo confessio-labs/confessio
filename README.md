@@ -179,21 +179,6 @@ This will download and load the latest prod database dump in local. Your psql us
 $ python manage.py dbrestore --uncompress --database default
 ```
 
-#### Restoring a dump taken before migration 0020
-
-Dumps created before `registry.0020_immutable_unaccent_search_path` was applied on prod fail with
-`ERROR: function unaccent(unknown, text) does not exist`: `pg_dump` restores with an empty
-`search_path`, and the old `immutable_unaccent()` body referenced `unaccent` unqualified. Patch the
-dump on the way in:
-
-```bash
-LATEST=$(aws s3 ls confessio-dbbackup-daily --profile confessio | awk '$4 ~ /\.psql\.gz$/ {print $4}' | sort | tail -1)
-aws s3 cp "s3://confessio-dbbackup-daily/$LATEST" - --profile confessio \
-  | gunzip \
-  | sed "s/SELECT unaccent('unaccent', \$1)/SELECT public.unaccent('public.unaccent'::regdictionary, \$1)/" \
-  | psql "postgresql://confessio@127.0.0.1:5432/confessio" --set ON_ERROR_STOP=on --single-transaction
-```
-
 ## Start the app
 
 ```bash
