@@ -36,7 +36,7 @@ def recognize_image(image: Image):
     image.save()
 
 
-def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
+def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str | None:
     pdf_sha256 = hash_bytes_to_sha256_hex(pdf_bytes)
 
     existing = PdfRecognition.objects.filter(pdf_sha256=pdf_sha256).first()
@@ -53,18 +53,20 @@ def recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
     llm_html, llm_error_detail, nb_pages = get_html_from_pdf(pdf_bytes, prompt,
                                                              llm_provider, llm_model)
 
-    pdf_recognition = PdfRecognition(
-        pdf_url=pdf_url,
+    # another thread might have recognized the same pdf in the meantime
+    pdf_recognition, _ = PdfRecognition.objects.update_or_create(
         pdf_sha256=pdf_sha256,
-        llm_html=llm_html,
-        llm_error_detail=llm_error_detail,
-        prompt_hash=prompt_hash,
-        llm_provider=llm_provider,
-        llm_model=llm_model,
-        pdf_size=len(pdf_bytes),
-        nb_pages=nb_pages,
+        defaults={
+            'pdf_url': pdf_url,
+            'llm_html': llm_html,
+            'llm_error_detail': llm_error_detail,
+            'prompt_hash': prompt_hash,
+            'llm_provider': llm_provider,
+            'llm_model': llm_model,
+            'pdf_size': len(pdf_bytes),
+            'nb_pages': nb_pages,
+        },
     )
-    pdf_recognition.save()
 
     return pdf_recognition.llm_html
 

@@ -26,7 +26,7 @@ def attaching_get_image_public_url(image: Image) -> str:
     return get_image_public_url(image)
 
 
-def attaching_recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str:
+def attaching_recognize_pdf(pdf_url: str, pdf_bytes: bytes) -> str | None:
     return recognize_pdf(pdf_url, pdf_bytes)
 
 
