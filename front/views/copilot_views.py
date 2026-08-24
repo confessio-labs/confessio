@@ -29,6 +29,9 @@ _CLAIMABLE_STATUSES = (Status.IDLE, Status.AWAITING_APPROVAL, Status.ERROR)
 # the freshest item is a reliable "a turn was just claimed" marker.
 _ENQUEUE_GRACE = timedelta(seconds=30)
 
+# The sidebar has neither scrolling nor pagination: cap the list to the most recent ones.
+_MAX_DISCUSSIONS = 20
+
 
 def _turn_state(discussion) -> tuple[str, datetime | None]:
     """Is the in-flight turn progressing, waiting for a retry, or gone for good?
@@ -46,7 +49,7 @@ def _turn_state(discussion) -> tuple[str, datetime | None]:
 
 
 def _discussions_for(user):
-    return CopilotDiscussion.objects.filter(user=user).order_by('-updated_at')
+    return CopilotDiscussion.objects.filter(user=user).order_by('-updated_at')[:_MAX_DISCUSSIONS]
 
 
 def _refuse_pending_proposals(discussion) -> list[dict]:

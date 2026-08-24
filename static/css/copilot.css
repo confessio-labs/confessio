@@ -54,6 +54,10 @@
 .copilot-args .copilot-arrow { color: #6c757d; margin: 0 .15rem; }
 .copilot-args .copilot-new { color: #146c43; font-weight: 600; }
 .copilot-args--snapshot dd { color: #6c757d; }
+/* color: inherit so the link keeps the diff semantics (struck red old, bold green new) instead of
+   overriding them; the underline and the icon carry the affordance on their own. */
+.copilot-args .copilot-entity-link { color: inherit; text-decoration: underline; }
+.copilot-args .copilot-entity-link i { font-size: .75em; margin-left: .25rem; opacity: .7; }
 .copilot-pre {
   background: #0f172a0a;
   padding: .5rem;

@@ -4,6 +4,8 @@ from django import template
 from django.contrib.gis.geos import Point
 from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
+from django.urls import NoReverseMatch, reverse
+from django.utils.html import format_html
 
 from front.services.search.map_service import get_map_with_single_location
 from registry.models import Church, Diocese, Parish, Website
@@ -83,6 +85,28 @@ def _arg_label(key):
     return _ARG_LABELS.get(key, key)
 
 
+def _entity_url(key, value):
+    """Public page of a resolved *_uuid arg, or None when it has none.
+
+    Only websites: they are the sole registry entity with a public page keyed by their own uuid
+    (`/paroisse/<uuid>`). A malformed uuid can't reach here (the DB lookup filtered it out), but
+    guard anyway — a broken reverse in a template filter would blank the whole discussion.
+    """
+    if key != 'website_uuid':
+        return None
+    try:
+        return reverse('website_view', kwargs={'website_uuid': value})
+    except NoReverseMatch:
+        return None
+
+
+def _linked(label, url):
+    """`format_html` escapes the label; the icon markup stays raw, as intended."""
+    return format_html(
+        '<a class="copilot-entity-link" href="{}" target="_blank" rel="noopener">{}'
+        '<i class="fas fa-up-right-from-square"></i></a>', url, label)
+
+
 def _display_value(key, value):
     """Render one arg value. Shared by the old and the new value so both read identically."""
     if value is None or value == '':
@@ -93,7 +117,10 @@ def _display_value(key, value):
             name = model.objects.filter(uuid=value).values_list('name', flat=True).first()
         except (ValueError, ValidationError, TypeError):
             name = None
-        return name or f'{value} (introuvable)'
+        if not name:
+            return f'{value} (introuvable)'
+        url = _entity_url(key, value)
+        return _linked(name, url) if url else name
     if isinstance(value, bool):
         return 'Oui' if value else 'Non'
     if key in ('latitude', 'longitude') and isinstance(value, (int, float)):
