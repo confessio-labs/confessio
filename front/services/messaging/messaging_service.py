@@ -6,7 +6,6 @@ Mailgun inbound webhook. The two are tied together by the conversation link in t
 import os
 
 from botocore.exceptions import ClientError
-from django.conf import settings
 from django.core.mail import BadHeaderError, EmailMessage
 from django.urls import reverse
 from email.utils import formataddr
@@ -38,13 +37,14 @@ def send_message(request, conversation: Conversation, body: str, author) -> Mess
     is_first = conversation.messages.count() == 1
     try:
         EmailMessage(
-            # SES only accepts a verified identity as From, so we send from DEFAULT_FROM_EMAIL and
-            # put the Mailgun-routed address in Reply-To to get the answer back in the webhook.
+            # From is CONTACT_EMAIL, not DEFAULT_FROM_EMAIL: it is the address Mailgun routes back
+            # to our webhook, so the answer reaches the thread by simply hitting reply. A no-reply@
+            # From would tell the correspondent not to do the one thing this feature needs. No
+            # Reply-To then: it would only repeat the From.
             subject=build_reply_subject(conversation.subject, is_first),
             body=append_conversation_footer(body, get_conversation_url(request, conversation)),
-            from_email=formataddr(('Confessio', settings.DEFAULT_FROM_EMAIL)),
+            from_email=formataddr(('Confessio', os.environ.get('CONTACT_EMAIL'))),
             to=[conversation.email],
-            reply_to=[os.environ.get('CONTACT_EMAIL')],
         ).send()
     except (BadHeaderError, ClientError) as e:
         print(e)
