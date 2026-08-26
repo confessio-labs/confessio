@@ -6,13 +6,13 @@ from django.conf import settings
 from django.core.mail import EmailMessage, BadHeaderError
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect
-from django.urls import reverse
 from django.utils.translation import gettext
 from django.views.decorators.csrf import csrf_exempt
 
 from core.utils.discord_utils import send_discord_alert, DiscordChanel
 from front.services.card.scraping_url_service import quote_path, unquote_path
-from front.services.messaging.messaging_service import ingest_inbound_email
+from front.services.messaging.messaging_service import (get_conversation_url,
+                                                        ingest_inbound_email)
 from front.utils.cloudflare_utils import verify_token
 from front.utils.mailgun_utils import validate_token
 from registry.models import Diocese, Website
@@ -125,9 +125,8 @@ def contact_mail_webhook(request):
             message = None
 
         if message:
-            conversation_url = request.build_absolute_uri(
-                reverse('messaging_view', args=[message.conversation_id]))
-            email_body += f"\n\n{conversation_url}"
+            # message.conversation is already cached by the create() that made it: no extra query.
+            email_body += f"\n\n{get_conversation_url(request, message.conversation)}"
 
         send_discord_alert(message=email_body, channel=DiscordChanel.CONTACT_FORM)
 

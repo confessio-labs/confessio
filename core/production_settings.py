@@ -23,6 +23,10 @@ if not os.environ.get('SERVER_HOST'):
 ALLOWED_HOSTS = [f'.{os.environ.get("SERVER_HOST")}']
 CSRF_TRUSTED_ORIGINS = [f'https://*.{os.environ.get("SERVER_HOST")}']
 SECURE_SSL_REDIRECT = False
+# Django only sees http:// otherwise (nginx terminates TLS and proxies over plain HTTP to
+# gunicorn on localhost), which makes request.build_absolute_uri emit http:// links in
+# emails and keeps request.is_secure() false. nginx always sets the header itself.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_HSTS_SECONDS = 60
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
