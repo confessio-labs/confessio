@@ -17,11 +17,11 @@ from front.utils.messaging_utils import (append_conversation_footer, build_reply
                                          parse_sender)
 
 
-def get_conversation_url(conversation: Conversation) -> str:
-    return settings.REQUEST_BASE_URL + reverse('messaging_view', args=[conversation.uuid])
+def get_conversation_url(request, conversation: Conversation) -> str:
+    return request.build_absolute_uri(reverse('messaging_view', args=[conversation.uuid]))
 
 
-def send_message(conversation: Conversation, body: str, author) -> Message:
+def send_message(request, conversation: Conversation, body: str, author) -> Message:
     """Record an outgoing message and mail it to the correspondent.
 
     Sending is synchronous: a failure is stored on the row rather than raised, so the admin sees
@@ -41,7 +41,7 @@ def send_message(conversation: Conversation, body: str, author) -> Message:
             # SES only accepts a verified identity as From, so we send from DEFAULT_FROM_EMAIL and
             # put the Mailgun-routed address in Reply-To to get the answer back in the webhook.
             subject=build_reply_subject(conversation.subject, is_first),
-            body=append_conversation_footer(body, get_conversation_url(conversation)),
+            body=append_conversation_footer(body, get_conversation_url(request, conversation)),
             from_email=formataddr(('Confessio', settings.DEFAULT_FROM_EMAIL)),
             to=[conversation.email],
             reply_to=[os.environ.get('CONTACT_EMAIL')],

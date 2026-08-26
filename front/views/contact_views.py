@@ -125,8 +125,8 @@ def contact_mail_webhook(request):
             message = None
 
         if message:
-            conversation_url = settings.REQUEST_BASE_URL + reverse(
-                'messaging_view', args=[message.conversation_id])
+            conversation_url = request.build_absolute_uri(
+                reverse('messaging_view', args=[message.conversation_id]))
             email_body += f"\n\n{conversation_url}"
 
         send_discord_alert(message=email_body, channel=DiscordChanel.CONTACT_FORM)

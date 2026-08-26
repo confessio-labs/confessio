@@ -41,7 +41,7 @@ def messaging_new(request):
 
     # The conversation and its first message are created together: no empty threads.
     conversation = Conversation.objects.create(email=email, subject=subject)
-    send_message(conversation, text, request.user)
+    send_message(request, conversation, text, request.user)
     return redirect('messaging_view', conversation_uuid=conversation.uuid)
 
 
@@ -54,5 +54,5 @@ def messaging_message(request, conversation_uuid):
     if not text:
         return HttpResponseBadRequest("Missing required fields")
 
-    send_message(conversation, text, request.user)
+    send_message(request, conversation, text, request.user)
     return redirect('messaging_view', conversation_uuid=conversation.uuid)
