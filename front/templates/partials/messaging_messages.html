@@ -1,0 +1,20 @@
+{% for message in messages %}
+  <div class="messaging-item messaging-item--{{ message.direction }}">
+    <div class="messaging-meta">
+      {% if message.direction == 'outbound' %}
+        {{ message.author.username|default:'Confessio' }}
+      {% else %}
+        {{ message.from_email|default:message.conversation.email }}
+      {% endif %}
+      — {{ message.created_at|date:"d/m/Y H:i" }}
+    </div>
+    <div class="messaging-bubble messaging-bubble--{{ message.direction }}">{{ message.body|linebreaksbr }}</div>
+    {% if message.status == 'failed' %}
+      <div class="messaging-error">
+        <i class="fas fa-exclamation-triangle"></i> Échec de l'envoi : {{ message.error_message }}
+      </div>
+    {% endif %}
+  </div>
+{% empty %}
+  <p class="text-muted">Aucun message.</p>
+{% endfor %}
