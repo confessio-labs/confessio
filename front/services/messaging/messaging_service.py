@@ -60,12 +60,17 @@ def ingest_inbound_email(from_header: str, reply_to: str, subject: str,
                          body_plain: str, stripped_text: str) -> Message | None:
     """Turn one inbound Mailgun mail into a message, opening a conversation if it is a new thread.
 
-    Returns None for mail we must not answer: bounces, auto-responders, and our own mail sent
-    without a Reply-To. A contact-form mail always carries the visitor in Reply-To, so it goes
-    through here like any other incoming message — the contact view has nothing to do.
+    Returns None only for mail nobody could answer: bounces and auto-responders. Anything else is
+    kept, even if we cannot make sense of the sender — a visible junk conversation beats a
+    submission dropped in silence.
+
+    A contact-form mail goes through here like any other incoming message (it is addressed to
+    CONTACT_EMAIL, which Mailgun routes back to us), so the contact view has nothing to do. Its
+    From is our own no-reply@ — SES only accepts a verified identity — and the visitor is in
+    Reply-To, which parse_sender prefers.
     """
     name, email = parse_sender(reply_to, from_header)
-    if not email or is_automated_sender(email) or email == settings.DEFAULT_FROM_EMAIL:
+    if not email or is_automated_sender(email):
         return None
 
     conversation = None
