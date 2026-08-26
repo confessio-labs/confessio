@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
 
-from front.models import CopilotDiscussion, Report
+from front.models import Conversation, CopilotDiscussion, Report
 
 
 @admin.register(Report)
@@ -14,3 +14,9 @@ class ReportAdmin(ModelAdmin):
 class CopilotDiscussionAdmin(ModelAdmin):
     list_display = ['__str__', 'user', 'website', 'status', 'updated_at']
     list_filter = ['status']
+
+
+@admin.register(Conversation)
+class ConversationAdmin(ModelAdmin):
+    list_display = ['__str__', 'email', 'subject', 'updated_at']
+    search_fields = ['email', 'subject']

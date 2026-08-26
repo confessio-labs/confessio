@@ -53,6 +53,13 @@ urlpatterns = [
     path('copilot/<uuid:discussion_uuid>/approve', views.copilot_approve, name='copilot_approve'),
     path('copilot/<uuid:discussion_uuid>/items', views.copilot_items, name='copilot_items'),
 
+    # messaging (admin)
+    path('messaging', views.messaging, name='messaging'),
+    path('messaging/new', views.messaging_new, name='messaging_new'),
+    path('messaging/<uuid:conversation_uuid>', views.messaging, name='messaging_view'),
+    path('messaging/<uuid:conversation_uuid>/message', views.messaging_message,
+         name='messaging_message'),
+
     # moderation
     path('moderate', views.moderation_home, name='moderation_home'),
     path('moderate/report/<category>/<str:status>/<str:diocese_slug>',

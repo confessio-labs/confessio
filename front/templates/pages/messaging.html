@@ -1,0 +1,88 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block stylesheets %}
+    <link type="text/css" rel="stylesheet" href="{% static 'css/messaging.css' %}">
+{% endblock stylesheets %}
+
+{% block content %}
+<main>
+<!-- Dark header band so the (absolute, white-text) navbar is readable and content clears it -->
+<section class="section-header bg-primary pt-6 pb-1">
+</section>
+<section class="section pt-3 pb-3">
+  <div class="container-fluid">
+    <div class="row messaging-layout">
+
+      <!-- Sidebar: conversations -->
+      <div class="col-12 col-md-3 messaging-sidebar">
+        <div class="d-flex align-items-baseline gap-2 mb-3">
+            <h2 class="mb-0">Messagerie</h2>
+        </div>
+        <a href="{% url 'messaging' %}" class="btn btn-primary btn-sm w-100 mb-3">
+          <i class="fas fa-plus"></i> Nouvelle conversation
+        </a>
+        <ul class="list-style-none messaging-conversations">
+          {% for c in conversations %}
+            <li class="messaging-conversation-link {% if conversation and c.uuid == conversation.uuid %}is-active{% endif %}">
+              <a href="{% url 'messaging_view' c.uuid %}">
+                <span class="messaging-conversation-subject">{{ c.subject|truncatechars:50 }}</span>
+                <span class="messaging-conversation-email">{{ c.email }}</span>
+              </a>
+            </li>
+          {% empty %}
+            <li class="text-muted">Aucune conversation pour l'instant.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Main: the thread, or the new-conversation form -->
+      <div class="col-12 col-md-9 messaging-main">
+        {% if conversation %}
+          <div class="messaging-header">
+            <h4 class="mb-0">{{ conversation.subject }}</h4>
+            <p class="mb-0 text-muted small">
+              {% if conversation.name %}{{ conversation.name }} — {% endif %}{{ conversation.email }}
+            </p>
+          </div>
+
+          <div class="messaging-messages">
+            {% include 'partials/messaging_messages.html' with messages=messages %}
+          </div>
+
+          <form method="post" action="{% url 'messaging_message' conversation.uuid %}"
+                class="messaging-input">
+            {% csrf_token %}
+            <textarea name="text" class="form-control" rows="3" required
+                      placeholder="Écris ta réponse…"></textarea>
+            <button type="submit" class="btn btn-primary">Envoyer</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'messaging_new' %}" class="messaging-new">
+            {% csrf_token %}
+            <h4>Nouvelle conversation</h4>
+            <div class="mb-2">
+              <label class="form-label" for="messaging-email">Destinataire</label>
+              <input type="email" name="email" id="messaging-email" class="form-control" required
+                     placeholder="paroisse@exemple.fr">
+            </div>
+            <div class="mb-2">
+              <label class="form-label" for="messaging-subject">Objet</label>
+              <input type="text" name="subject" id="messaging-subject" class="form-control" required
+                     maxlength="255" placeholder="Horaires de confession">
+            </div>
+            <div class="mb-2">
+              <label class="form-label" for="messaging-text">Message</label>
+              <textarea name="text" id="messaging-text" class="form-control" rows="6" required
+                        placeholder="Bonjour,…"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Envoyer</button>
+          </form>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</section>
+</main>
+{% endblock content %}

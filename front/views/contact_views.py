@@ -11,6 +11,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 from core.utils.discord_utils import send_discord_alert, DiscordChanel
 from front.services.card.scraping_url_service import quote_path, unquote_path
+from front.services.messaging.messaging_service import (get_conversation_url,
+                                                        ingest_inbound_email)
 from front.utils.cloudflare_utils import verify_token
 from front.utils.mailgun_utils import validate_token
 from registry.models import Diocese, Website
@@ -111,6 +113,22 @@ def contact_mail_webhook(request):
                   )
 
     if recipient == os.environ.get('CONTACT_EMAIL'):
+        # A contact form submission lands here too: it is mailed to CONTACT_EMAIL, which Mailgun
+        # routes back to this webhook. So this is the single entry point of the admin messaging,
+        # and the contact view has nothing to do.
+        try:
+            message = ingest_inbound_email(from_header, reply_to, subject,
+                                           body_plain, stripped_text,
+                                           request.POST.get('Message-Id', ''))
+        except Exception as e:
+            # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery.
+            print(e)
+            message = None
+
+        if message:
+            # message.conversation is already cached by the create() that made it: no extra query.
+            email_body += f"\n\n{get_conversation_url(request, message.conversation)}"
+
         send_discord_alert(message=email_body, channel=DiscordChanel.CONTACT_FORM)
 
     return HttpResponse(status=200)
