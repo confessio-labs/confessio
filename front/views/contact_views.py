@@ -118,7 +118,8 @@ def contact_mail_webhook(request):
         # and the contact view has nothing to do.
         try:
             message = ingest_inbound_email(from_header, reply_to, subject,
-                                           body_plain, stripped_text)
+                                           body_plain, stripped_text,
+                                           request.POST.get('Message-Id', ''))
         except Exception as e:
             # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery.
             print(e)

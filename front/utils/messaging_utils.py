@@ -59,3 +59,27 @@ def build_reply_subject(subject: str, is_first: bool) -> str:
     if is_first or subject.lower().startswith('re:'):
         return subject
     return f'Re: {subject}'
+
+
+def build_ses_message_id(ses_message_id: str, region: str) -> str:
+    """Rebuild the Message-ID header SES actually delivered.
+
+    SES overwrites whatever Message-ID we hand it and sends its own, derived from the id it returns
+    to the API: <{MessageId}@{region}.amazonses.com>. That is what the recipient's client threads
+    on, so that is the one worth storing.
+    """
+    if not ses_message_id or not region:
+        return ''
+    return f'<{ses_message_id}@{region}.amazonses.com>'
+
+
+def build_thread_headers(previous_message_ids: list[str]) -> dict[str, str]:
+    """Point an outgoing mail at the ones before it in the same conversation.
+
+    Gmail (and most clients) group on References/In-Reply-To, never on the subject alone: without
+    these headers every mail we send opens its own thread, even with an identical Subject.
+    """
+    known = [message_id for message_id in previous_message_ids if message_id]
+    if not known:
+        return {}
+    return {'In-Reply-To': known[-1], 'References': ' '.join(known)}

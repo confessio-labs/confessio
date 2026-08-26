@@ -39,6 +39,10 @@ class Message(TimeStampMixin):
     from_email = models.CharField(max_length=255, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices)
     error_message = models.TextField(blank=True)
+    # The RFC 5322 Message-ID this mail was delivered under, quoted by the next one in
+    # In-Reply-To/References so mail clients keep the thread together. Outbound: SES's, which
+    # overwrites the one Django sets. Inbound: the header Mailgun forwards. Empty if unknown.
+    message_id = models.CharField(max_length=255, blank=True)
 
     class Meta:
         ordering = ['created_at']

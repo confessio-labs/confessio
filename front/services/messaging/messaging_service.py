@@ -6,12 +6,14 @@ Mailgun inbound webhook. The two are tied together by the conversation link in t
 import os
 
 from botocore.exceptions import ClientError
+from django.conf import settings
 from django.core.mail import BadHeaderError, EmailMessage
 from django.urls import reverse
 from email.utils import formataddr
 
 from front.models import Conversation, Message
 from front.utils.messaging_utils import (append_conversation_footer, build_reply_subject,
+                                         build_ses_message_id, build_thread_headers,
                                          extract_conversation_uuid, is_automated_sender,
                                          parse_sender)
 
@@ -26,6 +28,11 @@ def send_message(request, conversation: Conversation, body: str, author) -> Mess
     Sending is synchronous: a failure is stored on the row rather than raised, so the admin sees
     it in the thread and can retry by sending again.
     """
+    # Read the thread before adding to it: these are the mails the new one answers.
+    previous_message_ids = list(conversation.messages.values_list('message_id', flat=True))
+    # The very first message of a thread carries the bare subject; anything after it is a reply.
+    is_first = not previous_message_ids
+
     message = Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.OUTBOUND,
@@ -33,31 +40,39 @@ def send_message(request, conversation: Conversation, body: str, author) -> Mess
         author=author,
         status=Message.Status.SENT,
     )
-    # The very first message of a thread carries the bare subject; anything after it is a reply.
-    is_first = conversation.messages.count() == 1
+    email = EmailMessage(
+        # From is CONTACT_EMAIL, not DEFAULT_FROM_EMAIL: it is the address Mailgun routes back
+        # to our webhook, so the answer reaches the thread by simply hitting reply. A no-reply@
+        # From would tell the correspondent not to do the one thing this feature needs. No
+        # Reply-To then: it would only repeat the From.
+        subject=build_reply_subject(conversation.subject, is_first),
+        body=append_conversation_footer(body, get_conversation_url(request, conversation)),
+        from_email=formataddr(('Confessio', os.environ.get('CONTACT_EMAIL'))),
+        to=[conversation.email],
+        headers=build_thread_headers(previous_message_ids),
+    )
     try:
-        EmailMessage(
-            # From is CONTACT_EMAIL, not DEFAULT_FROM_EMAIL: it is the address Mailgun routes back
-            # to our webhook, so the answer reaches the thread by simply hitting reply. A no-reply@
-            # From would tell the correspondent not to do the one thing this feature needs. No
-            # Reply-To then: it would only repeat the From.
-            subject=build_reply_subject(conversation.subject, is_first),
-            body=append_conversation_footer(body, get_conversation_url(request, conversation)),
-            from_email=formataddr(('Confessio', os.environ.get('CONTACT_EMAIL'))),
-            to=[conversation.email],
-        ).send()
+        email.send()
     except (BadHeaderError, ClientError) as e:
         print(e)
         message.status = Message.Status.FAILED
         message.error_message = str(e)
         message.save(update_fields=['status', 'error_message', 'updated_at'])
+    else:
+        # django-ses writes the id SES assigned back into extra_headers once the send succeeded.
+        message.message_id = build_ses_message_id(
+            email.extra_headers.get('message_id', ''),
+            getattr(settings, 'AWS_SES_REGION_NAME', ''))
+        if message.message_id:
+            message.save(update_fields=['message_id', 'updated_at'])
 
     _touch(conversation)
     return message
 
 
 def ingest_inbound_email(from_header: str, reply_to: str, subject: str,
-                         body_plain: str, stripped_text: str) -> Message | None:
+                         body_plain: str, stripped_text: str,
+                         message_id: str = '') -> Message | None:
     """Turn one inbound Mailgun mail into a message, opening a conversation if it is a new thread.
 
     Returns None only for mail nobody could answer: bounces and auto-responders. Anything else is
@@ -87,6 +102,7 @@ def ingest_inbound_email(from_header: str, reply_to: str, subject: str,
         body=stripped_text or body_plain,
         from_email=from_header,
         status=Message.Status.RECEIVED,
+        message_id=message_id,
     )
     _touch(conversation)
     return message

@@ -3,6 +3,7 @@ the dependency rules), so this runs in the fast suite."""
 import unittest
 
 from front.utils.messaging_utils import (append_conversation_footer, build_reply_subject,
+                                         build_ses_message_id, build_thread_headers,
                                          extract_conversation_uuid, is_automated_sender,
                                          parse_sender)
 
@@ -92,6 +93,36 @@ class FooterAndSubjectTests(unittest.TestCase):
         for (subject, is_first), expected in fixtures:
             with self.subTest(subject=subject, is_first=is_first):
                 self.assertEqual(expected, build_reply_subject(subject, is_first))
+
+
+class ThreadingTests(unittest.TestCase):
+    # Observed on a real delivery: SES replaces the Message-ID Django sets with its own, built
+    # from the id it returns to the API.
+    SES_ID = '011301a03ee56b39-7bb2ff5c-a7fe-475a-b30f-e9d125c462b9-000000'
+    DELIVERED = f'<{SES_ID}@eu-west-3.amazonses.com>'
+
+    def test_build_ses_message_id(self):
+        self.assertEqual(self.DELIVERED, build_ses_message_id(self.SES_ID, 'eu-west-3'))
+        # A send that told us nothing must not fabricate an id nobody will ever match.
+        self.assertEqual('', build_ses_message_id('', 'eu-west-3'))
+        self.assertEqual('', build_ses_message_id(self.SES_ID, ''))
+
+    def test_build_thread_headers(self):
+        first, second = self.DELIVERED, '<second@eu-west-3.amazonses.com>'
+        fixtures = [
+            # Opening a thread: nothing to point at.
+            ([], {}),
+            ([first], {'In-Reply-To': first, 'References': first}),
+            ([first, second],
+             {'In-Reply-To': second, 'References': f'{first} {second}'}),
+            # A failed send leaves no id behind: skip the gap rather than emit an empty reference.
+            ([first, '', second],
+             {'In-Reply-To': second, 'References': f'{first} {second}'}),
+            ([''], {}),
+        ]
+        for previous, expected in fixtures:
+            with self.subTest(previous=previous):
+                self.assertEqual(expected, build_thread_headers(previous))
 
 
 if __name__ == '__main__':
