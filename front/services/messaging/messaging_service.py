@@ -131,8 +131,9 @@ def record_contact_form(request, name: str, email: str, subject: str, body: str)
 
 
 def ingest_received_email(request, from_header: str, reply_to: str, subject: str,
-                          body_plain: str, stripped_text: str, message_id: str = '',
-                          in_reply_to: str = '', references: str = '') -> Message | None:
+                          body_plain: str, stripped_text: str, body_html: str = '',
+                          message_id: str = '', in_reply_to: str = '',
+                          references: str = '') -> Message | None:
     """Turn one mail received on the contact address into a message.
 
     Returns None for mail nobody could answer (bounces, auto-responders) and for a delivery we
@@ -145,7 +146,8 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
     if _is_duplicate(message_id):
         return None
 
-    conversation = find_conversation(body_plain, stripped_text, in_reply_to, references)
+    conversation = find_conversation(body_plain, stripped_text, body_html,
+                                     in_reply_to, references)
     is_new = conversation is None
     if is_new:
         conversation = Conversation.objects.create(email=_fit(Conversation, 'email', email),
@@ -170,8 +172,9 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
 
 
 def ingest_sent_email(from_header: str, to_header: str, subject: str,
-                      body_plain: str, stripped_text: str, message_id: str = '',
-                      in_reply_to: str = '', references: str = '') -> Message | None:
+                      body_plain: str, stripped_text: str, body_html: str = '',
+                      message_id: str = '', in_reply_to: str = '',
+                      references: str = '') -> Message | None:
     """Record a reply the admin wrote in the contact mailbox, outside /messaging.
 
     Mailgun keeps no copy of what our domain sends, so the only way to see such a reply is to be
@@ -187,7 +190,8 @@ def ingest_sent_email(from_header: str, to_header: str, subject: str,
     if _is_duplicate(message_id):
         return None
 
-    conversation = find_conversation(body_plain, stripped_text, in_reply_to, references)
+    conversation = find_conversation(body_plain, stripped_text, body_html,
+                                     in_reply_to, references)
     if conversation is None:
         ours = (os.environ.get('CONTACT_EMAIL', ''), os.environ.get('ARCHIVE_EMAIL', ''),
                 settings.DEFAULT_FROM_EMAIL)
@@ -212,14 +216,15 @@ def ingest_sent_email(from_header: str, to_header: str, subject: str,
     return message
 
 
-def find_conversation(body_plain: str, stripped_text: str,
+def find_conversation(body_plain: str, stripped_text: str, body_html: str = '',
                       in_reply_to: str = '', references: str = '') -> Conversation | None:
     """Attach an incoming mail to the thread it belongs to, or None to open a new one.
 
-    Our own link comes first: it names the conversation outright. The Message-IDs are the fallback
-    for a client that answered without quoting anything.
+    Our own link comes first: it names the conversation outright. The HTML part is searched too —
+    the footer shows the link as a word, so the url only survives in the href. The Message-IDs are
+    the fallback for a client that answered without quoting anything.
     """
-    conversation_uuid = extract_conversation_uuid(body_plain, stripped_text)
+    conversation_uuid = extract_conversation_uuid(body_plain, stripped_text, body_html)
     if conversation_uuid:
         conversation = Conversation.objects.filter(uuid=conversation_uuid).first()
         if conversation:

@@ -257,7 +257,7 @@ class BuildOutboundBodiesTests(unittest.TestCase):
         text, html = build_outbound_bodies('Bonjour', [inbound('Une question ?')], URL, HOME)
         self.assertEqual(1, text.count(URL))
         self.assertIn(f'Bonjour\n\n{FOOTER}\n\nLe 27/08', text)
-        self.assertEqual(2, html.count(URL))  # href + visible text of the same single link
+        self.assertEqual(1, html.count(URL))  # the href of the single footer link
 
     def test_no_second_footer_once_the_history_carries_the_link(self):
         text, html = build_outbound_bodies('Ma réponse', [outbound('Bonjour'), inbound('Merci')],
@@ -265,7 +265,7 @@ class BuildOutboundBodiesTests(unittest.TestCase):
         self.assertEqual(1, text.count(URL))
         self.assertTrue(text.startswith('Ma réponse\n\nLe 27/08'))
         # The HTML part must take the same decision, or the two would tell different stories.
-        self.assertEqual(2, html.count(URL))
+        self.assertEqual(1, html.count(URL))
         self.assertNotIn('<hr', html)
 
     def test_always_footer_forces_the_link(self):
@@ -274,7 +274,7 @@ class BuildOutboundBodiesTests(unittest.TestCase):
                                            always_footer=True)
         self.assertEqual(2, text.count(URL))
         self.assertTrue(text.startswith(f'{FOOTER}\n\nLe 27/08'))
-        self.assertEqual(4, html.count(URL))
+        self.assertEqual(2, html.count(URL))
 
     def test_the_link_survives_a_round_trip(self):
         text, _ = build_outbound_bodies('Ma réponse', [outbound('Bonjour'), inbound('Merci')],
@@ -299,12 +299,15 @@ class HtmlRenderingTests(unittest.TestCase):
         self.assertEqual('<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; co</p>',
                          html_paragraphs('<script>alert(1)</script> & co'))
 
-    def test_footer_carries_the_link_on_the_word_and_the_url_in_full(self):
+    def test_both_links_are_carried_by_their_words(self):
         html = conversation_footer_html(URL, HOME)
         self.assertIn(f'<a href="{HOME}" style="color:#888888">Confessio</a>', html)
-        # Written out, not hidden behind a label: a reply quotes what it can see.
-        self.assertIn(f'>{URL}</a>', html)
+        self.assertIn(f'<a href="{URL}" style="color:#888888">Espace administrateur</a>', html)
         self.assertIn('color:#888888', html)
+
+    def test_the_thread_key_survives_in_the_href(self):
+        # Nothing spells the url out in the HTML part, so a quoted reply only carries it there.
+        self.assertEqual(UUID, extract_conversation_uuid(conversation_footer_html(URL, HOME)))
 
     def test_history_is_quoted_in_blockquotes(self):
         html = build_history_block_html([inbound('Bonjour'), outbound('Bonsoir')], URL, HOME)

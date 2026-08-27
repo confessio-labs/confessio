@@ -91,6 +91,8 @@ def mail_received_webhook(request):
     subject = request.POST.get('subject', '')
     body_plain = request.POST.get('body-plain', '')
     stripped_text = request.POST.get('stripped-text', '')
+    # The footer shows the admin link as a word, so on a quoted reply the url is in the href only.
+    body_html = request.POST.get('body-html', '')
     message_id = request.POST.get('Message-Id', '')
     in_reply_to = request.POST.get('In-Reply-To', '')
     references = request.POST.get('References', '')
@@ -103,6 +105,7 @@ def mail_received_webhook(request):
                               subject=subject,
                               body_plain=body_plain,
                               stripped_text=stripped_text,
+                              body_html=body_html,
                               message_id=message_id,
                               in_reply_to=in_reply_to,
                               references=references)
@@ -127,6 +130,7 @@ def mail_received_webhook(request):
                               subject=subject,
                               body_plain=body_plain,
                               stripped_text=stripped_text,
+                              body_html=body_html,
                               message_id=message_id,
                               in_reply_to=in_reply_to,
                               references=references)

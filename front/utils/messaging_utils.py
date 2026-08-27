@@ -54,16 +54,16 @@ def conversation_footer(conversation_url: str, home_url: str) -> str:
 
 
 def conversation_footer_html(conversation_url: str, home_url: str) -> str:
-    """The same footer for the HTML part: greyed out, with the link carried by the word.
+    """The same footer for the HTML part: greyed out, both links carried by their words.
 
-    The admin URL stays written out rather than hidden behind an anchor — a correspondent's reply
-    quotes the text it can see, and that quoted URL is how the thread finds its way home.
+    Hiding the admin URL behind a word costs nothing on the way back: a reply quotes our markup,
+    and the href survives in `body-html`, which is one of the texts we search the thread key in.
     """
     return (f'<p style="{FOOTER_STYLE}">{FOOTER_INTRO} '
             f'<a href="{escape(home_url, quote=True)}" style="color:#888888">Confessio</a>.</p>'
-            f'<p style="{FOOTER_STYLE}">{FOOTER_LABEL}<br>'
+            f'<p style="{FOOTER_STYLE}">'
             f'<a href="{escape(conversation_url, quote=True)}" style="color:#888888">'
-            f'{escape(conversation_url)}</a></p>')
+            f'{FOOTER_LABEL}</a></p>')
 
 
 def append_conversation_footer(body: str, conversation_url: str, home_url: str) -> str:
