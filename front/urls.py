@@ -76,10 +76,7 @@ urlpatterns = [
     path('about', views.about, name='about'),
 
     # webhooks
-    path('webhooks/contact_mail_received', views.contact_mail_received_webhook,
-         name='contact_mail_received_webhook'),
-    path('webhooks/contact_mail_sent', views.contact_mail_sent_webhook,
-         name='contact_mail_sent_webhook'),
+    path('webhooks/mail_received', views.mail_received_webhook, name='mail_received_webhook'),
 
     # api
     path("api/", api.urls),

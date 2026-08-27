@@ -6,8 +6,9 @@ from front.utils.messaging_utils import (HistoryEntry, append_conversation_foote
                                          build_history_block, build_outbound_body,
                                          build_reply_subject, build_ses_message_id,
                                          build_thread_headers, conversation_footer,
-                                         extract_conversation_uuid, is_automated_sender,
-                                         is_same_email, parse_message_ids, parse_sender)
+                                         extract_conversation_uuid, first_external_address,
+                                         is_automated_sender, is_same_email, parse_message_ids,
+                                         parse_sender)
 
 UUID = '3f2a1b4c-1111-2222-3333-444455556666'
 OTHER_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -128,6 +129,31 @@ class ThreadingTests(unittest.TestCase):
         for previous, expected in fixtures:
             with self.subTest(previous=previous):
                 self.assertEqual(expected, build_thread_headers(previous))
+
+
+class FirstExternalAddressTests(unittest.TestCase):
+    OURS = ('contact@confessio.fr', 'archive@confessio.fr', 'no-reply@confessio.fr')
+
+    def get_fixtures(self):
+        return [
+            # A reply copied to the archive address: the correspondent is the other recipient.
+            (('Jean Dupont <jean@ex.fr>, archive@confessio.fr', self.OURS),
+             ('Jean Dupont', 'jean@ex.fr')),
+            # Whatever the order, and whatever the case of our own address.
+            (('Archive <ARCHIVE@confessio.fr>, jean@ex.fr', self.OURS), ('', 'jean@ex.fr')),
+            (('Jean <jean@ex.fr>', self.OURS), ('Jean', 'jean@ex.fr')),
+            # Several correspondents: the first one wins.
+            (('jean@ex.fr, marie@ex.fr', self.OURS), ('', 'jean@ex.fr')),
+            # Nobody but us: a conversation talking to itself is worse than none.
+            (('contact@confessio.fr, archive@confessio.fr', self.OURS), ('', '')),
+            (('', self.OURS), ('', '')),
+            (('garbage', self.OURS), ('', '')),
+        ]
+
+    def test_first_external_address(self):
+        for (header, ours), expected in self.get_fixtures():
+            with self.subTest(header=header):
+                self.assertEqual(expected, first_external_address(header, ours))
 
 
 class ParseMessageIdsTests(unittest.TestCase):

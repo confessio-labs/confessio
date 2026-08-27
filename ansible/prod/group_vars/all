@@ -50,6 +50,7 @@ nb_crawling_workers: 2
 # Email
 contact_email: "{{ lookup('ansible.builtin.env', 'CONTACT_EMAIL') }}"
 contact_forward_email: "{{ lookup('ansible.builtin.env', 'CONTACT_FORWARD_EMAIL') }}"
+archive_email: "{{ lookup('ansible.builtin.env', 'ARCHIVE_EMAIL') }}"
 admin_email: "{{ lookup('ansible.builtin.env', 'ADMIN_EMAIL') }}"
 letsencrypt_email: "{{ lookup('ansible.builtin.env', 'PROD_LETSENCRYPT_EMAIL') }}"
 
@@ -103,7 +104,6 @@ cloudflare_turnstile_secret_key: "{{ lookup('ansible.builtin.env', 'CLOUDFLARE_T
 
 # MailGun
 mailgun_webhook_signing_key: "{{ lookup('ansible.builtin.env', 'MAILGUN_WEBHOOK_SIGNING_KEY') }}"
-mailgun_api_key: "{{ lookup('ansible.builtin.env', 'MAILGUN_API_KEY') }}"
 
 # Jawg Maps
 jawg_api_key1: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY1') }}"

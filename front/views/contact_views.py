@@ -1,4 +1,3 @@
-import json
 import os
 
 from django.conf import settings
@@ -12,15 +11,10 @@ from front.services.card.scraping_url_service import quote_path, unquote_path
 from front.services.messaging.messaging_service import (ingest_received_email, ingest_sent_email,
                                                         record_contact_form)
 from front.utils.cloudflare_utils import verify_token
-from front.utils.mailgun_utils import StorageUnavailableError, fetch_stored_message, validate_token
+from front.utils.mailgun_utils import validate_token
 from front.utils.messaging_utils import is_same_email
 from registry.models import Diocese, Website
 from scheduling.models import IndexEvent
-
-# What we record is the admin's send, not the recipient's server accepting it: a mail that never
-# gets delivered was still written and belongs in the thread. 'accepted' also fires once per
-# message, where 'delivered' fires once per recipient.
-SENT_EVENT = 'accepted'
 
 
 def contact(request, message=None, email=None, name_text=None,
@@ -77,8 +71,13 @@ def about(request):
 
 
 @csrf_exempt
-def contact_mail_received_webhook(request):
-    """Mailgun's inbound route for mail addressed to the contact address."""
+def mail_received_webhook(request):
+    """The single Mailgun inbound route, for both addresses it delivers to us.
+
+    CONTACT_EMAIL carries what correspondents write to us. ARCHIVE_EMAIL carries the copy the
+    contact mailbox puts on what it sends: Mailgun keeps nothing of what our domain sends, so being
+    sent a copy is the only way we get to see a reply written outside /messaging.
+    """
     if request.method != 'POST':
         return HttpResponse(status=405)
 
@@ -87,18 +86,40 @@ def contact_mail_received_webhook(request):
                                request.POST.get('signature', '')):
         return HttpResponse(status=403)
 
-    if request.POST.get('recipient', '') != os.environ.get('CONTACT_EMAIL'):
+    recipient = request.POST.get('recipient', '')
+    from_header = request.POST.get('from', '')
+    subject = request.POST.get('subject', '')
+    body_plain = request.POST.get('body-plain', '')
+    stripped_text = request.POST.get('stripped-text', '')
+    message_id = request.POST.get('Message-Id', '')
+    in_reply_to = request.POST.get('In-Reply-To', '')
+    references = request.POST.get('References', '')
+
+    if is_same_email(recipient, os.environ.get('ARCHIVE_EMAIL', '')):
+        try:
+            # `To` names the correspondent; `recipient` is the archive address we were routed on.
+            ingest_sent_email(from_header=from_header,
+                              to_header=request.POST.get('To', ''),
+                              subject=subject,
+                              body_plain=body_plain,
+                              stripped_text=stripped_text,
+                              message_id=message_id,
+                              in_reply_to=in_reply_to,
+                              references=references)
+        except Exception as e:
+            # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery. No
+            # Discord alert here — this is us talking, and it is already in the mailbox.
+            print(e)
         return HttpResponse(status=200)
 
-    from_header = request.POST.get('from', '')
+    if not is_same_email(recipient, os.environ.get('CONTACT_EMAIL', '')):
+        return HttpResponse(status=200)
+
     # The mails we mirror to the contact mailbox come back through this route. They are already in
     # the conversation, and no-reply@ is by construction an address only we send from.
     if is_same_email(from_header, settings.DEFAULT_FROM_EMAIL):
         return HttpResponse(status=200)
 
-    subject = request.POST.get('subject', '')
-    body_plain = request.POST.get('body-plain', '')
-    stripped_text = request.POST.get('stripped-text', '')
     try:
         ingest_received_email(request,
                               from_header=from_header,
@@ -106,9 +127,9 @@ def contact_mail_received_webhook(request):
                               subject=subject,
                               body_plain=body_plain,
                               stripped_text=stripped_text,
-                              message_id=request.POST.get('Message-Id', ''),
-                              in_reply_to=request.POST.get('In-Reply-To', ''),
-                              references=request.POST.get('References', ''))
+                              message_id=message_id,
+                              in_reply_to=in_reply_to,
+                              references=references)
     except Exception as e:
         # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery. Ring
         # Discord with the raw mail instead — the conversation is lost, the message must not be.
@@ -117,66 +138,6 @@ def contact_mail_received_webhook(request):
             message=f"Mail entrant non enregistré ({e})\n\n"
                     f"FROM:{from_header}\nSUBJECT:{subject}\n\n{stripped_text or body_plain}",
             channel=DiscordChanel.CONTACT_FORM)
-
-    return HttpResponse(status=200)
-
-
-@csrf_exempt
-def contact_mail_sent_webhook(request):
-    """Mailgun's event webhook for mail sent from the contact mailbox, outside /messaging."""
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-
-    try:
-        payload = json.loads(request.body)
-        signature = payload['signature']
-        event_data = payload['event-data']
-    except (ValueError, KeyError, TypeError) as e:
-        print(e)
-        return HttpResponseBadRequest("Malformed payload")
-
-    if not _is_valid_signature(signature.get('token', ''), signature.get('timestamp', ''),
-                               signature.get('signature', '')):
-        return HttpResponse(status=403)
-
-    if event_data.get('event') != SENT_EVENT:
-        return HttpResponse(status=200)
-
-    # Mailgun raises this event for the mail it routes INTO the contact mailbox as well, so read
-    # the sender off the event and stop here unless the mail left that mailbox. The same check
-    # guards the ingestion, but downloading a body to then throw it away is what made a contact
-    # form submission look like a broken webhook.
-    headers = (event_data.get('message') or {}).get('headers') or {}
-    if not is_same_email(headers.get('from', ''), os.environ.get('CONTACT_EMAIL', '')):
-        return HttpResponse(status=200)
-
-    storage_url = (event_data.get('storage') or {}).get('url', '')
-    if not storage_url:
-        # Nothing to download from, so nothing to record.
-        return HttpResponse(status=200)
-
-    if not os.environ.get('MAILGUN_API_KEY'):
-        # A missing key does not fix itself: answering 5xx would have Mailgun retry for hours.
-        print("Cannot record a sent mail: MAILGUN_API_KEY is not set")
-        return HttpResponse(status=200)
-
-    try:
-        stored = fetch_stored_message(storage_url)
-    except StorageUnavailableError as e:
-        # Only a replay can fix this one, and 5xx is how we ask Mailgun for it. The Message-Id
-        # de-dup makes the replay safe.
-        print(e)
-        return HttpResponse(status=500)
-
-    if stored is None:
-        # Nothing a retry could change — Mailgun keeps no message for this domain, or the key was
-        # refused. Replaying would just repeat the failure for hours.
-        return HttpResponse(status=200)
-
-    try:
-        ingest_sent_email(stored)
-    except Exception as e:
-        print(e)
 
     return HttpResponse(status=200)
 
