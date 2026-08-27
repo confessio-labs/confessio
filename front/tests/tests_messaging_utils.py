@@ -3,19 +3,22 @@ the dependency rules), so this runs in the fast suite."""
 import unittest
 
 from front.utils.messaging_utils import (HistoryEntry, append_conversation_footer,
-                                         build_history_block, build_outbound_body,
+                                         build_history_block, build_history_block_html,
+                                         build_outbound_bodies,
                                          build_reply_subject, build_ses_message_id,
                                          build_thread_headers, conversation_footer,
-                                         extract_conversation_uuid, first_external_address,
+                                         conversation_footer_html, extract_conversation_uuid,
+                                         first_external_address, html_paragraphs,
                                          is_automated_sender, is_same_email, parse_message_ids,
                                          parse_sender)
 
 UUID = '3f2a1b4c-1111-2222-3333-444455556666'
 OTHER_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 URL = f'https://confessio.fr/messaging/{UUID}'
+HOME = 'https://confessio.fr'
 # Built, not spelled out: what matters is the `--` delimiter and the link, never the wording.
-FOOTER = conversation_footer(URL)
-QUOTED_FOOTER = '\n'.join(f'> {line}' for line in FOOTER.split('\n'))
+FOOTER = conversation_footer(URL, HOME)
+QUOTED_FOOTER = '\n'.join(f'> {line}'.rstrip() for line in FOOTER.split('\n'))
 
 
 class ExtractConversationUuidTests(unittest.TestCase):
@@ -84,7 +87,7 @@ class FooterAndSubjectTests(unittest.TestCase):
     def test_footer_is_a_signature_block(self):
         # The `--` delimiter is what makes Mailgun drop the footer from stripped-text, keeping it
         # out of what we display while body-plain still carries the uuid.
-        body = append_conversation_footer('Bonjour', URL)
+        body = append_conversation_footer('Bonjour', URL, HOME)
         self.assertEqual(f'Bonjour\n\n{FOOTER}', body)
         self.assertEqual(UUID, extract_conversation_uuid(body))
 
@@ -213,11 +216,11 @@ def outbound(body):
 
 class BuildHistoryBlockTests(unittest.TestCase):
     def test_empty_history(self):
-        self.assertEqual('', build_history_block([], URL))
+        self.assertEqual('', build_history_block([], URL, HOME))
 
     def test_most_recent_first(self):
         # Entries come in chronological order and are quoted the way a mail client does it.
-        block = build_history_block([inbound('Bonjour'), outbound('Bonsoir')], URL)
+        block = build_history_block([inbound('Bonjour'), outbound('Bonsoir')], URL, HOME)
         self.assertEqual('Le 27/08/2026 à 14:32, Confessio a écrit :\n'
                          '> Bonsoir\n'
                          '>\n'
@@ -228,44 +231,89 @@ class BuildHistoryBlockTests(unittest.TestCase):
 
     def test_only_the_first_outbound_carries_the_footer(self):
         # It is the only mail that ever went out with one, so it is the only one to render with it.
-        block = build_history_block([outbound('Un'), inbound('Deux'), outbound('Trois')], URL)
+        block = build_history_block([outbound('Un'), inbound('Deux'), outbound('Trois')], URL, HOME)
         self.assertEqual(1, block.count(URL))
         self.assertIn(f'> Un\n>\n{QUOTED_FOOTER}', block)
 
     def test_an_inbound_only_history_has_no_footer(self):
-        self.assertNotIn(URL, build_history_block([inbound('Bonjour')], URL))
+        self.assertNotIn(URL, build_history_block([inbound('Bonjour')], URL, HOME))
 
     def test_multiline_bodies_are_quoted_line_by_line(self):
-        block = build_history_block([inbound('Bonjour,\n\nUne question ?')], URL)
+        block = build_history_block([inbound('Bonjour,\n\nUne question ?')], URL, HOME)
         self.assertEqual('Le 27/08/2026 à 14:35, Jean Dupont a écrit :\n'
                          '> Bonjour,\n'
                          '>\n'
                          '> Une question ?', block)
 
 
-class BuildOutboundBodyTests(unittest.TestCase):
+class BuildOutboundBodiesTests(unittest.TestCase):
     def test_footer_on_the_first_mail_of_a_thread(self):
-        self.assertEqual(f'Bonjour\n\n{FOOTER}', build_outbound_body('Bonjour', [], URL))
+        text, html = build_outbound_bodies('Bonjour', [], URL, HOME)
+        self.assertEqual(f'Bonjour\n\n{FOOTER}', text)
+        self.assertIn('<p>Bonjour</p>', html)
+        self.assertIn(f'<a href="{HOME}"', html)
 
     def test_footer_when_the_history_does_not_carry_the_link_yet(self):
-        body = build_outbound_body('Bonjour', [inbound('Une question ?')], URL)
-        self.assertEqual(1, body.count(URL))
-        self.assertIn(f'Bonjour\n\n{FOOTER}\n\nLe 27/08', body)
+        text, html = build_outbound_bodies('Bonjour', [inbound('Une question ?')], URL, HOME)
+        self.assertEqual(1, text.count(URL))
+        self.assertIn(f'Bonjour\n\n{FOOTER}\n\nLe 27/08', text)
+        self.assertEqual(1, html.count(URL))  # the href of the single footer link
 
     def test_no_second_footer_once_the_history_carries_the_link(self):
-        body = build_outbound_body('Ma réponse', [outbound('Bonjour'), inbound('Merci')], URL)
-        self.assertEqual(1, body.count(URL))
-        self.assertTrue(body.startswith('Ma réponse\n\nLe 27/08'))
+        text, html = build_outbound_bodies('Ma réponse', [outbound('Bonjour'), inbound('Merci')],
+                                           URL, HOME)
+        self.assertEqual(1, text.count(URL))
+        self.assertTrue(text.startswith('Ma réponse\n\nLe 27/08'))
+        # The HTML part must take the same decision, or the two would tell different stories.
+        self.assertEqual(1, html.count(URL))
+        self.assertNotIn('<hr', html)
 
     def test_always_footer_forces_the_link(self):
         # The mails we mirror to the contact mailbox exist to hand it the link.
-        body = build_outbound_body('', [outbound('Bonjour')], URL, always_footer=True)
-        self.assertEqual(2, body.count(URL))
-        self.assertTrue(body.startswith(f'{FOOTER}\n\nLe 27/08'))
+        text, html = build_outbound_bodies('', [outbound('Bonjour')], URL, HOME,
+                                           always_footer=True)
+        self.assertEqual(2, text.count(URL))
+        self.assertTrue(text.startswith(f'{FOOTER}\n\nLe 27/08'))
+        self.assertEqual(2, html.count(URL))
 
     def test_the_link_survives_a_round_trip(self):
-        body = build_outbound_body('Ma réponse', [outbound('Bonjour'), inbound('Merci')], URL)
-        self.assertEqual(UUID, extract_conversation_uuid(body))
+        text, _ = build_outbound_bodies('Ma réponse', [outbound('Bonjour'), inbound('Merci')],
+                                        URL, HOME)
+        self.assertEqual(UUID, extract_conversation_uuid(text))
+
+    def test_the_text_part_still_opens_with_the_signature_delimiter(self):
+        # Mailgun drops everything below `--` from stripped-text: lose it and the footer starts
+        # showing up inside the message bodies we display.
+        text, _ = build_outbound_bodies('Bonjour', [], URL, HOME)
+        self.assertIn('\n--\n', text)
+
+
+class HtmlRenderingTests(unittest.TestCase):
+    def test_paragraphs_and_line_breaks(self):
+        self.assertEqual('<p>Bonjour,</p><p>Une question ?<br>Merci</p>',
+                         html_paragraphs('Bonjour,\n\nUne question ?\nMerci'))
+        self.assertEqual('', html_paragraphs('   \n\n  '))
+
+    def test_bodies_are_escaped(self):
+        # These come from mail we received: none of it is markup we wrote.
+        self.assertEqual('<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; co</p>',
+                         html_paragraphs('<script>alert(1)</script> & co'))
+
+    def test_both_links_are_carried_by_their_words(self):
+        html = conversation_footer_html(URL, HOME)
+        self.assertIn(f'<a href="{HOME}" style="color:#888888">Confessio</a>', html)
+        self.assertIn(f'<a href="{URL}" style="color:#888888">Espace administrateur</a>', html)
+        self.assertIn('color:#888888', html)
+
+    def test_the_thread_key_survives_in_the_href(self):
+        # Nothing spells the url out in the HTML part, so a quoted reply only carries it there.
+        self.assertEqual(UUID, extract_conversation_uuid(conversation_footer_html(URL, HOME)))
+
+    def test_history_is_quoted_in_blockquotes(self):
+        html = build_history_block_html([inbound('Bonjour'), outbound('Bonsoir')], URL, HOME)
+        self.assertEqual(2, html.count('<blockquote'))
+        self.assertLess(html.index('Bonsoir'), html.index('Bonjour'))  # most recent first
+        self.assertEqual('', build_history_block_html([], URL, HOME))
 
 
 if __name__ == '__main__':

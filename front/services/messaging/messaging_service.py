@@ -14,18 +14,18 @@ import os
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
-from django.core.mail import BadHeaderError, EmailMessage
+from django.core.mail import BadHeaderError, EmailMultiAlternatives
 from django.urls import reverse
 from django.utils import timezone
 from email.utils import formataddr
 
 from core.utils.discord_utils import DiscordChanel, send_discord_alert
 from front.models import Conversation, Message
-from front.utils.messaging_utils import (HistoryEntry, build_outbound_body, build_reply_subject,
-                                         build_ses_message_id, build_thread_headers,
-                                         extract_conversation_uuid, first_external_address,
-                                         is_automated_sender, is_same_email, parse_message_ids,
-                                         parse_sender)
+from front.utils.messaging_utils import (HistoryEntry, build_outbound_bodies,
+                                         build_reply_subject, build_ses_message_id,
+                                         build_thread_headers, extract_conversation_uuid,
+                                         first_external_address, is_automated_sender,
+                                         is_same_email, parse_message_ids, parse_sender)
 
 # Discord rejects anything past 2000 characters, and a long mail adds nothing to an alert whose
 # job is to hand over the link.
@@ -34,6 +34,24 @@ MAX_DISCORD_BODY = 1200
 
 def get_conversation_url(request, conversation: Conversation) -> str:
     return request.build_absolute_uri(reverse('messaging_view', args=[conversation.uuid]))
+
+
+def get_home_url(request) -> str:
+    return request.build_absolute_uri(reverse('home'))
+
+
+def _build_mail(subject: str, content: str, entries: list[HistoryEntry], request,
+                conversation: Conversation, always_footer: bool = False,
+                **kwargs) -> EmailMultiAlternatives:
+    """One mail, two parts. The text part is the one that matters on the way back: Mailgun strips
+    it at the footer's `--` and we read the thread key out of it."""
+    text_body, html_body = build_outbound_bodies(content, entries,
+                                                 get_conversation_url(request, conversation),
+                                                 get_home_url(request),
+                                                 always_footer=always_footer)
+    mail = EmailMultiAlternatives(subject=subject, body=text_body, **kwargs)
+    mail.attach_alternative(html_body, 'text/html')
+    return mail
 
 
 def send_message(request, conversation: Conversation, body: str, author) -> Message:
@@ -54,14 +72,16 @@ def send_message(request, conversation: Conversation, body: str, author) -> Mess
         author=author,
         status=Message.Status.SENT,
     )
-    email = EmailMessage(
+    email = _build_mail(
         # From is CONTACT_EMAIL, not DEFAULT_FROM_EMAIL: it is the address Mailgun routes back
         # to our webhook, so the answer reaches the thread by simply hitting reply. A no-reply@
         # From would tell the correspondent not to do the one thing this feature needs. No
         # Reply-To then: it would only repeat the From.
         subject=build_reply_subject(conversation.subject, is_first),
-        body=build_outbound_body(body, _history_entries(previous),
-                                 get_conversation_url(request, conversation)),
+        content=body,
+        entries=_history_entries(previous),
+        request=request,
+        conversation=conversation,
         from_email=formataddr(('Confessio', os.environ.get('CONTACT_EMAIL'))),
         to=[conversation.email],
         headers=build_thread_headers([one.message_id for one in previous]),
@@ -90,12 +110,15 @@ def record_contact_form(request, name: str, email: str, subject: str, body: str)
     )
     _notify_discord(request, message)
 
-    mail = EmailMessage(
+    mail = _build_mail(
         # SES only accepts a verified identity as From, so the visitor goes in Reply-To: hitting
         # reply in the contact mailbox answers them directly.
         subject=conversation.subject,
-        body=build_outbound_body(body, [], get_conversation_url(request, conversation),
-                                 always_footer=True),
+        content=body,
+        entries=[],
+        request=request,
+        conversation=conversation,
+        always_footer=True,
         from_email=formataddr((f'{name} (via Confessio)', settings.DEFAULT_FROM_EMAIL)),
         to=[os.environ.get('CONTACT_EMAIL')],
         reply_to=[formataddr((name, email))],
@@ -108,8 +131,9 @@ def record_contact_form(request, name: str, email: str, subject: str, body: str)
 
 
 def ingest_received_email(request, from_header: str, reply_to: str, subject: str,
-                          body_plain: str, stripped_text: str, message_id: str = '',
-                          in_reply_to: str = '', references: str = '') -> Message | None:
+                          body_plain: str, stripped_text: str, body_html: str = '',
+                          message_id: str = '', in_reply_to: str = '',
+                          references: str = '') -> Message | None:
     """Turn one mail received on the contact address into a message.
 
     Returns None for mail nobody could answer (bounces, auto-responders) and for a delivery we
@@ -122,7 +146,8 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
     if _is_duplicate(message_id):
         return None
 
-    conversation = find_conversation(body_plain, stripped_text, in_reply_to, references)
+    conversation = find_conversation(body_plain, stripped_text, body_html,
+                                     in_reply_to, references)
     is_new = conversation is None
     if is_new:
         conversation = Conversation.objects.create(email=_fit(Conversation, 'email', email),
@@ -147,8 +172,9 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
 
 
 def ingest_sent_email(from_header: str, to_header: str, subject: str,
-                      body_plain: str, stripped_text: str, message_id: str = '',
-                      in_reply_to: str = '', references: str = '') -> Message | None:
+                      body_plain: str, stripped_text: str, body_html: str = '',
+                      message_id: str = '', in_reply_to: str = '',
+                      references: str = '') -> Message | None:
     """Record a reply the admin wrote in the contact mailbox, outside /messaging.
 
     Mailgun keeps no copy of what our domain sends, so the only way to see such a reply is to be
@@ -164,7 +190,8 @@ def ingest_sent_email(from_header: str, to_header: str, subject: str,
     if _is_duplicate(message_id):
         return None
 
-    conversation = find_conversation(body_plain, stripped_text, in_reply_to, references)
+    conversation = find_conversation(body_plain, stripped_text, body_html,
+                                     in_reply_to, references)
     if conversation is None:
         ours = (os.environ.get('CONTACT_EMAIL', ''), os.environ.get('ARCHIVE_EMAIL', ''),
                 settings.DEFAULT_FROM_EMAIL)
@@ -189,14 +216,15 @@ def ingest_sent_email(from_header: str, to_header: str, subject: str,
     return message
 
 
-def find_conversation(body_plain: str, stripped_text: str,
+def find_conversation(body_plain: str, stripped_text: str, body_html: str = '',
                       in_reply_to: str = '', references: str = '') -> Conversation | None:
     """Attach an incoming mail to the thread it belongs to, or None to open a new one.
 
-    Our own link comes first: it names the conversation outright. The Message-IDs are the fallback
-    for a client that answered without quoting anything.
+    Our own link comes first: it names the conversation outright. The HTML part is searched too —
+    the footer shows the link as a word, so the url only survives in the href. The Message-IDs are
+    the fallback for a client that answered without quoting anything.
     """
-    conversation_uuid = extract_conversation_uuid(body_plain, stripped_text)
+    conversation_uuid = extract_conversation_uuid(body_plain, stripped_text, body_html)
     if conversation_uuid:
         conversation = Conversation.objects.filter(uuid=conversation_uuid).first()
         if conversation:
@@ -223,11 +251,13 @@ def _mirror_to_contact_mailbox(request, conversation: Conversation, message: Mes
     mail it announces so both sit in the same conversation.
     """
     name = conversation.name or conversation.email
-    mail = EmailMessage(
+    mail = _build_mail(
         subject=build_reply_subject(conversation.subject, is_first=False),
-        body=build_outbound_body('', _history_entries([message]),
-                                 get_conversation_url(request, conversation),
-                                 always_footer=True),
+        content='',
+        entries=_history_entries([message]),
+        request=request,
+        conversation=conversation,
+        always_footer=True,
         from_email=formataddr((f'{name} (via Confessio)', settings.DEFAULT_FROM_EMAIL)),
         to=[os.environ.get('CONTACT_EMAIL')],
         reply_to=[formataddr((conversation.name, conversation.email))],
@@ -240,7 +270,7 @@ def _mirror_to_contact_mailbox(request, conversation: Conversation, message: Mes
         print(e)
 
 
-def _send_and_record(message: Message, email: EmailMessage) -> None:
+def _send_and_record(message: Message, email: EmailMultiAlternatives) -> None:
     """Mail it out, then keep the id it went out under so the next mail can quote it."""
     try:
         email.send()
