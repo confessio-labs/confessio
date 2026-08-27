@@ -142,9 +142,22 @@ def contact_mail_sent_webhook(request):
     if event_data.get('event') != SENT_EVENT:
         return HttpResponse(status=200)
 
+    # Mailgun raises this event for the mail it routes INTO the contact mailbox as well, so read
+    # the sender off the event and stop here unless the mail left that mailbox. The same check
+    # guards the ingestion, but downloading a body to then throw it away is what made a contact
+    # form submission look like a broken webhook.
+    headers = (event_data.get('message') or {}).get('headers') or {}
+    if not is_same_email(headers.get('from', ''), os.environ.get('CONTACT_EMAIL', '')):
+        return HttpResponse(status=200)
+
     storage_url = (event_data.get('storage') or {}).get('url', '')
     if not storage_url:
         # Nothing to download from, so nothing to record.
+        return HttpResponse(status=200)
+
+    if not os.environ.get('MAILGUN_API_KEY'):
+        # A missing key does not fix itself: answering 5xx would have Mailgun retry for hours.
+        print("Cannot record a sent mail: MAILGUN_API_KEY is not set")
         return HttpResponse(status=200)
 
     stored = fetch_stored_message(storage_url)
