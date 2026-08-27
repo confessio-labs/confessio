@@ -10,9 +10,9 @@ correspondent's client dropped the quoted body.
 """
 import re
 from dataclasses import dataclass
-from email.utils import parseaddr
+from email.utils import getaddresses, parseaddr
 
-FOOTER_LABEL = 'Conversation'
+FOOTER_LABEL = 'Identifiant de la conversation'
 
 _UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 # Match the link, not a bare uuid: an unrelated uuid quoted in the mail must not hijack the thread.
@@ -92,6 +92,18 @@ def is_same_email(one: str, other: str) -> bool:
     # parseaddr hands back the raw string when it cannot parse an address, so require an @ before
     # believing it: two identically malformed headers name no mailbox, let alone the same one.
     return '@' in one_email and one_email == other_email
+
+
+def first_external_address(header: str, ours: tuple[str, ...]) -> tuple[str, str]:
+    """The correspondent among a mail's recipients, skipping our own addresses.
+
+    A reply copied to the archive address lists it alongside the person it answers; opening a
+    conversation on our own mailbox would be a conversation talking to itself.
+    """
+    for name, email in getaddresses([header or '']):
+        if '@' in email and not any(is_same_email(email, one) for one in ours):
+            return name, email
+    return '', ''
 
 
 def is_automated_sender(email: str) -> bool:

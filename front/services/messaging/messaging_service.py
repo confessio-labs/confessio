@@ -21,11 +21,11 @@ from email.utils import formataddr
 
 from core.utils.discord_utils import DiscordChanel, send_discord_alert
 from front.models import Conversation, Message
-from front.utils.mailgun_utils import get_field
 from front.utils.messaging_utils import (HistoryEntry, build_outbound_body, build_reply_subject,
                                          build_ses_message_id, build_thread_headers,
-                                         extract_conversation_uuid, is_automated_sender,
-                                         is_same_email, parse_message_ids, parse_sender)
+                                         extract_conversation_uuid, first_external_address,
+                                         is_automated_sender, is_same_email, parse_message_ids,
+                                         parse_sender)
 
 # Discord rejects anything past 2000 characters, and a long mail adds nothing to an alert whose
 # job is to hand over the link.
@@ -146,34 +146,35 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
     return message
 
 
-def ingest_sent_email(stored: dict) -> Message | None:
-    """Record a mail the admin sent straight from the contact mailbox, outside /messaging.
+def ingest_sent_email(from_header: str, to_header: str, subject: str,
+                      body_plain: str, stripped_text: str, message_id: str = '',
+                      in_reply_to: str = '', references: str = '') -> Message | None:
+    """Record a reply the admin wrote in the contact mailbox, outside /messaging.
 
-    `stored` is the message downloaded from Mailgun's storage: the event webhook that announced it
-    carries headers only.
+    Mailgun keeps no copy of what our domain sends, so the only way to see such a reply is to be
+    sent one: the mail client puts ARCHIVE_EMAIL in Bcc, and that copy comes back through the
+    inbound route like any other mail.
     """
-    from_header = get_field(stored, 'From', 'sender')
     if not is_same_email(from_header, os.environ.get('CONTACT_EMAIL', '')):
+        # A correspondent's reply-all reaches the archive address too. That one is inbound mail,
+        # and the contact address already received its own copy of it.
+        print(f"Ignoring archived mail not sent from the contact address: {from_header}")
         return None
 
-    message_id = get_field(stored, 'Message-Id')
     if _is_duplicate(message_id):
         return None
 
-    body_plain = get_field(stored, 'body-plain')
-    stripped_text = get_field(stored, 'stripped-text')
-    conversation = find_conversation(body_plain, stripped_text,
-                                     get_field(stored, 'In-Reply-To'),
-                                     get_field(stored, 'References'))
+    conversation = find_conversation(body_plain, stripped_text, in_reply_to, references)
     if conversation is None:
-        name, email = parse_sender('', get_field(stored, 'To', 'recipient'))
+        ours = (os.environ.get('CONTACT_EMAIL', ''), os.environ.get('ARCHIVE_EMAIL', ''),
+                settings.DEFAULT_FROM_EMAIL)
+        name, email = first_external_address(to_header, ours)
         if not email:
             # A conversation we could never mail back to is worse than no conversation.
             return None
-        conversation = Conversation.objects.create(
-            email=_fit(Conversation, 'email', email),
-            name=_fit(Conversation, 'name', name),
-            subject=_fit(Conversation, 'subject', get_field(stored, 'Subject')))
+        conversation = Conversation.objects.create(email=_fit(Conversation, 'email', email),
+                                                   name=_fit(Conversation, 'name', name),
+                                                   subject=_fit(Conversation, 'subject', subject))
 
     message = Message.objects.create(
         conversation=conversation,

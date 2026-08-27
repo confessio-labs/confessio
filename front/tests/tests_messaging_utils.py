@@ -5,13 +5,17 @@ import unittest
 from front.utils.messaging_utils import (HistoryEntry, append_conversation_footer,
                                          build_history_block, build_outbound_body,
                                          build_reply_subject, build_ses_message_id,
-                                         build_thread_headers, extract_conversation_uuid,
+                                         build_thread_headers, conversation_footer,
+                                         extract_conversation_uuid, first_external_address,
                                          is_automated_sender, is_same_email, parse_message_ids,
                                          parse_sender)
 
 UUID = '3f2a1b4c-1111-2222-3333-444455556666'
 OTHER_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 URL = f'https://confessio.fr/messaging/{UUID}'
+# Built, not spelled out: what matters is the `--` delimiter and the link, never the wording.
+FOOTER = conversation_footer(URL)
+QUOTED_FOOTER = '\n'.join(f'> {line}' for line in FOOTER.split('\n'))
 
 
 class ExtractConversationUuidTests(unittest.TestCase):
@@ -81,7 +85,7 @@ class FooterAndSubjectTests(unittest.TestCase):
         # The `--` delimiter is what makes Mailgun drop the footer from stripped-text, keeping it
         # out of what we display while body-plain still carries the uuid.
         body = append_conversation_footer('Bonjour', URL)
-        self.assertEqual(f'Bonjour\n\n--\nConversation : {URL}', body)
+        self.assertEqual(f'Bonjour\n\n{FOOTER}', body)
         self.assertEqual(UUID, extract_conversation_uuid(body))
 
     def test_build_reply_subject(self):
@@ -125,6 +129,31 @@ class ThreadingTests(unittest.TestCase):
         for previous, expected in fixtures:
             with self.subTest(previous=previous):
                 self.assertEqual(expected, build_thread_headers(previous))
+
+
+class FirstExternalAddressTests(unittest.TestCase):
+    OURS = ('contact@confessio.fr', 'archive@confessio.fr', 'no-reply@confessio.fr')
+
+    def get_fixtures(self):
+        return [
+            # A reply copied to the archive address: the correspondent is the other recipient.
+            (('Jean Dupont <jean@ex.fr>, archive@confessio.fr', self.OURS),
+             ('Jean Dupont', 'jean@ex.fr')),
+            # Whatever the order, and whatever the case of our own address.
+            (('Archive <ARCHIVE@confessio.fr>, jean@ex.fr', self.OURS), ('', 'jean@ex.fr')),
+            (('Jean <jean@ex.fr>', self.OURS), ('Jean', 'jean@ex.fr')),
+            # Several correspondents: the first one wins.
+            (('jean@ex.fr, marie@ex.fr', self.OURS), ('', 'jean@ex.fr')),
+            # Nobody but us: a conversation talking to itself is worse than none.
+            (('contact@confessio.fr, archive@confessio.fr', self.OURS), ('', '')),
+            (('', self.OURS), ('', '')),
+            (('garbage', self.OURS), ('', '')),
+        ]
+
+    def test_first_external_address(self):
+        for (header, ours), expected in self.get_fixtures():
+            with self.subTest(header=header):
+                self.assertEqual(expected, first_external_address(header, ours))
 
 
 class ParseMessageIdsTests(unittest.TestCase):
@@ -192,7 +221,7 @@ class BuildHistoryBlockTests(unittest.TestCase):
         self.assertEqual('Le 27/08/2026 à 14:32, Confessio a écrit :\n'
                          '> Bonsoir\n'
                          '>\n'
-                         f'> --\n> Conversation : {URL}\n'
+                         f'{QUOTED_FOOTER}\n'
                          '\n'
                          'Le 27/08/2026 à 14:35, Jean Dupont a écrit :\n'
                          '> Bonjour', block)
@@ -201,7 +230,7 @@ class BuildHistoryBlockTests(unittest.TestCase):
         # It is the only mail that ever went out with one, so it is the only one to render with it.
         block = build_history_block([outbound('Un'), inbound('Deux'), outbound('Trois')], URL)
         self.assertEqual(1, block.count(URL))
-        self.assertIn(f'> Un\n>\n> --\n> Conversation : {URL}', block)
+        self.assertIn(f'> Un\n>\n{QUOTED_FOOTER}', block)
 
     def test_an_inbound_only_history_has_no_footer(self):
         self.assertNotIn(URL, build_history_block([inbound('Bonjour')], URL))
@@ -216,13 +245,12 @@ class BuildHistoryBlockTests(unittest.TestCase):
 
 class BuildOutboundBodyTests(unittest.TestCase):
     def test_footer_on_the_first_mail_of_a_thread(self):
-        self.assertEqual(f'Bonjour\n\n--\nConversation : {URL}',
-                         build_outbound_body('Bonjour', [], URL))
+        self.assertEqual(f'Bonjour\n\n{FOOTER}', build_outbound_body('Bonjour', [], URL))
 
     def test_footer_when_the_history_does_not_carry_the_link_yet(self):
         body = build_outbound_body('Bonjour', [inbound('Une question ?')], URL)
         self.assertEqual(1, body.count(URL))
-        self.assertIn(f'Bonjour\n\n--\nConversation : {URL}\n\nLe 27/08', body)
+        self.assertIn(f'Bonjour\n\n{FOOTER}\n\nLe 27/08', body)
 
     def test_no_second_footer_once_the_history_carries_the_link(self):
         body = build_outbound_body('Ma réponse', [outbound('Bonjour'), inbound('Merci')], URL)
@@ -233,7 +261,7 @@ class BuildOutboundBodyTests(unittest.TestCase):
         # The mails we mirror to the contact mailbox exist to hand it the link.
         body = build_outbound_body('', [outbound('Bonjour')], URL, always_footer=True)
         self.assertEqual(2, body.count(URL))
-        self.assertTrue(body.startswith(f'--\nConversation : {URL}\n\nLe 27/08'))
+        self.assertTrue(body.startswith(f'{FOOTER}\n\nLe 27/08'))
 
     def test_the_link_survives_a_round_trip(self):
         body = build_outbound_body('Ma réponse', [outbound('Bonjour'), inbound('Merci')], URL)
