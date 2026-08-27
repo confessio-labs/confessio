@@ -18,10 +18,9 @@ from registry.models import Diocese, Website
 from scheduling.models import IndexEvent
 
 # What we record is the admin's send, not the recipient's server accepting it: a mail that never
-# gets delivered was still written and must show in the thread. 'accepted' fires first and once per
-# message, 'delivered' once per recipient and only on success — we take whichever comes, and the
-# Message-Id de-dup makes the overlap a no-op.
-SENT_EVENTS = ('accepted', 'delivered')
+# gets delivered was still written and belongs in the thread. 'accepted' also fires once per
+# message, where 'delivered' fires once per recipient.
+SENT_EVENT = 'accepted'
 
 
 def contact(request, message=None, email=None, name_text=None,
@@ -140,13 +139,12 @@ def contact_mail_sent_webhook(request):
                                signature.get('signature', '')):
         return HttpResponse(status=403)
 
-    if event_data.get('event') not in SENT_EVENTS:
+    if event_data.get('event') != SENT_EVENT:
         return HttpResponse(status=200)
 
     storage_url = (event_data.get('storage') or {}).get('url', '')
     if not storage_url:
-        # Nothing to download from: if this was the 'accepted' event, the 'delivered' one still has
-        # its chance.
+        # Nothing to download from, so nothing to record.
         return HttpResponse(status=200)
 
     stored = fetch_stored_message(storage_url)

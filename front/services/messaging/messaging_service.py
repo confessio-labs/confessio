@@ -12,7 +12,7 @@ inbound webhook filters on so our own mirrors never come back in as new messages
 """
 import os
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.mail import BadHeaderError, EmailMessage
 from django.urls import reverse
@@ -78,12 +78,14 @@ def record_contact_form(request, name: str, email: str, subject: str, body: str)
     The submission is kept before anything is mailed: it is captured even if SES is down, in which
     case the failure shows on the message in /messaging.
     """
-    conversation = Conversation.objects.create(email=email, name=name, subject=subject)
+    conversation = Conversation.objects.create(email=_fit(Conversation, 'email', email),
+                                               name=_fit(Conversation, 'name', name),
+                                               subject=_fit(Conversation, 'subject', subject))
     message = Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.INBOUND,
         body=body,
-        from_email=formataddr((name, email)),
+        from_email=_fit(Message, 'from_email', formataddr((name, email))),
         status=Message.Status.RECEIVED,
     )
     _notify_discord(request, message)
@@ -123,16 +125,18 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
     conversation = find_conversation(body_plain, stripped_text, in_reply_to, references)
     is_new = conversation is None
     if is_new:
-        conversation = Conversation.objects.create(email=email, name=name, subject=subject)
+        conversation = Conversation.objects.create(email=_fit(Conversation, 'email', email),
+                                                   name=_fit(Conversation, 'name', name),
+                                                   subject=_fit(Conversation, 'subject', subject))
 
     # Mailgun's stripped-text already removed the quoted thread below the reply.
     message = Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.INBOUND,
         body=stripped_text or body_plain,
-        from_email=from_header,
+        from_email=_fit(Message, 'from_email', from_header),
         status=Message.Status.RECEIVED,
-        message_id=message_id,
+        message_id=_fit(Message, 'message_id', message_id),
     )
     _touch(conversation)
     _notify_discord(request, message)
@@ -166,17 +170,19 @@ def ingest_sent_email(stored: dict) -> Message | None:
         if not email:
             # A conversation we could never mail back to is worse than no conversation.
             return None
-        conversation = Conversation.objects.create(email=email, name=name,
-                                                   subject=get_field(stored, 'Subject'))
+        conversation = Conversation.objects.create(
+            email=_fit(Conversation, 'email', email),
+            name=_fit(Conversation, 'name', name),
+            subject=_fit(Conversation, 'subject', get_field(stored, 'Subject')))
 
     message = Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.OUTBOUND,
         # Nobody typed this in /messaging, so there is no author to credit.
         body=stripped_text or body_plain,
-        from_email=from_header,
+        from_email=_fit(Message, 'from_email', from_header),
         status=Message.Status.SENT,
-        message_id=message_id,
+        message_id=_fit(Message, 'message_id', message_id),
     )
     _touch(conversation)
     return message
@@ -228,7 +234,7 @@ def _mirror_to_contact_mailbox(request, conversation: Conversation, message: Mes
     )
     try:
         mail.send()
-    except (BadHeaderError, ClientError) as e:
+    except (BadHeaderError, BotoCoreError, ClientError) as e:
         # The message is already recorded and Discord already rang: the mirror is a convenience.
         print(e)
 
@@ -237,7 +243,7 @@ def _send_and_record(message: Message, email: EmailMessage) -> None:
     """Mail it out, then keep the id it went out under so the next mail can quote it."""
     try:
         email.send()
-    except (BadHeaderError, ClientError) as e:
+    except (BadHeaderError, BotoCoreError, ClientError) as e:
         print(e)
         message.status = Message.Status.FAILED
         message.error_message = str(e)
@@ -250,6 +256,16 @@ def _send_and_record(message: Message, email: EmailMessage) -> None:
         getattr(settings, 'AWS_SES_REGION_NAME', ''))
     if message.message_id:
         message.save(update_fields=['message_id', 'updated_at'])
+
+
+def _fit(model, field_name: str, value: str) -> str:
+    """Clip a header to the column it lands in.
+
+    Nothing bounds the length of a Subject or a display name, and create() hands the value straight
+    to Postgres, which rejects the whole row rather than clipping it — losing the mail over a long
+    subject. A shortened subject beats a conversation that never existed.
+    """
+    return (value or '')[:model._meta.get_field(field_name).max_length]
 
 
 def _is_duplicate(message_id: str) -> bool:
