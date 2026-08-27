@@ -12,7 +12,7 @@ from front.services.card.scraping_url_service import quote_path, unquote_path
 from front.services.messaging.messaging_service import (ingest_received_email, ingest_sent_email,
                                                         record_contact_form)
 from front.utils.cloudflare_utils import verify_token
-from front.utils.mailgun_utils import fetch_stored_message, validate_token
+from front.utils.mailgun_utils import StorageUnavailableError, fetch_stored_message, validate_token
 from front.utils.messaging_utils import is_same_email
 from registry.models import Diocese, Website
 from scheduling.models import IndexEvent
@@ -160,11 +160,18 @@ def contact_mail_sent_webhook(request):
         print("Cannot record a sent mail: MAILGUN_API_KEY is not set")
         return HttpResponse(status=200)
 
-    stored = fetch_stored_message(storage_url)
-    if stored is None:
-        # The event carries headers only, so without the download there is nothing to record.
-        # Answering 5xx makes Mailgun replay the webhook, which the Message-Id de-dup makes safe.
+    try:
+        stored = fetch_stored_message(storage_url)
+    except StorageUnavailableError as e:
+        # Only a replay can fix this one, and 5xx is how we ask Mailgun for it. The Message-Id
+        # de-dup makes the replay safe.
+        print(e)
         return HttpResponse(status=500)
+
+    if stored is None:
+        # Nothing a retry could change — Mailgun keeps no message for this domain, or the key was
+        # refused. Replaying would just repeat the failure for hours.
+        return HttpResponse(status=200)
 
     try:
         ingest_sent_email(stored)

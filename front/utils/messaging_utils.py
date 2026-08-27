@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from email.utils import parseaddr
 
-FOOTER_LABEL = 'Conversation'
+FOOTER_LABEL = 'Identifiant de la conversation'
 
 _UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 # Match the link, not a bare uuid: an unrelated uuid quoted in the mail must not hijack the thread.

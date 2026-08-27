@@ -41,12 +41,19 @@ def get_field(payload: dict, *names: str) -> str:
     return ''
 
 
+class StorageUnavailableError(Exception):
+    """The message could not be downloaded now, but asking again later could work."""
+
+
 def fetch_stored_message(storage_url: str) -> dict | None:
     """Download the mail body an event webhook only points at.
 
     Mailgun's event payload carries headers, never the content: it hands out a storage URL instead,
-    behind the private API key — the webhook signing key authenticates no API call. Returns None on
-    any failure, which the caller must treat as transient: the message is only kept a few days.
+    behind the private API key — the webhook signing key authenticates no API call.
+
+    Returns None when the download can never succeed: retrieval turned off for the domain, a
+    message past its TTL, a rejected key. Raises StorageUnavailableError when a later attempt could
+    still work, so the caller can ask Mailgun to replay the event instead of losing the mail.
     """
     api_key = os.environ.get('MAILGUN_API_KEY', '')
     if not api_key:
@@ -58,12 +65,15 @@ def fetch_stored_message(storage_url: str) -> dict | None:
                              headers={'Accept': 'application/json'},
                              timeout=STORAGE_TIMEOUT_SECONDS)
     except httpx.HTTPError as e:
-        print(f"Error fetching stored message {storage_url}: {e}")
-        return None
+        raise StorageUnavailableError(f"Cannot reach {storage_url}: {e}") from e
 
-    if response.status_code != 200:
-        print(f"Error fetching stored message {storage_url}: "
-              f"{response.status_code} - {response.text}")
-        return None
+    if response.status_code == 200:
+        return response.json()
 
-    return response.json()
+    detail = f"{storage_url}: {response.status_code} - {response.text}"
+    # Rate limiting and Mailgun's own failures pass; every other 4xx is a standing answer.
+    if response.status_code == 429 or response.status_code >= 500:
+        raise StorageUnavailableError(f"Storage temporarily unavailable for {detail}")
+
+    print(f"Stored message unavailable for good — {detail}")
+    return None
