@@ -2,9 +2,11 @@
 the dependency rules), so this runs in the fast suite."""
 import unittest
 
-from front.utils.messaging_utils import (append_conversation_footer, build_reply_subject,
-                                         build_ses_message_id, build_thread_headers,
-                                         extract_conversation_uuid, is_automated_sender,
+from front.utils.messaging_utils import (HistoryEntry, append_conversation_footer,
+                                         build_history_block, build_outbound_body,
+                                         build_reply_subject, build_ses_message_id,
+                                         build_thread_headers, extract_conversation_uuid,
+                                         is_automated_sender, is_same_email, parse_message_ids,
                                          parse_sender)
 
 UUID = '3f2a1b4c-1111-2222-3333-444455556666'
@@ -123,6 +125,119 @@ class ThreadingTests(unittest.TestCase):
         for previous, expected in fixtures:
             with self.subTest(previous=previous):
                 self.assertEqual(expected, build_thread_headers(previous))
+
+
+class ParseMessageIdsTests(unittest.TestCase):
+    FIRST = '<first@eu-west-3.amazonses.com>'
+    SECOND = '<second@mailgun.org>'
+    THIRD = '<third@ex.fr>'
+
+    def get_fixtures(self):
+        return [
+            (('', ''), []),
+            ((self.THIRD, ''), [self.THIRD]),
+            # References runs oldest first: the closest ancestor is the likeliest to be ours.
+            (('', f'{self.FIRST} {self.SECOND} {self.THIRD}'),
+             [self.THIRD, self.SECOND, self.FIRST]),
+            # In-Reply-To is read first, and the duplicate it shares with References is dropped.
+            ((self.THIRD, f'{self.FIRST} {self.THIRD}'), [self.THIRD, self.FIRST]),
+            # Folded headers: real clients wrap References over several lines.
+            (('', f'{self.FIRST}\n\t{self.SECOND}'), [self.SECOND, self.FIRST]),
+            # Not a Message-ID: no brackets, or no @.
+            (('first@ex.fr', '<notanid>'), []),
+        ]
+
+    def test_parse_message_ids(self):
+        for headers, expected in self.get_fixtures():
+            with self.subTest(headers=headers):
+                self.assertEqual(expected, parse_message_ids(*headers))
+
+
+class IsSameEmailTests(unittest.TestCase):
+    @staticmethod
+    def get_fixtures():
+        return [
+            (('no-reply@confessio.fr', 'no-reply@confessio.fr'), True),
+            # The display name is noise, and mailbox comparison is case-insensitive.
+            (('"Jean (via Confessio)" <No-Reply@Confessio.fr>', 'no-reply@confessio.fr'), True),
+            (('contact@confessio.fr', 'no-reply@confessio.fr'), False),
+            # An unparseable or missing header matches nothing, itself included.
+            (('', ''), False),
+            (('garbage', 'garbage'), False),
+        ]
+
+    def test_is_same_email(self):
+        for (one, other), expected in self.get_fixtures():
+            with self.subTest(one=one, other=other):
+                self.assertEqual(expected, is_same_email(one, other))
+
+
+def inbound(body):
+    return HistoryEntry(label='Jean Dupont', sent_at='27/08/2026 à 14:35', body=body,
+                        is_outbound=False)
+
+
+def outbound(body):
+    return HistoryEntry(label='Confessio', sent_at='27/08/2026 à 14:32', body=body,
+                        is_outbound=True)
+
+
+class BuildHistoryBlockTests(unittest.TestCase):
+    def test_empty_history(self):
+        self.assertEqual('', build_history_block([], URL))
+
+    def test_most_recent_first(self):
+        # Entries come in chronological order and are quoted the way a mail client does it.
+        block = build_history_block([inbound('Bonjour'), outbound('Bonsoir')], URL)
+        self.assertEqual('Le 27/08/2026 à 14:32, Confessio a écrit :\n'
+                         '> Bonsoir\n'
+                         '>\n'
+                         f'> --\n> Conversation : {URL}\n'
+                         '\n'
+                         'Le 27/08/2026 à 14:35, Jean Dupont a écrit :\n'
+                         '> Bonjour', block)
+
+    def test_only_the_first_outbound_carries_the_footer(self):
+        # It is the only mail that ever went out with one, so it is the only one to render with it.
+        block = build_history_block([outbound('Un'), inbound('Deux'), outbound('Trois')], URL)
+        self.assertEqual(1, block.count(URL))
+        self.assertIn(f'> Un\n>\n> --\n> Conversation : {URL}', block)
+
+    def test_an_inbound_only_history_has_no_footer(self):
+        self.assertNotIn(URL, build_history_block([inbound('Bonjour')], URL))
+
+    def test_multiline_bodies_are_quoted_line_by_line(self):
+        block = build_history_block([inbound('Bonjour,\n\nUne question ?')], URL)
+        self.assertEqual('Le 27/08/2026 à 14:35, Jean Dupont a écrit :\n'
+                         '> Bonjour,\n'
+                         '>\n'
+                         '> Une question ?', block)
+
+
+class BuildOutboundBodyTests(unittest.TestCase):
+    def test_footer_on_the_first_mail_of_a_thread(self):
+        self.assertEqual(f'Bonjour\n\n--\nConversation : {URL}',
+                         build_outbound_body('Bonjour', [], URL))
+
+    def test_footer_when_the_history_does_not_carry_the_link_yet(self):
+        body = build_outbound_body('Bonjour', [inbound('Une question ?')], URL)
+        self.assertEqual(1, body.count(URL))
+        self.assertIn(f'Bonjour\n\n--\nConversation : {URL}\n\nLe 27/08', body)
+
+    def test_no_second_footer_once_the_history_carries_the_link(self):
+        body = build_outbound_body('Ma réponse', [outbound('Bonjour'), inbound('Merci')], URL)
+        self.assertEqual(1, body.count(URL))
+        self.assertTrue(body.startswith('Ma réponse\n\nLe 27/08'))
+
+    def test_always_footer_forces_the_link(self):
+        # The mails we mirror to the contact mailbox exist to hand it the link.
+        body = build_outbound_body('', [outbound('Bonjour')], URL, always_footer=True)
+        self.assertEqual(2, body.count(URL))
+        self.assertTrue(body.startswith(f'--\nConversation : {URL}\n\nLe 27/08'))
+
+    def test_the_link_survives_a_round_trip(self):
+        body = build_outbound_body('Ma réponse', [outbound('Bonjour'), inbound('Merci')], URL)
+        self.assertEqual(UUID, extract_conversation_uuid(body))
 
 
 if __name__ == '__main__':
