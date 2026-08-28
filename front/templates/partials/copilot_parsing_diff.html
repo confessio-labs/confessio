@@ -1,0 +1,49 @@
+{% if raw_json %}
+    <div class="copilot-tool-label">Horaires proposés</div>
+    <pre class="copilot-pre">{{ raw_json }}</pre>
+{% else %}
+    {% if edit_url %}
+        <div class="copilot-parsing-head">
+            <a class="copilot-entity-link" href="{{ edit_url }}" target="_blank" rel="noopener">Éditer ce parsing<i class="fas fa-up-right-from-square"></i></a>
+        </div>
+    {% endif %}
+    {% for church in diff.church_diffs %}
+        <div class="copilot-parsing-church{% if church.differs %} copilot-parsing-church--differs{% endif %}">
+            <div class="copilot-parsing-church-name">{{ church.church_desc }}</div>
+            <div class="copilot-parsing-cols">
+                <div>
+                    <div class="copilot-tool-label">Actuel</div>
+                    {% for line in church.before_lines %}
+                        <div class="copilot-parsing-line{% if line.changed %} copilot-parsing-line--removed{% endif %}">{{ line.text }}</div>
+                    {% empty %}
+                        <div class="copilot-parsing-line copilot-parsing-empty">—</div>
+                    {% endfor %}
+                </div>
+                <div>
+                    <div class="copilot-tool-label">Proposé</div>
+                    {% for line in church.after_lines %}
+                        <div class="copilot-parsing-line{% if line.changed %} copilot-parsing-line--added{% endif %}">{{ line.text }}</div>
+                    {% empty %}
+                        <div class="copilot-parsing-line copilot-parsing-empty">—</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="copilot-parsing-empty">Aucun horaire, ni actuel ni proposé.</div>
+    {% endfor %}
+    <table class="copilot-parsing-flags">
+        <thead>
+            <tr><th></th><th>Actuel</th><th>Proposé</th></tr>
+        </thead>
+        <tbody>
+            {% for flag in diff.flag_diffs %}
+                <tr{% if flag.differs %} class="copilot-parsing-flag--differs"{% endif %}>
+                    <td>{{ flag.label }}</td>
+                    <td>{% if flag.before_on %}oui{% else %}non{% endif %}</td>
+                    <td>{% if flag.after_on %}oui{% else %}non{% endif %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}

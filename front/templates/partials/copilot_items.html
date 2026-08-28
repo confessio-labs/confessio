@@ -31,31 +31,36 @@
                         <span class="badge badge-danger">Échec</span>
                     {% endif %}
                 </div>
-                {% with call=item.tool_args|humanize_tool_call:item.tool_args_before %}
-                    {% if call.rows %}
-                        <dl class="copilot-args">
-                            {% for row in call.rows %}
-                                <dt>{{ row.label }}</dt>
-                                <dd>
-                                    {% if row.has_change %}
-                                        <span class="copilot-old">{{ row.old_value }}</span>
-                                        <span class="copilot-arrow">&rarr;</span>
-                                        <span class="copilot-new">{{ row.value }}</span>
-                                    {% else %}{{ row.value }}{% endif %}
-                                </dd>
-                            {% endfor %}
-                        </dl>
-                    {% endif %}
-                    {% if call.snapshot_rows %}
-                        <div class="copilot-tool-label">Valeurs actuelles</div>
-                        <dl class="copilot-args copilot-args--snapshot">
-                            {% for row in call.snapshot_rows %}
-                                <dt>{{ row.label }}</dt>
-                                <dd>{{ row.value }}</dd>
-                            {% endfor %}
-                        </dl>
-                    {% endif %}
-                {% endwith %}
+                {% if item.tool_name == 'update_parsing_human_json' %}
+                    {# A schedules json is unreadable as args: show it explained, current vs proposed. #}
+                    {% parsing_schedules_diff item.tool_args item.tool_args_before %}
+                {% else %}
+                    {% with call=item.tool_args|humanize_tool_call:item.tool_args_before %}
+                        {% if call.rows %}
+                            <dl class="copilot-args">
+                                {% for row in call.rows %}
+                                    <dt>{{ row.label }}</dt>
+                                    <dd>
+                                        {% if row.has_change %}
+                                            <span class="copilot-old">{{ row.old_value }}</span>
+                                            <span class="copilot-arrow">&rarr;</span>
+                                            <span class="copilot-new">{{ row.value }}</span>
+                                        {% else %}{{ row.value }}{% endif %}
+                                    </dd>
+                                {% endfor %}
+                            </dl>
+                        {% endif %}
+                        {% if call.snapshot_rows %}
+                            <div class="copilot-tool-label">Valeurs actuelles</div>
+                            <dl class="copilot-args copilot-args--snapshot">
+                                {% for row in call.snapshot_rows %}
+                                    <dt>{{ row.label }}</dt>
+                                    <dd>{{ row.value }}</dd>
+                                {% endfor %}
+                            </dl>
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
                 {% if item.tool_name == 'add_church' or item.tool_name == 'update_church' %}
                     {% with map_html=item.tool_args|position_map %}
                         {% if map_html %}<div class="copilot-map">{{ map_html }}</div>{% endif %}

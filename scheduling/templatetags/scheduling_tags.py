@@ -7,6 +7,7 @@ from django.template.loader import render_to_string
 from scheduling.models import Parsing
 from scheduling.services.scheduling.scheduling_service import get_prunings_of_parsing
 from scheduling.utils.date_utils import get_current_year
+from scheduling.workflows.parsing.compare_parsing_explanations import get_church_desc
 from scheduling.workflows.parsing.explain_schedule import get_explanation_from_schedule
 from scheduling.workflows.parsing.holidays import HolidayZoneEnum
 from scheduling.workflows.parsing.rrule_utils import get_events_from_schedule_item
@@ -16,12 +17,7 @@ from scheduling.workflows.parsing.schedules import ScheduleItem, Event, Schedule
 @register.simple_tag
 def explain_schedule(schedule: ScheduleItem, church_desc_by_id_json: str):
     church_desc_by_id = {int(k): v for (k, v) in json.loads(church_desc_by_id_json).items()}
-    if schedule.church_id in church_desc_by_id:
-        church_desc = church_desc_by_id[schedule.church_id]
-    elif schedule.church_id == -1:
-        church_desc = 'Autre église'
-    else:
-        church_desc = 'Église inconnue'
+    church_desc = get_church_desc(schedule.church_id, church_desc_by_id)
     explained_schedule = get_explanation_from_schedule(schedule)
     return render_to_string('displays/explained_schedule_display.html', {
         'explained_schedule': explained_schedule,

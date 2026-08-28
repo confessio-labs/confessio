@@ -9,6 +9,11 @@ from django.utils.html import format_html
 
 from front.services.search.map_service import get_map_with_single_location
 from registry.models import Church, Diocese, Parish, Website
+from scheduling.models import Parsing
+from scheduling.public_model import SchedulesList
+from scheduling.public_service import (scheduling_get_parsing_church_desc_by_id,
+                                       scheduling_get_schedules_list_from_dict)
+from scheduling.public_workflow import scheduling_build_schedules_list_diff
 
 register = template.Library()
 
@@ -32,6 +37,9 @@ TOOL_LABELS = {
     'update_website': 'Modifier un site web',
     'delete_website': 'Supprimer un site web',
     'trigger_recrawl': 'Relancer le crawl d’un site',
+    'get_website_parsings': 'Lister les horaires analysés d’un site',
+    'get_parsing': 'Consulter un parsing (horaires analysés)',
+    'update_parsing_human_json': 'Corriger les horaires analysés',
     'report_bug': 'Signaler un bug',
 }
 
@@ -192,3 +200,37 @@ def position_map(tool_args):
     folium_map = get_map_with_single_location(Point(longitude, latitude, srid=4326))
     return render_to_string('displays/location_display.html',
                             {'map_html': folium_map._repr_html_()})
+
+
+def _parsing_schedules_diff(tool_args: dict, tool_args_before) -> str:
+    parsing = Parsing.objects.filter(uuid=tool_args['parsing_uuid']).first()
+    church_desc_by_id = scheduling_get_parsing_church_desc_by_id(parsing) if parsing else {}
+
+    after = SchedulesList(**tool_args['schedules_list'])
+    before = None
+    if isinstance(tool_args_before, dict) and tool_args_before.get('schedules_list'):
+        before = scheduling_get_schedules_list_from_dict(
+            tool_args_before['schedules_list'], tool_args_before['schedules_list_version'])
+
+    return render_to_string('partials/copilot_parsing_diff.html', {
+        'diff': scheduling_build_schedules_list_diff(before, after, church_desc_by_id),
+        'edit_url': (reverse('edit_parsing', kwargs={'parsing_uuid': parsing.uuid})
+                     if parsing else None),
+    })
+
+
+@register.simple_tag
+def parsing_schedules_diff(tool_args, tool_args_before=None):
+    """Render an update_parsing_human_json proposal as French explanations, not as raw json.
+
+    Same idea as the "Explained" tab of the parsing moderation, plus the schedules currently stored
+    on the parsing (tool_args_before) so the admin sees what the action replaces.
+
+    Never raises: this renders on every load of the whole discussion, so a malformed or outdated
+    payload must degrade to the raw json instead of 500-ing the copilot page.
+    """
+    try:
+        return _parsing_schedules_diff(tool_args, tool_args_before)
+    except Exception:  # noqa: BLE001 - see docstring
+        return render_to_string('partials/copilot_parsing_diff.html',
+                                {'raw_json': to_pretty_json(tool_args)})

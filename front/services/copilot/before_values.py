@@ -77,6 +77,26 @@ def _assign_website_before(discussion: CopilotDiscussion) -> dict:
     return {'website_uuid': str(current) if current else None}
 
 
+def _parsing_before(tool_args: dict) -> dict | None:
+    """update_parsing_human_json replaces a whole schedules json, not a set of flat fields.
+
+    The snapshot keeps the effective json (human_json, else llm_json) with its version, so the
+    approval card can render the CURRENT schedules next to the proposed ones. It is display-only
+    and never enters the agent's context (tool_args_before is excluded from _HISTORY_FIELDS).
+    """
+    from scheduling.models import Parsing
+    from scheduling.public_service import scheduling_get_parsing_dict_and_version
+
+    parsing = _get_instance(Parsing, tool_args.get('parsing_uuid'))
+    if parsing is None:
+        return None
+    schedules_json, version = scheduling_get_parsing_dict_and_version(parsing)
+    if schedules_json is None:
+        return None
+
+    return {'schedules_list': schedules_json, 'schedules_list_version': version}
+
+
 def snapshot_before_values(discussion: CopilotDiscussion, tool_name: str,
                            tool_args) -> dict | None:
     """Return {arg_key: current value in DB} for what a proposed tool is about to change.
@@ -90,6 +110,8 @@ def snapshot_before_values(discussion: CopilotDiscussion, tool_name: str,
     try:
         if tool_name == 'assign_website':
             return _assign_website_before(discussion)
+        if tool_name == 'update_parsing_human_json':
+            return _parsing_before(tool_args)
         if tool_name not in _TARGETS:
             return None
         model, uuid_key, fields = _TARGETS[tool_name]

@@ -278,3 +278,98 @@ def do_report_bug(title: str, details: str) -> dict:
     tool_result and its tool call is never left unanswered in a later rebuilt history.
     """
     return {'reported': True, 'title': title, 'details': details}
+
+
+# --------------------------------------------------------------------------- #
+# Parsing (scheduling pipeline)                                                #
+# --------------------------------------------------------------------------- #
+
+def _explanation_rows(parsing) -> list[str]:
+    """One readable French line per schedule of the parsing's effective json (human, else llm).
+
+    Never raises: get_parsing_schedules_list rejects an unknown json version, and a schedule can be
+    unphrasable — neither must break a read tool.
+    """
+    from scheduling.public_service import (scheduling_get_parsing_church_desc_by_id,
+                                           scheduling_get_parsing_schedules_list)
+    from scheduling.public_workflow import scheduling_explain_schedules
+    try:
+        schedules_list = scheduling_get_parsing_schedules_list(parsing)
+    except ValueError as e:
+        return [f'⚠️ {e}']
+    if schedules_list is None:
+        return []
+
+    return scheduling_explain_schedules(schedules_list,
+                                        scheduling_get_parsing_church_desc_by_id(parsing))
+
+
+def get_website_parsings(website_uuid: str) -> dict:
+    """List the parsings the website is currently indexed on, with their current schedules.
+
+    A picker: no HTML, so it stays short. Call get_parsing for the full detail of one of them --
+    these are the parsings as the indexed scheduling froze them, which is what the site serves
+    today, whereas get_parsing reads the live row.
+    """
+    from scheduling.public_service import (scheduling_get_indexed_scheduling,
+                                           scheduling_get_scheduling_sources)
+    try:
+        website = _get(Website, 'website', uuid=website_uuid)
+        scheduling = scheduling_get_indexed_scheduling(website)
+        parsings = scheduling_get_scheduling_sources(scheduling).parsings
+    except Exception as e:  # noqa: BLE001
+        return {'error': f'{type(e).__name__}: {e}'}
+
+    return {'website_uuid': str(website.uuid), 'website_name': website.name, 'parsings': [
+        {
+            'parsing_uuid': str(parsing.uuid),
+            'church_desc_by_id': parsing.church_desc_by_id,
+            'has_human_json': parsing.human_json is not None,
+            'explanations': _explanation_rows(parsing),
+        }
+        for parsing in parsings
+    ]}
+
+
+def get_parsing(parsing_uuid: str) -> dict:
+    """Full detail of one parsing: the HTML it was extracted from, its churches, its schedules."""
+    from django.urls import reverse
+
+    from scheduling.models import Parsing
+    from scheduling.public_service import scheduling_get_parsing_dict_and_version
+    try:
+        parsing = _get(Parsing, 'parsing', uuid=parsing_uuid)
+        schedules_json, version = scheduling_get_parsing_dict_and_version(parsing)
+    except Exception as e:  # noqa: BLE001
+        return {'error': f'{type(e).__name__}: {e}'}
+
+    return {
+        'parsing_uuid': str(parsing.uuid),
+        'church_desc_by_id': parsing.church_desc_by_id,
+        # Sent WHOLE, deliberately: it is not a web page but the already-pruned snippet the parsing
+        # LLM itself is prompted with, and capping it silently drops the schedules of its tail.
+        'truncated_html': parsing.truncated_html or '',
+        'has_human_json': parsing.human_json is not None,
+        'current_schedules_version': version,
+        'current_schedules_json': schedules_json,
+        'current_explanations': _explanation_rows(parsing),
+        'edit_url': reverse('edit_parsing', kwargs={'parsing_uuid': parsing.uuid}),
+    }
+
+
+def do_update_parsing_human_json(parsing_uuid: str, schedules_list_dict: dict) -> dict:
+    """Replace the human-validated schedules of a parsing, exactly as the edit_parsing view does.
+
+    set_human_json re-runs the whole pipeline (prune -> parse -> match -> index) for every website
+    indexed on this parsing, but only when the json actually changed.
+    """
+    from scheduling.models import Parsing
+    from scheduling.public_model import SchedulesList
+    from scheduling.public_service import scheduling_update_parsing_human_json
+
+    parsing = _get(Parsing, 'parsing', uuid=parsing_uuid)
+    schedules_list = SchedulesList(**schedules_list_dict)
+    schedules_list.check_is_valid()  # raises ValueError on e.g. an unsorted rule
+    scheduling_update_parsing_human_json(parsing, schedules_list)
+    return {'updated_parsing_uuid': str(parsing.uuid),
+            'schedules_count': len(schedules_list.schedules)}
