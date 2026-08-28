@@ -1,6 +1,7 @@
 from registry.models import Website
 from scheduling.models import Parsing, Scheduling
 from scheduling.models.pruning_models import Sentence, Pruning
+from scheduling.public_model import SchedulesList
 from scheduling.services.merging.sourced_schedules_service import SchedulingElements, \
     retrieve_scheduling_elements
 from scheduling.services.parsing.parsing_service import has_schedules, get_dict_and_version, \
@@ -11,9 +12,7 @@ from scheduling.services.scheduling.scheduling_process_service import init_sched
 from scheduling.services.scheduling.scheduling_service import get_websites_of_prunings, \
     get_websites_of_parsing, get_indexed_scheduling, SchedulingSources, get_scheduling_sources, \
     SchedulingPrimarySources, get_scheduling_primary_sources
-from scheduling.workflows.parsing.compare_parsing_explanations import SchedulesListDiff, \
-    build_schedules_list_diff, explain_schedules
-from scheduling.workflows.parsing.schedules import SCHEDULES_LIST_VERSION, SchedulesList
+from scheduling.workflows.parsing.schedules import SCHEDULES_LIST_VERSION
 
 
 ###########
@@ -62,17 +61,6 @@ def scheduling_update_parsing_human_json(parsing: Parsing, schedules_list: Sched
     from scheduling.services.parsing.edit_parsing_service import set_human_json
 
     set_human_json(parsing, schedules_list.model_dump(mode='json'), SCHEDULES_LIST_VERSION)
-
-
-def scheduling_explain_schedules(schedules_list: SchedulesList | None,
-                                 church_desc_by_id: dict[int, str]) -> list[str]:
-    return explain_schedules(schedules_list, church_desc_by_id)
-
-
-def scheduling_build_schedules_list_diff(before: SchedulesList | None,
-                                         after: SchedulesList | None,
-                                         church_desc_by_id: dict[int, str]) -> SchedulesListDiff:
-    return build_schedules_list_diff(before, after, church_desc_by_id)
 
 
 ###################

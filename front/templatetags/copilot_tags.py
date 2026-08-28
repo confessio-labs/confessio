@@ -11,9 +11,9 @@ from front.services.search.map_service import get_map_with_single_location
 from registry.models import Church, Diocese, Parish, Website
 from scheduling.models import Parsing
 from scheduling.public_model import SchedulesList
-from scheduling.public_service import (scheduling_build_schedules_list_diff,
-                                       scheduling_get_parsing_church_desc_by_id,
+from scheduling.public_service import (scheduling_get_parsing_church_desc_by_id,
                                        scheduling_get_schedules_list_from_dict)
+from scheduling.public_workflow import scheduling_build_schedules_list_diff
 
 register = template.Library()
 

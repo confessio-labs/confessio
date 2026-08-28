@@ -290,9 +290,9 @@ def _explanation_rows(parsing) -> list[str]:
     Never raises: get_parsing_schedules_list rejects an unknown json version, and a schedule can be
     unphrasable — neither must break a read tool.
     """
-    from scheduling.public_service import (scheduling_explain_schedules,
-                                           scheduling_get_parsing_church_desc_by_id,
+    from scheduling.public_service import (scheduling_get_parsing_church_desc_by_id,
                                            scheduling_get_parsing_schedules_list)
+    from scheduling.public_workflow import scheduling_explain_schedules
     try:
         schedules_list = scheduling_get_parsing_schedules_list(parsing)
     except ValueError as e:
