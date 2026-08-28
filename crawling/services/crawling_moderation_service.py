@@ -6,22 +6,21 @@ from registry.models.base_moderation_models import ModerationStatus
 
 def upsert_crawling_moderation(website: Website, category: CrawlingModeration.Category,
                                moderation_validated: bool) -> CrawlingModeration:
-    try:
-        moderation = CrawlingModeration.objects.get(website=website)
-        if moderation.category != category:
-            moderation.category = category
-            moderation.status = (ModerationStatus.VALIDATED
-                                 if moderation_validated
-                                 else ModerationStatus.TO_VALIDATE)
-            moderation.save()
-    except CrawlingModeration.DoesNotExist:
-        moderation = CrawlingModeration(
-            website=website, category=category,
-            diocese=website.get_diocese(),
-            status=(ModerationStatus.VALIDATED
-                    if moderation_validated
-                    else ModerationStatus.TO_VALIDATE),
-        )
+    status = (ModerationStatus.VALIDATED
+              if moderation_validated
+              else ModerationStatus.TO_VALIDATE)
+    # get_or_create so that two concurrent crawls of the same website don't both insert
+    moderation, created = CrawlingModeration.objects.get_or_create(
+        website=website,
+        defaults={
+            'category': category,
+            'diocese': website.get_diocese(),
+            'status': status,
+        },
+    )
+    if not created and moderation.category != category:
+        moderation.category = category
+        moderation.status = status
         moderation.save()
 
     return moderation

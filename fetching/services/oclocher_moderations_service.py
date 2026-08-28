@@ -11,18 +11,17 @@ def add_organization_moderation(website: Website,
                                 category: OClocherOrganizationModeration.Category,
                                 oclocher_organization: OClocherOrganization | None = None,
                                 ):
-    try:
-        moderation = OClocherOrganizationModeration.objects.get(website=website, category=category)
-        if moderation.oclocher_organization != oclocher_organization:
-            moderation.oclocher_organization = oclocher_organization
-            moderation.save()
-    except OClocherOrganizationModeration.DoesNotExist:
-        moderation = OClocherOrganizationModeration(
-            website=website, category=category,
-            diocese=website.get_diocese(),
-            oclocher_organization=oclocher_organization,
-            status=ModerationStatus.TO_VALIDATE,
-        )
+    # get_or_create so that two concurrent fetchings of the same website don't both insert
+    moderation, created = OClocherOrganizationModeration.objects.get_or_create(
+        website=website, category=category,
+        defaults={
+            'diocese': website.get_diocese(),
+            'oclocher_organization': oclocher_organization,
+            'status': ModerationStatus.TO_VALIDATE,
+        },
+    )
+    if not created and moderation.oclocher_organization != oclocher_organization:
+        moderation.oclocher_organization = oclocher_organization
         moderation.save()
 
 
@@ -41,25 +40,24 @@ def upsert_matching_moderation(oclocher_organization: OClocherOrganization,
                                oclocher_matching: OClocherMatching,
                                category: OClocherMatchingModeration.Category,
                                moderation_validated: bool):
-    try:
-        moderation = OClocherMatchingModeration.objects.get(
-            oclocher_organization=oclocher_organization)
-        if moderation.oclocher_matching != oclocher_matching or moderation.category != category:
-            moderation.oclocher_matching = oclocher_matching
-            moderation.category = category
-            moderation.status = (ModerationStatus.VALIDATED
-                                 if moderation_validated
-                                 else ModerationStatus.TO_VALIDATE)
-            moderation.save()
-            notify_if_relevant(moderation)
-    except OClocherMatchingModeration.DoesNotExist:
-        moderation = OClocherMatchingModeration(
-            oclocher_matching=oclocher_matching, category=category,
-            oclocher_organization=oclocher_organization,
-            diocese=oclocher_organization.website.get_diocese(),
-            status=(ModerationStatus.VALIDATED
-                    if moderation_validated
-                    else ModerationStatus.TO_VALIDATE),
-        )
+    status = (ModerationStatus.VALIDATED
+              if moderation_validated
+              else ModerationStatus.TO_VALIDATE)
+    # get_or_create so that two concurrent matchings of the same organization don't both insert
+    moderation, created = OClocherMatchingModeration.objects.get_or_create(
+        oclocher_organization=oclocher_organization,
+        defaults={
+            'oclocher_matching': oclocher_matching,
+            'category': category,
+            'diocese': oclocher_organization.website.get_diocese(),
+            'status': status,
+        },
+    )
+    if created:
+        notify_if_relevant(moderation)
+    elif moderation.oclocher_matching != oclocher_matching or moderation.category != category:
+        moderation.oclocher_matching = oclocher_matching
+        moderation.category = category
+        moderation.status = status
         moderation.save()
         notify_if_relevant(moderation)

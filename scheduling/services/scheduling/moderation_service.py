@@ -16,22 +16,21 @@ from scheduling.services.scheduling.index_scheduling_service import SchedulingIn
 
 def upsert_scheduling_moderation(website: Website, category: SchedulingModeration.Category,
                                  moderation_validated: bool):
-    try:
-        moderation = SchedulingModeration.objects.get(website=website)
-        if moderation.category != category:
-            moderation.category = category
-            moderation.status = (ModerationStatus.VALIDATED
-                                 if moderation_validated
-                                 else ModerationStatus.TO_VALIDATE)
-            moderation.save()
-    except SchedulingModeration.DoesNotExist:
-        moderation = SchedulingModeration(
-            website=website, category=category,
-            diocese=website.get_diocese(),
-            status=(ModerationStatus.VALIDATED
-                    if moderation_validated
-                    else ModerationStatus.TO_VALIDATE),
-        )
+    status = (ModerationStatus.VALIDATED
+              if moderation_validated
+              else ModerationStatus.TO_VALIDATE)
+    # get_or_create so that two concurrent indexings of the same website don't both insert
+    moderation, created = SchedulingModeration.objects.get_or_create(
+        website=website,
+        defaults={
+            'category': category,
+            'diocese': website.get_diocese(),
+            'status': status,
+        },
+    )
+    if not created and moderation.category != category:
+        moderation.category = category
+        moderation.status = status
         moderation.save()
 
 
@@ -60,23 +59,23 @@ def notify_if_relevant(moderation: ValidatedSchedulesModeration,):
 def upsert_validated_schedules_moderation(website: Website,
                                           category: ValidatedSchedulesModeration.Category,
                                           moderation_validated: bool):
-    try:
-        moderation = ValidatedSchedulesModeration.objects.get(website=website)
-        if moderation.category != category:
-            moderation.category = category
-            moderation.status = (ModerationStatus.VALIDATED
-                                 if moderation_validated
-                                 else ModerationStatus.TO_VALIDATE)
-            moderation.save()
-            notify_if_relevant(moderation)
-    except ValidatedSchedulesModeration.DoesNotExist:
-        moderation = ValidatedSchedulesModeration(
-            website=website, category=category,
-            diocese=website.get_diocese(),
-            status=(ModerationStatus.VALIDATED
-                    if moderation_validated
-                    else ModerationStatus.TO_VALIDATE),
-        )
+    status = (ModerationStatus.VALIDATED
+              if moderation_validated
+              else ModerationStatus.TO_VALIDATE)
+    # get_or_create so that two concurrent indexings of the same website don't both insert
+    moderation, created = ValidatedSchedulesModeration.objects.get_or_create(
+        website=website,
+        defaults={
+            'category': category,
+            'diocese': website.get_diocese(),
+            'status': status,
+        },
+    )
+    if created:
+        notify_if_relevant(moderation)
+    elif moderation.category != category:
+        moderation.category = category
+        moderation.status = status
         moderation.save()
         notify_if_relevant(moderation)
 
