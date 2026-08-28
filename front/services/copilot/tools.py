@@ -307,12 +307,16 @@ def _explanation_rows(parsing) -> list[str]:
 def get_website_parsings(website_uuid: str) -> dict:
     """List the parsings the website is currently indexed on, with their current schedules.
 
-    A picker: no HTML, so it stays short. Call get_parsing for the full detail of one of them.
+    A picker: no HTML, so it stays short. Call get_parsing for the full detail of one of them --
+    these are the parsings as the indexed scheduling froze them, which is what the site serves
+    today, whereas get_parsing reads the live row.
     """
-    from scheduling.public_service import scheduling_get_parsings_of_website
+    from scheduling.public_service import (scheduling_get_indexed_scheduling,
+                                           scheduling_get_scheduling_sources)
     try:
         website = _get(Website, 'website', uuid=website_uuid)
-        parsings = scheduling_get_parsings_of_website(website)
+        scheduling = scheduling_get_indexed_scheduling(website)
+        parsings = scheduling_get_scheduling_sources(scheduling).parsings
     except Exception as e:  # noqa: BLE001
         return {'error': f'{type(e).__name__}: {e}'}
 

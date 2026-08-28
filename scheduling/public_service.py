@@ -10,7 +10,7 @@ from scheduling.services.pruning.prune_scraping_service import create_pruning, \
 from scheduling.services.scheduling.scheduling_process_service import init_scheduling
 from scheduling.services.scheduling.scheduling_service import get_websites_of_prunings, \
     get_websites_of_parsing, get_indexed_scheduling, SchedulingSources, get_scheduling_sources, \
-    SchedulingPrimarySources, get_scheduling_primary_sources, get_parsings_of_website
+    SchedulingPrimarySources, get_scheduling_primary_sources
 from scheduling.workflows.parsing.compare_parsing_explanations import SchedulesListDiff, \
     build_schedules_list_diff, explain_schedules
 from scheduling.workflows.parsing.schedules import SCHEDULES_LIST_VERSION, SchedulesList
@@ -34,10 +34,6 @@ def scheduling_remove_pruning_moderation_if_orphan(pruning: Pruning):
 
 def scheduling_has_schedules(parsing: Parsing) -> bool:
     return has_schedules(parsing)
-
-
-def scheduling_get_parsings_of_website(website: Website) -> list[Parsing]:
-    return get_parsings_of_website(website)
 
 
 def scheduling_get_parsing_church_desc_by_id(parsing: Parsing) -> dict[int, str]:
