@@ -5,7 +5,8 @@ from scheduling.utils.list_utils import enumerate_with_and
 from scheduling.workflows.parsing.intervals import PeriodEnum, get_liturgical_date, \
     LiturgicalDayEnum
 from scheduling.workflows.parsing.schedules import (ScheduleItem, OneOffRule, RegularRule, Position,
-                                                    WeeklyRule, MonthlyRule, CustomPeriod)
+                                                    WeeklyRule, MonthlyRule, DailyRule,
+                                                    CustomPeriod)
 
 ################
 # TRANSLATIONS #
@@ -265,19 +266,23 @@ POSITION_BY_WEEKDAY = {
 }
 
 
-def get_weekdays_key(regular_rule: RegularRule) -> tuple:
-    if isinstance(regular_rule, WeeklyRule):
-        return tuple(sorted(POSITION_BY_WEEKDAY[w] for w in regular_rule.by_weekdays))
+def get_weekdays_key(rule: DailyRule | WeeklyRule | MonthlyRule) -> tuple:
+    """Takes the frequency rule, not the RegularRule wrapping it: the weekdays live on
+    RegularRule.rule, so testing the wrapper would never match and every weekly rule would get the
+    same (empty) key."""
+    if isinstance(rule, WeeklyRule):
+        return tuple(sorted(POSITION_BY_WEEKDAY[w] for w in rule.by_weekdays))
 
     return tuple()
 
 
 def regular_rule_sort_key(regular_rule: RegularRule) -> tuple:
+    rule = regular_rule.rule
     return (
         get_periods_key(regular_rule.only_in_periods),
         get_frequency_key(regular_rule),
-        len(regular_rule.by_weekdays) if isinstance(regular_rule, WeeklyRule) else 0,
-        get_weekdays_key(regular_rule),
+        len(rule.by_weekdays) if isinstance(rule, WeeklyRule) else 0,
+        get_weekdays_key(rule),
     )
 
 

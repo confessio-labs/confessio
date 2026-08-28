@@ -67,6 +67,35 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* update_parsing_human_json: schedules read as explained sentences, current next to proposed.
+   Reuses the diff colors of .copilot-old / .copilot-new. */
+.copilot-parsing-head { margin: .3rem 0; }
+.copilot-parsing-head .copilot-entity-link { color: inherit; text-decoration: underline; }
+.copilot-parsing-head .copilot-entity-link i { font-size: .75em; margin-left: .25rem; opacity: .7; }
+.copilot-parsing-church {
+  border: 1px solid #e3e3e3;
+  border-radius: .4rem;
+  padding: .4rem .6rem;
+  margin: .4rem 0;
+}
+.copilot-parsing-church--differs { border-color: #f0c36d; }
+.copilot-parsing-church-name { font-weight: 600; }
+.copilot-parsing-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .1rem .8rem;
+}
+@media (max-width: 576px) {
+  .copilot-parsing-cols { grid-template-columns: 1fr; }
+}
+.copilot-parsing-line { word-break: break-word; }
+.copilot-parsing-line--removed { color: #b02a37; text-decoration: line-through; opacity: .75; }
+.copilot-parsing-line--added { color: #146c43; font-weight: 600; }
+.copilot-parsing-empty { color: #6c757d; font-style: italic; }
+.copilot-parsing-flags { margin: .4rem 0; border-collapse: collapse; }
+.copilot-parsing-flags th, .copilot-parsing-flags td { padding: .1rem .6rem .1rem 0; }
+.copilot-parsing-flags th { font-weight: 600; color: #6c757d; }
+.copilot-parsing-flag--differs { background: #fff3cd; }
 .copilot-map { max-width: 480px; margin: .5rem 0; }
 .copilot-map iframe { border-radius: .4rem; }
 .copilot-proposed-actions { margin-top: .5rem; display: flex; gap: .5rem; }

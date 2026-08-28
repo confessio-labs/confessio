@@ -1,9 +1,10 @@
 """The admin copilot PydanticAI agent: model factory, system prompt, and the tool set.
 
-Autonomous tools (read-only SQL, visit URL, Google / Google Maps) execute inline and record an
-AUTONOMOUS_TOOL_CALL item as they run. Proposed tools (registry CRUD, recrawl, assign website,
-report bug) are `requires_approval=True`: on the first turn they surface as DeferredToolRequests
-and the runner records a PROPOSED_TOOL_CALL item; their body only runs after the admin approves.
+Autonomous tools (read-only SQL, visit URL, Google / Google Maps, parsing reads) execute inline
+and record an AUTONOMOUS_TOOL_CALL item as they run. Proposed tools (registry CRUD, recrawl, assign
+website, parsing schedules, report bug) are `requires_approval=True`: on the first turn they
+surface as DeferredToolRequests and the runner records a PROPOSED_TOOL_CALL item; their body only
+runs after the admin approves.
 """
 import os
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from front.models import CopilotDiscussion
 from front.services.copilot import tools
 from front.services.copilot.items import add_autonomous_tool_item, record_proposed_execution
 from front.services.copilot.schema_introspection import describe_table, get_schema_text
+from scheduling.public_model import SchedulesList
 
 COPILOT_MODEL = 'gpt-5'
 
@@ -65,7 +67,23 @@ discussion.
 `google_maps_search` avant de proposer l'action.
 - Les requêtes HTTP (visite de site) peuvent échouer (timeout, 4xx, 5xx) : adapte-toi, n'insiste \
 pas inutilement.
-- Sois concis et concret. Ne propose une action de modification qu'avec des valeurs précises.\
+- Sois concis et concret. Ne propose une action de modification qu'avec des valeurs précises.
+
+Corriger un HORAIRE (app scheduling) :
+- Les horaires extraits d'une page vivent dans un Parsing : `llm_json` (sortie du LLM) et \
+`human_json` (validé par un humain, qui prime sur `llm_json`).
+- Enchaînement : identifie le Website (et propose `assign_website`), puis `get_website_parsings` \
+pour lister ses parsings, puis `get_parsing` pour lire l'extrait HTML source et les églises. \
+N'utilise pas `run_sql` pour ça : il tronque les cellules à 2000 caractères, donc le HTML \
+reviendrait coupé.
+- Ne propose `update_parsing_human_json` qu'après avoir lu le HTML source : c'est lui qui \
+fait foi, pas ce que dit l'admin de mémoire.
+- `update_parsing_human_json` REMPLACE toute la liste d'horaires : renvoie aussi les horaires \
+corrects déjà présents, sinon ils seront perdus.
+- `church_id` doit être une clé de `church_desc_by_id` du parsing ; `-1` = une autre église, \
+`null` = église non précisée dans le texte.
+- Après validation, tout le pipeline (prune → parse → match → index) est relancé pour les sites \
+concernés : ne le propose que si le contenu change vraiment.\
 """
 
 
@@ -148,6 +166,22 @@ async def google_maps_search(ctx: RunContext[CopilotDeps], query: str) -> dict:
     return await sync_to_async(_record_autonomous)(
         ctx.deps.discussion_uuid, 'google_maps_search', {'query': query},
         tools.google_maps_search, query)
+
+
+@agent.tool
+async def get_website_parsings(ctx: RunContext[CopilotDeps], website_uuid: str) -> dict:
+    """List the parsings a website is indexed on, with the schedules each one currently holds."""
+    return await sync_to_async(_record_autonomous)(
+        ctx.deps.discussion_uuid, 'get_website_parsings', {'website_uuid': website_uuid},
+        tools.get_website_parsings, website_uuid)
+
+
+@agent.tool
+async def get_parsing(ctx: RunContext[CopilotDeps], parsing_uuid: str) -> dict:
+    """Read one parsing: the HTML extract it was parsed from, its churches, its schedules."""
+    return await sync_to_async(_record_autonomous)(
+        ctx.deps.discussion_uuid, 'get_parsing', {'parsing_uuid': parsing_uuid},
+        tools.get_parsing, parsing_uuid)
 
 
 # --------------------------------------------------------------------------- #
@@ -264,6 +298,17 @@ async def trigger_recrawl(ctx: RunContext[CopilotDeps], website_uuid: str) -> di
     """Enqueue a fresh crawl of a website."""
     return await sync_to_async(_record_proposed)(
         ctx.deps.discussion_uuid, ctx.tool_call_id, tools.do_trigger_recrawl, website_uuid)
+
+
+@agent.tool(requires_approval=True)
+async def update_parsing_human_json(ctx: RunContext[CopilotDeps], parsing_uuid: str,
+                                    schedules_list: SchedulesList) -> dict:
+    """Replace the human-validated schedules of a parsing. This is a FULL replacement of the
+    schedules list, not a patch: send every schedule that must remain. Read the parsing with
+    get_parsing first, and only use church ids listed in its church_desc_by_id."""
+    return await sync_to_async(_record_proposed)(
+        ctx.deps.discussion_uuid, ctx.tool_call_id, tools.do_update_parsing_human_json,
+        parsing_uuid, schedules_list.model_dump(mode='json'))
 
 
 @agent.tool(requires_approval=True)

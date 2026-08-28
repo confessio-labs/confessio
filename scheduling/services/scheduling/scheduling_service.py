@@ -313,6 +313,29 @@ def get_prunings_of_parsing(parsing: Parsing) -> list[Pruning]:
     )
 
 
+################
+# GET PARSINGS #
+################
+
+def get_parsings_of_website(website: Website) -> list[Parsing]:
+    """The parsings the website is currently indexed on (the inverse of get_websites_of_parsing).
+
+    The link goes through the historical rows the indexed Scheduling froze, so we resolve them back
+    to the live Parsing rows: what a caller wants to read or edit is today's json, not the one that
+    was indexed.
+    """
+    scheduling = get_indexed_scheduling(website)
+    if scheduling is None:
+        return []
+
+    parsing_history_ids = scheduling.pruning_parsings.values_list('parsing_history_id', flat=True)
+    parsing_uuids = Parsing.history.filter(
+        history_id__in=parsing_history_ids
+    ).values_list('uuid', flat=True)
+
+    return list(Parsing.objects.filter(uuid__in=parsing_uuids))
+
+
 def get_parsing_moderation_of_pruning(pruning: Pruning) -> ParsingModeration | None:
     history_ids = Subquery(
         pruning.history.values('history_id')
