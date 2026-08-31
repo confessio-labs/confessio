@@ -66,7 +66,6 @@ otel_better_stack_source_token: "{{ lookup('ansible.builtin.env', 'OTEL_BETTER_S
 additional_pub_key1: "{{ lookup('ansible.builtin.env', 'ADDITIONAL_PUB_KEY1') }}"
 additional_pub_key2: "{{ lookup('ansible.builtin.env', 'ADDITIONAL_PUB_KEY2') }}"
 whitelisted_ip1: "{{ lookup('ansible.builtin.env', 'WHITELISTED_IP1') }}"
-whitelisted_ip2: "{{ lookup('ansible.builtin.env', 'WHITELISTED_IP2') }}"
 whitelisted_user1: "{{ lookup('ansible.builtin.env', 'WHITELISTED_USER1') }}"
 
 # API keys
