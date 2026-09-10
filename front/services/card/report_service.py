@@ -98,7 +98,15 @@ def get_report_moderation_category(report: Report) -> ReportModeration.Category:
     raise NotImplementedError
 
 
+def is_empty_good_report(report: Report) -> bool:
+    """A thumbs-up with no comment says nothing a moderator could act on."""
+    return report.feedback_type == Report.FeedbackType.GOOD and not report.comment
+
+
 def add_necessary_moderation_for_report(report: Report):
+    if is_empty_good_report(report):
+        return
+
     category = get_report_moderation_category(report)
     report_moderation = ReportModeration(report=report, category=category,
                                          diocese=report.website.get_diocese(),
