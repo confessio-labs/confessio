@@ -71,7 +71,7 @@ class ModerationMixin(TimeStampMixin):
             )
         super().save(*args, **kwargs)
 
-    def validate(self, user: User):
+    def validate(self, user: User | None):
         if self.delete_on_validate():
             self.delete()
         else:
