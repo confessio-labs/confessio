@@ -49,5 +49,5 @@ class ReportModeration(ModerationMixin):
         unique_together = ('report', 'category')
 
     def delete_on_validate(self) -> bool:
-        # we don't need to keep validated ReportModeration
-        return True
+        # we keep the row, to keep track of which reports have been reviewed
+        return False

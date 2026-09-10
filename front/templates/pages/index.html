@@ -312,6 +312,13 @@
                                         <a class="text-muted" href="{% url 'admin:front_report_change' report.uuid %}" target="_blank">
                                             - Admin <i class="fas fa-up-right-from-square"></i>
                                         </a>
+                                        {% with report_moderation=moderation_by_report_uuid|get_item:report.uuid %}
+                                            {% if report_moderation %}
+                                                <a href="{{ report_moderation|get_url }}" target="_blank">
+                                                    {% display_status_badge report_moderation.status %}
+                                                </a>
+                                            {% endif %}
+                                        {% endwith %}
                                     {% endif %}
                                     <hr class="hr" />
                                 {% endfor %}

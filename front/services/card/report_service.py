@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from django.http import HttpResponse, HttpResponseBadRequest, HttpRequest
 from django.urls import reverse
 
@@ -121,6 +123,16 @@ def get_previous_reports(website: Website) -> list[list[Report]]:
             reports_by_main_report[report.uuid] = [report]
 
     return [reports_by_main_report[main_report.uuid] for main_report in reversed(main_reports)]
+
+
+def get_moderation_by_report_uuid(previous_reports: list[list[Report]]
+                                  ) -> dict[UUID, ReportModeration]:
+    all_reports = [report for reports in previous_reports for report in reports]
+
+    return {
+        moderation.report_id: moderation
+        for moderation in ReportModeration.objects.filter(report__in=all_reports).all()
+    }
 
 
 ##################
