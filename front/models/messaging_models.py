@@ -44,7 +44,18 @@ class Message(TimeStampMixin):
     # The RFC 5322 Message-ID this mail was delivered under, quoted by the next one in
     # In-Reply-To/References so mail clients keep the thread together. Outbound: SES's, which
     # overwrites the one Django sets. Inbound: the header Mailgun forwards. Empty if unknown.
-    message_id = models.CharField(max_length=255, blank=True)
+    # Indexed: every SES event looks a message up by it, and an open fires again on each
+    # image load.
+    message_id = models.CharField(max_length=255, blank=True, db_index=True)
+    # What became of an outbound mail, from the SES event webhook. Each is written once, by the
+    # first event of its kind: that is what makes an at-least-once, out-of-order stream harmless.
+    # Null on everything sent before this existed, and on inbound mail.
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    # The first load of the tracking pixel. An indication, not a proof: a client that blocks
+    # images never fires it, and Apple Mail Privacy Protection fires it without anyone reading.
+    opened_at = models.DateTimeField(null=True, blank=True)
+    # Marked as spam. Not a send failure — the mail did arrive — so it never touches status.
+    complained_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['created_at']

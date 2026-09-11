@@ -76,6 +76,8 @@ if COPILOT_DB_USERNAME:
 LOGIN_REDIRECT_URL = '/'
 DEFAULT_FROM_EMAIL = f"no-reply@{os.environ.get('SERVER_HOST')}"
 EMAIL_BACKEND = 'django_ses.SESBackend'
+# Every event here comes from SNS over the open internet: check what it signed.
+AWS_SES_VERIFY_EVENT_SIGNATURES = True
 
 # Static files
 # Might be a faster way to deliver static files in the future

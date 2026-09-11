@@ -239,7 +239,7 @@ dependencies = [
     { name = "django-leaflet" },
     { name = "django-ninja" },
     { name = "django-request" },
-    { name = "django-ses" },
+    { name = "django-ses", extra = ["events"] },
     { name = "django-simple-history" },
     { name = "django-storages" },
     { name = "folium" },
@@ -313,7 +313,7 @@ requires-dist = [
     { name = "django-leaflet", specifier = "==0.29.0" },
     { name = "django-ninja", specifier = "==1.4.1" },
     { name = "django-request", specifier = "==1.6.3" },
-    { name = "django-ses", specifier = "==3.5.2" },
+    { name = "django-ses", extras = ["events"], specifier = "==3.5.2" },
     { name = "django-simple-history", specifier = "==3.7.0" },
     { name = "django-storages", specifier = "==1.14.2" },
     { name = "folium", specifier = "==0.14.0" },
@@ -575,6 +575,12 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/17/d0/f041ced12a9adf209763a86dd76c713483570eeddcca282d03b415ea855a/django_ses-3.5.2.tar.gz", hash = "sha256:b6d94689bc15de02a11e84f05a5bf4a7895688e570c6f07c21698094debc6ced", size = 45578, upload-time = "2023-12-01T19:36:19.9Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ff/34/78530467d595dc7eca527832d64d2f08b8aedd9e043e111548acb2380bf9/django_ses-3.5.2-py3-none-any.whl", hash = "sha256:90c68cc6ca3467893faa8499981c81ba8ff2bd3f3acb08c06423a4142d6a0fc6", size = 28834, upload-time = "2023-12-01T19:36:17.731Z" },
+]
+
+[package.optional-dependencies]
+events = [
+    { name = "cryptography" },
+    { name = "requests" },
 ]
 
 [[package]]

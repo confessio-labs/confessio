@@ -105,6 +105,37 @@ Here is a policy to add to the IAM user to allow email sending:
 
 You'll have to verify domain and some email address on SES console.
 
+### SES event webhook (accusés de réception)
+
+`/webhooks/mail_events` records what became of each outbound mail (delivered, opened, bounced,
+complained), which is what draws the ticks in `/messaging`. SES only publishes events for mails
+tagged with a configuration set, so nothing happens until this is wired, in this order — the
+endpoint must be live before the subscription is created, because confirmation is automatic:
+
+1. Deploy the code, so `https://<host>/webhooks/mail_events` answers.
+2. SNS → create a Standard topic, e.g. `confessio-ses-events`, in the same region as
+   `AWS_SES_REGION_NAME` (eu-west-3).
+3. SES → Configuration sets → create one, e.g. `confessio-events`.
+4. On that set, add an event destination pointing at the topic, with event types
+   **Delivery, Open, Bounce, Complaint**.
+
+   **Do not subscribe to `Click`.** SES rewrites every link to `awstrack.me` as soon as a Click
+   destination exists, and `find_conversation` reads the `/messaging/<uuid>` url out of the
+   quoted HTML of inbound replies to thread them. Open only adds a tracking pixel and leaves
+   links alone.
+5. SNS → create an HTTPS subscription on the topic pointing at the endpoint, with **raw message
+   delivery OFF** (django-ses needs the SNS envelope). It should flip to Confirmed on its own; if
+   it stays Pending, the app rejected it — check `AWS_SES_EVENT_TOPIC_ARN`.
+6. Set `AWS_SES_CONFIGURATION_SET` and `AWS_SES_EVENT_TOPIC_ARN` in the environment and redeploy.
+
+No IAM change: `ses:SendRawEmail` already covers sending with a configuration set, and it is SES
+itself, not our IAM user, that publishes to the topic. The console writes the topic access policy
+allowing `ses.amazonaws.com` to `sns:Publish` when the destination is created.
+
+`AWS_SES_EVENT_TOPIC_ARN` is a security control, not a convenience: a valid SNS signature only
+proves the payload came from AWS, not that it came from our topic. Without it, anyone could point
+a topic of their own at the endpoint and post forged events.
+
 ### AWS CloudWatch
 
 Create a loggroup in AWS CloudWatch called "/metrics/opentelemetry", 
