@@ -2,11 +2,11 @@
 
 ### Start the Next.js front as a node {{ node_major }} process (bound to localhost, behind nginx)
 
-cd {{ front_app_dir }}
+cd {{ front_build_dir }}
 
 # Load the templated env (NEXT_PUBLIC_MAP_TILER_API_KEY, CRON_SECRET) into the process environment
 set -a
-. {{ front_app_dir }}/.env.local
+. {{ front_build_dir }}/.env.local
 set +a
 
 export NODE_ENV=production

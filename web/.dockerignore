@@ -1,0 +1,16 @@
+node_modules
+.next
+build
+test-results
+playwright-report
+.git
+.github
+.env
+.env.local
+.env*.local
+*.md
+docs
+.claude
+.mcp.json
+.DS_Store
+npm-debug.log*

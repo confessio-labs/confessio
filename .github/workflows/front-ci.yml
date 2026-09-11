@@ -1,0 +1,41 @@
+name: Front CI
+
+on:
+  pull_request:
+    branches: [main, staging]
+    paths: ["web/**", ".github/workflows/front-ci.yml"]
+  push:
+    branches: [main, staging]
+    paths: ["web/**", ".github/workflows/front-ci.yml"]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: "web/.nvmrc"
+          cache: pnpm
+          cache-dependency-path: "web/pnpm-lock.yaml"
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm tsc --noEmit
+
+      - run: pnpm build

@@ -16,7 +16,7 @@
 - name: Create the front .env.local file
   template:
     src: env.local.j2
-    dest: "{{ front_app_dir }}/.env.local"
+    dest: "{{ front_build_dir }}/.env.local"
   become: no
   notify:
     - restart confessio-front

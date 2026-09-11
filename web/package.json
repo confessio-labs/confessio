@@ -1,0 +1,50 @@
+{
+  "name": "confessio",
+  "version": "1.0.3",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write .",
+    "test:seo": "next build && playwright test",
+    "test:seo:only": "playwright test",
+    "pull-types": "openapi-typescript https://confessio.fr/front/api/openapi.json -o src/types.d.ts"
+  },
+  "dependencies": {
+    "@maptiler/leaflet-maptilersdk": "^4.1.1",
+    "@phosphor-icons/react": "^2.1.10",
+    "@tanstack/react-query": "^5.79.0",
+    "clsx": "^2.1.1",
+    "jotai": "^2.13.1",
+    "leaflet": "^1.9.4",
+    "leaflet-defaulticon-compatibility": "^0.1.2",
+    "next": "15.3.6",
+    "posthog-js": "^1.365.0",
+    "prettier": "^3.6.2",
+    "react": "^19.0.0",
+    "react-bottom-sheet": "^1.1.1",
+    "react-dom": "^19.0.0",
+    "react-leaflet": "^5.0.0",
+    "react-modal-sheet": "^4.4.0",
+    "use-debounce": "^10.0.6"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.18",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.2",
+    "openapi-typescript": "^7.9.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

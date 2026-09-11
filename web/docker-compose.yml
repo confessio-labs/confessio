@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # NEXT_PUBLIC_* are inlined into the client bundle at build time.
+      # Values come from the shell env / a root .env file (compose substitutes them).
+      args:
+        NEXT_PUBLIC_MAP_TILER_API_KEY: ${NEXT_PUBLIC_MAP_TILER_API_KEY}
+        NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: ${NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://confessio.fr}
+    image: confessio-front
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    # Runtime env (e.g. CRON_SECRET, and NEXT_PUBLIC_* read server-side).
+    env_file:
+      - .env
+      - .env.local
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # Replaces the Vercel cron: hits /api/revalidate-dioceses daily at 01:00.
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    command:
+      - sh
+      - -c
+      - |
+        echo '0 1 * * * wget -q -O- --header="Authorization: Bearer '"$$CRON_SECRET"'" http://app:3000/api/revalidate-dioceses' > /etc/crontabs/root
+        exec crond -f -l 2

@@ -112,10 +112,14 @@ jawg_api_key3: "{{ lookup('ansible.builtin.env', 'JAWG_API_KEY3') }}"
 # Hugging Face
 hf_token: "{{ lookup('ansible.builtin.env', 'HF_TOKEN') }}"
 
-# Front (Next.js) app
+# Front (Next.js) app — now lives in the `web/` subdir of the confessio monorepo.
+# front_app_dir is a dedicated checkout of the monorepo, kept separate from the backend's
+# app_dir to avoid collision. The front is built and run from front_build_dir (= app_dir/web).
 front_app_name: confessio-front
 front_app_dir: /home/{{ deployer_user }}/{{ front_app_name }}
-front_repo_url: https://github.com/darkpitoune/confessio-front.git
+front_subdir: web
+front_build_dir: "{{ front_app_dir }}/{{ front_subdir }}"
+front_repo_url: "{{ code_repository_url }}"
 front_git_version: main
 front_port: 3000
 node_major: 22
