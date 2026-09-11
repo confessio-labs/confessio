@@ -81,6 +81,8 @@ urlpatterns = [
 
     # webhooks
     path('webhooks/mail_received', views.mail_received_webhook, name='mail_received_webhook'),
+    path('webhooks/mail_events', views.MailEventWebhookView.as_view(),
+         name='mail_events_webhook'),
 
     # api
     path("api/", api.urls),

@@ -9,7 +9,7 @@ dependencies = [
     "gunicorn==23.0.0",
     "python-dotenv==1.2.2",
     "whitenoise==6.6.0",
-    "django-ses==3.5.2",
+    "django-ses[events]==3.5.2",
     "psycopg2-binary==2.9.11",
     "django-request==1.6.3",
     "django-simple-history==3.7.0",

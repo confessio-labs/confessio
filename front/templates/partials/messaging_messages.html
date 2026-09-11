@@ -7,11 +7,27 @@
         {{ message.from_email|default:message.conversation.email }}
       {% endif %}
       — {{ message.created_at|date:"d/m/Y H:i" }}
+      {% if message.direction == 'outbound' and message.status != 'failed' %}
+        {# Ouvert d'abord : un open dont le Delivery s'est perdu mérite quand même ses 2 coches. #}
+        {% if message.opened_at %}
+          <i class="fas fa-check-double messaging-tick messaging-tick--read"
+             title="Ouvert le {{ message.opened_at|date:'d/m/Y à H:i' }}"></i>
+        {% elif message.delivered_at %}
+          <i class="fas fa-check messaging-tick"
+             title="Reçu le {{ message.delivered_at|date:'d/m/Y à H:i' }}"></i>
+        {% endif %}
+      {% endif %}
     </div>
     <div class="messaging-bubble messaging-bubble--{{ message.direction }}">{{ message.body|linebreaksbr }}</div>
     {% if message.status == 'failed' %}
       <div class="messaging-error">
         <i class="fas fa-exclamation-triangle"></i> Échec de l'envoi : {{ message.error_message }}
+      </div>
+    {% endif %}
+    {% if message.complained_at %}
+      <div class="messaging-error">
+        <i class="fas fa-exclamation-triangle"></i> Signalé comme indésirable le
+        {{ message.complained_at|date:"d/m/Y à H:i" }}.
       </div>
     {% endif %}
   </div>

@@ -35,5 +35,9 @@
 .messaging-bubble--outbound { background: #2d6cdf; color: #fff; float: right; clear: both; }
 .messaging-bubble--inbound { background: #f0f3f7; color: #222; float: left; clear: both; }
 .messaging-error { clear: both; color: #b02a37; font-size: .8rem; padding-top: .25rem; }
+/* Accusés à la WhatsApp : une coche grise reçu, deux coches bleues ouvert. La coche simple
+   hérite du gris de .messaging-meta. */
+.messaging-tick { margin-left: .25rem; }
+.messaging-tick--read { color: #2d6cdf; }
 .messaging-input { display: flex; gap: .5rem; margin-top: .5rem; align-items: flex-end; }
 .messaging-new { max-width: 640px; }

@@ -205,6 +205,16 @@ EMAIL_BACKEND = 'django_ses.SESBackend'
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_KEY')
 AWS_SES_REGION_NAME = 'eu-west-3'
+# SES only publishes Delivery/Open/Bounce/Complaint for mails tagged with a configuration set,
+# so django-ses stamps this name into an X-SES-CONFIGURATION-SET header on every send. Unset
+# locally: a dev send must not push events at the prod endpoint.
+AWS_SES_CONFIGURATION_SET = os.environ.get('AWS_SES_CONFIGURATION_SET')
+# The one SNS topic allowed to post to /webhooks/mail_events. A valid AWS signature proves the
+# sender is SNS, never that the topic is ours.
+AWS_SES_EVENT_TOPIC_ARN = os.environ.get('AWS_SES_EVENT_TOPIC_ARN', '')
+# A signature can only be checked against a payload AWS actually signed, and in dev we replay
+# hand-written ones. Production settings put this back to True.
+AWS_SES_VERIFY_EVENT_SIGNATURES = False
 AWS_S3_REGION_NAME = 'eu-west-3'
 AWS_STORAGE_BUCKET_NAME = 'confessio-uploaded-documents'
 

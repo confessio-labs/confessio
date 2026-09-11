@@ -57,6 +57,8 @@ letsencrypt_email: "{{ lookup('ansible.builtin.env', 'PROD_LETSENCRYPT_EMAIL') }
 # AWS
 aws_access_key: "{{ lookup('ansible.builtin.env', 'AWS_ACCESS_KEY') }}"
 aws_secret_key: "{{ lookup('ansible.builtin.env', 'AWS_SECRET_KEY') }}"
+aws_ses_configuration_set: "{{ lookup('ansible.builtin.env', 'AWS_SES_CONFIGURATION_SET') }}"
+aws_ses_event_topic_arn: "{{ lookup('ansible.builtin.env', 'AWS_SES_EVENT_TOPIC_ARN') }}"
 
 # OpenTelemetry
 otel_better_stack_ingesting_host: "{{ lookup('ansible.builtin.env', 'OTEL_BETTER_STACK_INGESTING_HOST') }}"
