@@ -35,7 +35,12 @@
           {% for d in discussions %}
             <li class="copilot-discussion-link {% if discussion and d.uuid == discussion.uuid %}is-active{% endif %}">
               <a href="{% url 'copilot_view' d.uuid %}">
-                {{ d.title|default:'(sans titre)'|truncatechars:60 }}
+                <span class="copilot-discussion-title">{{ d.title|default:'(sans titre)'|truncatechars:60 }}</span>
+                {% if d.user and d.user != request.user %}
+                  <span class="copilot-discussion-user">
+                    <i class="fas fa-user"></i> {{ d.user.first_name|default:d.user.username }}
+                  </span>
+                {% endif %}
               </a>
             </li>
           {% empty %}
@@ -46,6 +51,13 @@
 
       <!-- Main: conversation -->
       <div class="col-12 col-md-9 copilot-main">
+        {% if discussion.user and discussion.user != request.user %}
+          <p class="copilot-discussion-owner text-muted small mb-2">
+            <i class="fas fa-user"></i>
+            Discussion de <strong>{{ discussion.user.first_name|default:discussion.user.username }}</strong>
+          </p>
+        {% endif %}
+
         <div id="copilot-error" class="alert alert-danger {% if not discussion or not discussion.error_message %}d-none{% endif %}">
           {{ discussion.error_message }}
         </div>

@@ -48,8 +48,14 @@ def _turn_state(discussion) -> tuple[str, datetime | None]:
     return state, retry_at
 
 
-def _discussions_for(user):
-    return CopilotDiscussion.objects.filter(user=user).order_by('-updated_at')[:_MAX_DISCUSSIONS]
+def _recent_discussions():
+    """Every discussion, whoever started it: the copilot is a shared admin console.
+
+    Seeing what a colleague has already asked avoids redoing the work, and lets anyone pick up a
+    turn left waiting for approval. select_related because the sidebar names the owner.
+    """
+    return (CopilotDiscussion.objects.select_related('user')
+            .order_by('-updated_at')[:_MAX_DISCUSSIONS])
 
 
 def _refuse_pending_proposals(discussion) -> list[dict]:
@@ -78,10 +84,12 @@ def copilot(request, discussion_uuid=None):
     discussion = None
     items = []
     if discussion_uuid is not None:
-        discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid, user=request.user)
+        # No ownership check here nor in the other endpoints: scheduling.change_sentence is the
+        # only gate, and anyone past it may read and continue anyone else's discussion.
+        discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid)
         items = list(discussion.items.all())
     return render(request, 'pages/copilot.html', {
-        'discussions': _discussions_for(request.user),
+        'discussions': _recent_discussions(),
         'discussion': discussion,
         'items': items,
     })
@@ -105,7 +113,7 @@ def copilot_new(request):
 @permission_required("scheduling.change_sentence")
 @require_POST
 def copilot_message(request, discussion_uuid):
-    discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid, user=request.user)
+    discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid)
     text = (request.POST.get('text') or '').strip()
     if not text:
         return JsonResponse({'error': 'empty'}, status=400)
@@ -133,7 +141,7 @@ def copilot_message(request, discussion_uuid):
 @permission_required("scheduling.change_sentence")
 @require_POST
 def copilot_approve(request, discussion_uuid):
-    discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid, user=request.user)
+    discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid)
     item = get_object_or_404(
         CopilotDiscussionItem, uuid=request.POST.get('item_uuid'), discussion=discussion,
         item_type=ItemType.PROPOSED_TOOL_CALL)
@@ -167,7 +175,7 @@ def copilot_approve(request, discussion_uuid):
 @login_required
 @permission_required("scheduling.change_sentence")
 def copilot_items(request, discussion_uuid):
-    discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid, user=request.user)
+    discussion = get_object_or_404(CopilotDiscussion, uuid=discussion_uuid)
     try:
         since = int(request.GET.get('since', -1))
     except (TypeError, ValueError):
