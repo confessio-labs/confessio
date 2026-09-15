@@ -12,6 +12,10 @@
 }
 .copilot-discussion-link.is-active a,
 .copilot-discussion-link a:hover { background: #f0f3f7; }
+/* The list is shared across admins: name the owner under the title when it isn't the reader. */
+.copilot-discussion-title { display: block; }
+.copilot-discussion-user { display: block; color: #6c757d; font-size: .8rem; }
+.copilot-discussion-user i { font-size: .75em; opacity: .7; }
 .copilot-main { display: flex; flex-direction: column; }
 .copilot-messages {
   flex: 1 1 auto;
