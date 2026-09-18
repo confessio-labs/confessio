@@ -76,6 +76,19 @@
 .copilot-parsing-head { margin: .3rem 0; }
 .copilot-parsing-head .copilot-entity-link { color: inherit; text-decoration: underline; }
 .copilot-parsing-head .copilot-entity-link i { font-size: .75em; margin-left: .25rem; opacity: .7; }
+.copilot-parsing-html summary { cursor: pointer; }
+.copilot-parsing-html-body {
+  max-height: 18rem;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: .4rem;
+  padding: .4rem .6rem;
+  margin-top: .4rem;
+  word-break: break-word;
+}
+/* Crawled markup can carry wide tables and images: keep them inside the discussion column. */
+.copilot-parsing-html-body table { max-width: 100%; }
+.copilot-parsing-html-body img { max-width: 100%; height: auto; }
 .copilot-parsing-church {
   border: 1px solid #e3e3e3;
   border-radius: .4rem;

@@ -214,6 +214,7 @@ def _parsing_schedules_diff(tool_args: dict, tool_args_before) -> str:
 
     return render_to_string('partials/copilot_parsing_diff.html', {
         'diff': scheduling_build_schedules_list_diff(before, after, church_desc_by_id),
+        'truncated_html': parsing.truncated_html if parsing else None,
         'edit_url': (reverse('edit_parsing', kwargs={'parsing_uuid': parsing.uuid})
                      if parsing else None),
     })

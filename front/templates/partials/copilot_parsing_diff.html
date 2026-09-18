@@ -7,6 +7,13 @@
             <a class="copilot-entity-link" href="{{ edit_url }}" target="_blank" rel="noopener">Éditer ce parsing<i class="fas fa-up-right-from-square"></i></a>
         </div>
     {% endif %}
+    {% if truncated_html %}
+        {# `safe` like the moderation's "Nice display": the html is already sanitized at refine. #}
+        <details class="copilot-tool copilot-parsing-html">
+            <summary><i class="fas fa-code"></i> Contenu</summary>
+            <div class="copilot-parsing-html-body">{{ truncated_html|safe }}</div>
+        </details>
+    {% endif %}
     {% for church in diff.church_diffs %}
         <div class="copilot-parsing-church{% if church.differs %} copilot-parsing-church--differs{% endif %}">
             <div class="copilot-parsing-church-name">{{ church.church_desc }}</div>
