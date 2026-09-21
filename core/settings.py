@@ -17,6 +17,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from core.utils.map_tiles_utils import get_jawg_tiles
+
 load_dotenv()  # take environment variables from .env.
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -224,6 +226,12 @@ if os.getenv('GDAL_LIBRARY_PATH'):
     GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
 if os.getenv('GEOS_LIBRARY_PATH'):
     GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
+
+# Leaflet, used by the admin map widgets. django-leaflet reads this once at import, so the drawn
+# key is fixed for the whole process: admin traffic is low enough not to unbalance the quota.
+LEAFLET_CONFIG = {
+    'TILES': [('Jawg', *get_jawg_tiles())],
+}
 
 # Dbbackup
 DBBACKUP_DATABASES = ['default']

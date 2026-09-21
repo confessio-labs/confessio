@@ -1,6 +1,4 @@
 import json
-import os
-import random
 from datetime import date, datetime
 from statistics import mean
 from typing import List, Tuple, Dict, Optional
@@ -10,6 +8,7 @@ from django.contrib.gis.geos import Point
 from django.utils.translation import gettext as _
 from folium import Map, Icon, Popup, Marker
 
+from core.utils.map_tiles_utils import get_jawg_tiles
 from front.services.card.website_events_service import WebsiteEvents
 from registry.models import Church
 from scheduling.utils.date_utils import format_datetime_with_locale
@@ -71,14 +70,11 @@ def prepare_map(center, churches: List[Church], bounds,
                 is_around_me: bool
                 ) -> Tuple[Map, Dict[UUID, str]]:
     # Create Map Object
-    jawg_api_key = os.environ[random.choice(['JAWG_API_KEY1', 'JAWG_API_KEY2', 'JAWG_API_KEY3'])]
+    tiles, attr = get_jawg_tiles()
     folium_map = Map(
         location=center,
-        tiles="https://tile.jawg.io/jawg-sunny/{z}/{x}/{y}{r}.png?"
-              f"access-token={jawg_api_key}",
-        attr='<a href="https://jawg.io" title="Tiles Courtesy of Jawg Maps" target="_blank">'
-             '&copy; <b>Jawg</b>Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">'
-             'OpenStreetMap</a> contributors',
+        tiles=tiles,
+        attr=attr,
     )
 
     if is_around_me:
@@ -121,9 +117,12 @@ def prepare_map(center, churches: List[Church], bounds,
 
 
 def get_map_with_single_location(location: Point) -> Map:
+    tiles, attr = get_jawg_tiles()
     folium_map = Map(
         location=get_latitude_longitude(location),
         zoom_start=16,
+        tiles=tiles,
+        attr=attr,
     )
     marker = Marker(get_latitude_longitude(location),
                     icon=Icon(icon='cross', prefix='fa', color='blue'))
@@ -136,9 +135,12 @@ def get_map_with_multiple_locations(churches: list[Church]) -> Optional[Map]:
     if not churches:
         return None
 
+    tiles, attr = get_jawg_tiles()
     folium_map = Map(
         location=get_center(churches),
         zoom_start=16,
+        tiles=tiles,
+        attr=attr,
     )
 
     for church in churches:
@@ -155,9 +157,12 @@ def get_map_with_multiple_locations(churches: list[Church]) -> Optional[Map]:
 
 
 def get_map_with_alternative_locations(church: Church, similar_churches: list[Church]) -> Map:
+    tiles, attr = get_jawg_tiles()
     folium_map = Map(
         location=get_latitude_longitude(church.location),
         zoom_start=16,
+        tiles=tiles,
+        attr=attr,
     )
     marker = Marker(get_latitude_longitude(church.location),
                     tooltip=church.name,
