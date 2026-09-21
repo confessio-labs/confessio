@@ -1,0 +1,18 @@
+<div class="parsing-section">
+    <h5 class="mb-1">Churches</h5>
+    <ul class="parsing-church-list">
+        {% for church_id, church_desc in churches %}
+            <li><strong>{{ church_id }}</strong> — {{ church_desc }}</li>
+        {% empty %}
+            <li class="text-muted">No church</li>
+        {% endfor %}
+        <li class="text-muted"><strong>-1</strong> — {{ other_church_desc }}</li>
+    </ul>
+</div>
+{% if truncated_html %}
+    {# `safe` like the moderation's "Nice display": the html is the already-pruned snippet. #}
+    <details class="parsing-html parsing-section">
+        <summary><h5 class="d-inline mb-1"><i class="fas fa-code"></i> Truncated html</h5></summary>
+        <div class="parsing-html-body">{{ truncated_html|safe }}</div>
+    </details>
+{% endif %}

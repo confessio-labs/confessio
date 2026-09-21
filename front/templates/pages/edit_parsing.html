@@ -4,11 +4,17 @@
 
 {% load i18n %}
 
+{% block stylesheets %}
+    <link type="text/css" rel="stylesheet" href="{% static 'css/parsing.css' %}">
+{% endblock stylesheets %}
+
 {% block card %}
 
     <div class="col-12">
         <h2>Edit Parsing</h2>
         {% display_parsing_scrapings parsing %}
+        {% display_parsing_content parsing %}
+        {% display_parsing_schedules_diff parsing %}
         {% if success %}
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 <span class="alert-inner--icon"><i class="far fa-thumbs-up"></i></span>
@@ -26,8 +32,16 @@
                 </button>
             </div>
         {% endif %}
-        <form action="{% url 'edit_parsing' parsing.uuid %}" method="post">
+        {% if parsing.llm_json and parsing.human_json != parsing.llm_json %}
+            <form action="{% url 'edit_parsing' parsing.uuid %}" method="post" class="parsing-section">
+                {% csrf_token %}
+                <input type="hidden" name="set_llm_as_human" />
+                <button type="submit" class="btn btn-warning">Set LLM as human</button>
+            </form>
+        {% endif %}
+        <form action="{% url 'edit_parsing' parsing.uuid %}" method="post" class="parsing-section">
             {% csrf_token %}
+            <h5 class="mb-1">Edit human</h5>
             {{ form.media }}
             {{ form.json }}
             <button type="submit" class="btn btn-primary mt-4">Submit</button>

@@ -10,7 +10,8 @@ from scheduling.forms.jsoneditor_form import JSONSchemaForm
 from scheduling.models import Parsing
 from scheduling.models.pruning_models import Pruning, Sentence
 from scheduling.public_service import init_scheduling_for_sentences
-from scheduling.services.parsing.edit_parsing_service import set_human_json
+from scheduling.services.parsing.edit_parsing_service import set_human_json, \
+    set_llm_json_as_human_json
 from scheduling.services.parsing.parsing_service import get_parsing_schedules_list
 from scheduling.services.pruning.edit_pruning_service import set_human_indices, \
     get_pruning_human_pieces, get_colored_pieces_v2, set_v2_indices_as_human, \
@@ -102,7 +103,13 @@ def edit_parsing(request, parsing_uuid):
     validation_error = None
     success = False
 
-    if request.method == "POST":
+    if 'set_llm_as_human' in request.POST:
+        if parsing.llm_json is None:
+            validation_error = 'This parsing has no llm_json'
+        else:
+            set_llm_json_as_human_json(parsing)
+            success = True
+    elif request.method == "POST":
         schedules_list_as_json = request.POST.get("json")
         schedules_list_as_dict = json.loads(schedules_list_as_json)
         try:
