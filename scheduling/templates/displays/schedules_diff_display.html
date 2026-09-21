@@ -1,0 +1,39 @@
+{% for church in diff.church_diffs %}
+    <div class="parsing-diff-church{% if church.differs %} parsing-diff-church--differs{% endif %}">
+        <div class="parsing-diff-church-name">{{ church.church_desc }}</div>
+        <div class="parsing-diff-cols">
+            <div>
+                <div class="parsing-diff-label">{{ before_label }}</div>
+                {% for line in church.before_lines %}
+                    <div class="parsing-diff-line{% if line.changed %} parsing-diff-line--removed{% endif %}">{{ line.text }}</div>
+                {% empty %}
+                    <div class="parsing-diff-line parsing-diff-empty">—</div>
+                {% endfor %}
+            </div>
+            <div>
+                <div class="parsing-diff-label">{{ after_label }}</div>
+                {% for line in church.after_lines %}
+                    <div class="parsing-diff-line{% if line.changed %} parsing-diff-line--added{% endif %}">{{ line.text }}</div>
+                {% empty %}
+                    <div class="parsing-diff-line parsing-diff-empty">—</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% empty %}
+    <div class="parsing-diff-empty">{{ empty_label }}</div>
+{% endfor %}
+<table class="parsing-diff-flags">
+    <thead>
+        <tr><th></th><th>{{ before_label }}</th><th>{{ after_label }}</th></tr>
+    </thead>
+    <tbody>
+        {% for flag in diff.flag_diffs %}
+            <tr{% if flag.differs %} class="parsing-diff-flag--differs"{% endif %}>
+                <td>{{ flag.label }}</td>
+                <td>{% if flag.before_on %}oui{% else %}non{% endif %}</td>
+                <td>{% if flag.after_on %}oui{% else %}non{% endif %}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
