@@ -1,0 +1,109 @@
+/* Staff-only parsing pages: the edit_parsing form and the copilot's approval card.
+   Kept out of index1.css, which every public page loads. */
+
+/**
+ * Parsing content display
+ */
+.parsing-section {
+    margin-top: 1.5rem;
+}
+
+.parsing-church-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0.5em;
+}
+
+.parsing-html summary {
+    cursor: pointer;
+}
+
+.parsing-html-body {
+    max-height: 30rem;
+    overflow-y: auto;
+    border: 1px solid #e3e3e3;
+    border-radius: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    margin-top: 0.4rem;
+    word-break: break-word;
+}
+
+/* Crawled markup carries full-size images that would widen the card. */
+.parsing-html-body img {
+    max-width: 100%;
+    height: auto;
+}
+
+/**
+ * Schedules diff, side by side (copilot approval card and edit_parsing)
+ */
+.parsing-diff-church {
+    border: 1px solid #e3e3e3;
+    border-radius: .4rem;
+    padding: .4rem .6rem;
+    margin: .4rem 0;
+}
+
+.parsing-diff-church--differs {
+    border-color: #f0c36d;
+}
+
+.parsing-diff-church-name {
+    font-weight: 600;
+}
+
+.parsing-diff-label {
+    font-weight: 600;
+    margin-top: .4rem;
+}
+
+.parsing-diff-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .1rem .8rem;
+}
+
+@media (max-width: 576px) {
+    .parsing-diff-cols {
+        grid-template-columns: 1fr;
+    }
+}
+
+.parsing-diff-line {
+    word-break: break-word;
+}
+
+.parsing-diff-line--removed {
+    color: #b02a37;
+    text-decoration: line-through;
+    opacity: .75;
+}
+
+.parsing-diff-line--added {
+    color: #146c43;
+    font-weight: 600;
+}
+
+.parsing-diff-empty {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.parsing-diff-flags {
+    margin: .4rem 0;
+    border-collapse: collapse;
+}
+
+.parsing-diff-flags th,
+.parsing-diff-flags td {
+    padding: .1rem .6rem .1rem 0;
+}
+
+.parsing-diff-flags th {
+    font-weight: 600;
+    color: #6c757d;
+}
+
+.parsing-diff-flag--differs {
+    background: #fff3cd;
+}
