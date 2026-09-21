@@ -25,3 +25,14 @@ def scheduling_build_schedules_list_diff(before: SchedulesList | None,
                                          after: SchedulesList | None,
                                          church_desc_by_id: dict[int, str]) -> SchedulesListDiff:
     return build_schedules_list_diff(before, after, church_desc_by_id)
+
+
+##################
+# PARSING PROMPT #
+##################
+
+def scheduling_get_parsing_prompt_template() -> str:
+    # Late import: parse_with_llm pulls dateutil + holidays + httpx, and this module sits on the
+    # web startup path while the prompt is only ever needed on demand.
+    from scheduling.workflows.parsing.parse_with_llm import get_prompt_template
+    return get_prompt_template()

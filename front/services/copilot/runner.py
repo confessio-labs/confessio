@@ -13,8 +13,9 @@ from pydantic_ai.tools import ToolDenied
 from core.utils.async_utils import run_and_close
 from crawling.utils.string_utils import remove_unsafe_chars
 from front.models import CopilotDiscussion, CopilotDiscussionItem
-from front.services.copilot.agent import CopilotDeps, agent, build_provider_and_model
+from front.services.copilot.agent import agent, build_provider_and_model
 from front.services.copilot.before_values import snapshot_before_values
+from front.services.copilot.deps import CopilotDeps
 from front.services.copilot.items import add_item, build_history_from_items
 from front.services.copilot.serialization import (TOOL_DENIED_MESSAGE, deferred_tool_call_ids,
                                                   dump_messages, load_messages)
