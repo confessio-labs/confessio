@@ -63,6 +63,7 @@ def is_new_url_valid(new_url: str) -> bool:
         'google.com/v3/signin',
         'accounts.google.com',
         'wp-admin/install.php',
+        'ph-sys/suspended',
     ]
     for not_eligible_url in not_eligible_urls:
         if not_eligible_url in new_url:
