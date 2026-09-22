@@ -7,6 +7,7 @@ from django.utils.translation import gettext
 from django.views.decorators.csrf import csrf_exempt
 
 from core.utils.discord_utils import DiscordChanel, send_discord_alert
+from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.services.card.scraping_url_service import quote_path, unquote_path
 from front.services.messaging.messaging_service import (ingest_received_email, ingest_sent_email,
                                                         record_contact_form)
@@ -136,12 +137,13 @@ def mail_received_webhook(request):
                               references=references)
     except Exception as e:
         # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery. Ring
-        # Discord with the raw mail instead — the conversation is lost, the message must not be.
+        # the alert channels with the raw mail instead — the conversation is lost, the message
+        # must not be.
         print(e)
-        send_discord_alert(
-            message=f"Mail entrant non enregistré ({e})\n\n"
-                    f"FROM:{from_header}\nSUBJECT:{subject}\n\n{stripped_text or body_plain}",
-            channel=DiscordChanel.CONTACT_FORM)
+        message = (f"Mail entrant non enregistré ({e})\n\n"
+                   f"FROM:{from_header}\nSUBJECT:{subject}\n\n{stripped_text or body_plain}")
+        send_discord_alert(message=message, channel=DiscordChanel.CONTACT_FORM)
+        send_telegram_alert(message=message, topic=TelegramTopic.CONTACT_FORM)
 
     return HttpResponse(status=200)
 

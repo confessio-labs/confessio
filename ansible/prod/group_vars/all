@@ -99,6 +99,10 @@ discord_contact_form_url: "{{ lookup('ansible.builtin.env', 'DISCORD_CONTACT_FOR
 discord_pb_oclocher_url: "{{ lookup('ansible.builtin.env', 'DISCORD_PB_OCLOCHER_URL') }}"
 discord_new_schedules_url: "{{ lookup('ansible.builtin.env', 'DISCORD_NEW_SCHEDULES_URL') }}"
 
+# Telegram bot
+telegram_bot_token: "{{ lookup('ansible.builtin.env', 'TELEGRAM_BOT_TOKEN') }}"
+telegram_chat_id: "{{ lookup('ansible.builtin.env', 'TELEGRAM_CHAT_ID') }}"
+
 # Cloudflare Turnstile
 cloudflare_turnstile_site_key: "{{ lookup('ansible.builtin.env', 'CLOUDFLARE_TURNSTILE_SITE_KEY') }}"
 cloudflare_turnstile_secret_key: "{{ lookup('ansible.builtin.env', 'CLOUDFLARE_TURNSTILE_SECRET_KEY') }}"

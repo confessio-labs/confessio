@@ -20,6 +20,7 @@ from django.utils import timezone
 from email.utils import formataddr
 
 from core.utils.discord_utils import DiscordChanel, send_discord_alert
+from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.models import Conversation, Message
 from front.services.messaging.conversation_moderation_service import (
     upsert_conversation_moderation)
@@ -111,7 +112,7 @@ def record_contact_form(request, name: str, email: str, subject: str, body: str)
         status=Message.Status.RECEIVED,
     )
     upsert_conversation_moderation(conversation)
-    _notify_discord(request, message)
+    _notify_admins(request, message)
 
     mail = _build_mail(
         # SES only accepts a verified identity as From, so the visitor goes in Reply-To: hitting
@@ -168,7 +169,7 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
     )
     _touch(conversation)
     upsert_conversation_moderation(conversation)
-    _notify_discord(request, message)
+    _notify_admins(request, message)
 
     if is_new:
         _mirror_to_contact_mailbox(request, conversation, message)
@@ -325,15 +326,16 @@ def _label(message: Message) -> str:
     return name or email or message.conversation.name or message.conversation.email
 
 
-def _notify_discord(request, message: Message) -> None:
+def _notify_admins(request, message: Message) -> None:
     conversation = message.conversation
     body = message.body[:MAX_DISCORD_BODY]
-    send_discord_alert(
-        message=f"**{conversation.subject}**\n"
-                f"De : {message.from_email or conversation.email}\n\n"
-                f"{body}\n\n"
-                f"{get_conversation_url(request, conversation)}",
-        channel=DiscordChanel.CONTACT_FORM)
+    details = (f"De : {message.from_email or conversation.email}\n\n"
+               f"{body}\n\n"
+               f"{get_conversation_url(request, conversation)}")
+    send_discord_alert(message=f"**{conversation.subject}**\n{details}",
+                       channel=DiscordChanel.CONTACT_FORM)
+    send_telegram_alert(message=f"{conversation.subject}\n{details}",
+                        topic=TelegramTopic.CONTACT_FORM)
 
 
 def _touch(conversation: Conversation) -> None:

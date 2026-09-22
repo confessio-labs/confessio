@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from core.management.abstract_command import AbstractCommand
 from core.utils.discord_utils import DiscordChanel, send_discord_alert
+from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from crawling.models import Log as CrawlingLog
 from registry.models import Website
 from scheduling.models import Log as SchedulingLog
@@ -93,6 +94,7 @@ class Command(AbstractCommand):
             """
             mail_admins(subject=error_message, message=message)
             send_discord_alert(message=message, channel=DiscordChanel.CRAWLING_ALERTS)
+            send_telegram_alert(message=message, topic=TelegramTopic.CRAWLING_ALERTS)
             self.success('Email sent to admins')
         else:
             self.success('All websites have been crawled recently')
