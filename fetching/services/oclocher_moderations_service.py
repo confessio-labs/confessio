@@ -1,5 +1,6 @@
 from django.conf import settings
 from core.utils.discord_utils import send_discord_alert, DiscordChanel
+from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from core.views import get_moderation_url
 from fetching.models import OClocherOrganization, OClocherMatchingModeration, OClocherMatching
 from fetching.models.oclocher_moderation_models import OClocherOrganizationModeration
@@ -30,10 +31,11 @@ def notify_if_relevant(moderation: OClocherMatchingModeration,):
         return
 
     moderation_url = settings.REQUEST_BASE_URL + get_moderation_url(moderation)
-    send_discord_alert(f"OClocher matching issue ({moderation.category}) "
-                       f"on website {moderation.oclocher_organization.website.name} "
-                       f"{moderation_url}",
-                       DiscordChanel.PB_OCLOCHER)
+    message = (f"OClocher matching issue ({moderation.category}) "
+               f"on website {moderation.oclocher_organization.website.name} "
+               f"{moderation_url}")
+    send_discord_alert(message, DiscordChanel.PB_OCLOCHER)
+    send_telegram_alert(message, TelegramTopic.PB_OCLOCHER)
 
 
 def upsert_matching_moderation(oclocher_organization: OClocherOrganization,

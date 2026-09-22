@@ -4,6 +4,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpRequest
 from django.urls import reverse
 
 from core.utils.discord_utils import send_discord_alert, DiscordChanel
+from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.models import Report, ReportModeration
 from registry.models import Website
 from registry.models.base_moderation_models import ModerationStatus
@@ -46,6 +47,7 @@ def save_report(request: HttpRequest, report: Report):
         subject = f'New report on confessio for {report.website.name}'
         send_email_to_admin(subject, email_body)
         send_discord_alert(message=email_body, channel=DiscordChanel.NEW_REPORTS)
+        send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
 
 
 def new_report(request, website: Website) -> str:
