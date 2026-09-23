@@ -1,0 +1,16 @@
+name: Revalidate dioceses (staging)
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  revalidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping staging revalidation endpoint
+        run: |
+          curl -fsS --retry 3 --retry-delay 10 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET_STAGING }}" \
+            https://staging-confessio.pcdhebrail.fr/api/revalidate-dioceses

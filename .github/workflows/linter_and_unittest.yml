@@ -1,6 +1,9 @@
 name: CI linter and unit tests
 
-on: [push]
+on:
+  push:
+    paths-ignore:
+      - "web/**"
 
 permissions:
   contents: read
