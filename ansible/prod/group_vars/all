@@ -90,15 +90,6 @@ heartbeat_nightly_fetching_url: "{{ lookup('ansible.builtin.env', 'HEARTBEAT_NIG
 heartbeat_check_data_url: "{{ lookup('ansible.builtin.env', 'HEARTBEAT_CHECK_DATA_URL') }}"
 heartbeat_annuaire_url: "{{ lookup('ansible.builtin.env', 'HEARTBEAT_ANNUAIRE_URL') }}"
 
-# Discord Webhooks
-discord_new_reports_url: "{{ lookup('ansible.builtin.env', 'DISCORD_NEW_REPORTS_URL') }}"
-discord_new_images_url: "{{ lookup('ansible.builtin.env', 'DISCORD_NEW_IMAGES_URL') }}"
-discord_infra_alerts_url: "{{ lookup('ansible.builtin.env', 'DISCORD_INFRA_ALERTS_URL') }}"
-discord_crawling_alerts_url: "{{ lookup('ansible.builtin.env', 'DISCORD_CRAWLING_ALERTS_URL') }}"
-discord_contact_form_url: "{{ lookup('ansible.builtin.env', 'DISCORD_CONTACT_FORM_URL') }}"
-discord_pb_oclocher_url: "{{ lookup('ansible.builtin.env', 'DISCORD_PB_OCLOCHER_URL') }}"
-discord_new_schedules_url: "{{ lookup('ansible.builtin.env', 'DISCORD_NEW_SCHEDULES_URL') }}"
-
 # Telegram bot
 telegram_bot_token: "{{ lookup('ansible.builtin.env', 'TELEGRAM_BOT_TOKEN') }}"
 telegram_chat_id: "{{ lookup('ansible.builtin.env', 'TELEGRAM_CHAT_ID') }}"

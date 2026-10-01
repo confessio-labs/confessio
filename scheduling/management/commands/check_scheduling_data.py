@@ -3,7 +3,6 @@ from datetime import timedelta
 from django.core.mail import mail_admins
 
 from core.management.abstract_command import AbstractCommand
-from core.utils.discord_utils import DiscordChanel, send_discord_alert
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from scheduling.models import IndexEvent
 from scheduling.workflows.parsing.holidays import check_holiday_by_zone
@@ -31,7 +30,6 @@ class Command(AbstractCommand):
             Easter: {easter_ok}
             """
             mail_admins(subject=error_message, message=message)
-            send_discord_alert(message=message, channel=DiscordChanel.CRAWLING_ALERTS)
             send_telegram_alert(message=message, topic=TelegramTopic.CRAWLING_ALERTS)
             self.success('Email sent to admins')
         else:
@@ -48,7 +46,6 @@ class Command(AbstractCommand):
             You shall check the index_events job.
             """
             mail_admins(subject=error_message, message=message)
-            send_discord_alert(message=message, channel=DiscordChanel.CRAWLING_ALERTS)
             send_telegram_alert(message=message, topic=TelegramTopic.CRAWLING_ALERTS)
             self.success('Email sent to admins')
         else:
