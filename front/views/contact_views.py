@@ -6,7 +6,6 @@ from django.shortcuts import render, redirect
 from django.utils.translation import gettext
 from django.views.decorators.csrf import csrf_exempt
 
-from core.utils.discord_utils import DiscordChanel, send_discord_alert
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.services.card.scraping_url_service import quote_path, unquote_path
 from front.services.messaging.messaging_service import (ingest_received_email, ingest_sent_email,
@@ -50,7 +49,7 @@ def contact(request, message=None, email=None, name_text=None,
                             name_text=name_text, email=from_email,
                             message_subject=message_subject, message_text=message_text)
 
-        # The submission is stored, notified on Discord and only then mirrored to the contact
+        # The submission is stored, notified on Telegram and only then mirrored to the contact
         # mailbox, so a mail failure loses nothing: it shows on the message in /messaging. Sending
         # the visitor back to the failure page would only invite a duplicate conversation.
         record_contact_form(request, name, from_email, subject, message)
@@ -112,7 +111,7 @@ def mail_received_webhook(request):
                               references=references)
         except Exception as e:
             # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery. No
-            # Discord alert here — this is us talking, and it is already in the mailbox.
+            # alert here — this is us talking, and it is already in the mailbox.
             print(e)
         return HttpResponse(status=200)
 
@@ -137,13 +136,12 @@ def mail_received_webhook(request):
                               references=references)
     except Exception as e:
         # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery. Ring
-        # the alert channels with the raw mail instead — the conversation is lost, the message
-        # must not be.
+        # Telegram with the raw mail instead — the conversation is lost, the message must not be.
         print(e)
-        message = (f"Mail entrant non enregistré ({e})\n\n"
-                   f"FROM:{from_header}\nSUBJECT:{subject}\n\n{stripped_text or body_plain}")
-        send_discord_alert(message=message, channel=DiscordChanel.CONTACT_FORM)
-        send_telegram_alert(message=message, topic=TelegramTopic.CONTACT_FORM)
+        send_telegram_alert(
+            message=f"Mail entrant non enregistré ({e})\n\n"
+                    f"FROM:{from_header}\nSUBJECT:{subject}\n\n{stripped_text or body_plain}",
+            topic=TelegramTopic.CONTACT_FORM)
 
     return HttpResponse(status=200)
 

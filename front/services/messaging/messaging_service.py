@@ -19,7 +19,6 @@ from django.urls import reverse
 from django.utils import timezone
 from email.utils import formataddr
 
-from core.utils.discord_utils import DiscordChanel, send_discord_alert
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.models import Conversation, Message
 from front.services.messaging.conversation_moderation_service import (
@@ -30,9 +29,8 @@ from front.utils.messaging_utils import (HistoryEntry, build_outbound_bodies,
                                          first_external_address, is_automated_sender,
                                          is_same_email, parse_message_ids, parse_sender)
 
-# Discord rejects anything past 2000 characters, and a long mail adds nothing to an alert whose
-# job is to hand over the link.
-MAX_DISCORD_BODY = 1200
+# A long mail adds nothing to an alert whose job is to hand over the link.
+MAX_ALERT_BODY = 1200
 
 
 def get_conversation_url(request, conversation: Conversation) -> str:
@@ -271,7 +269,7 @@ def _mirror_to_contact_mailbox(request, conversation: Conversation, message: Mes
     try:
         mail.send()
     except (BadHeaderError, BotoCoreError, ClientError) as e:
-        # The message is already recorded and Discord already rang: the mirror is a convenience.
+        # The message is already recorded and the alert already rang: the mirror is a convenience.
         print(e)
 
 
@@ -328,14 +326,12 @@ def _label(message: Message) -> str:
 
 def _notify_admins(request, message: Message) -> None:
     conversation = message.conversation
-    body = message.body[:MAX_DISCORD_BODY]
-    details = (f"De : {message.from_email or conversation.email}\n\n"
-               f"{body}\n\n"
-               f"{get_conversation_url(request, conversation)}")
-    send_discord_alert(message=f"**{conversation.subject}**\n{details}",
-                       channel=DiscordChanel.CONTACT_FORM)
-    send_telegram_alert(message=f"{conversation.subject}\n{details}",
-                        topic=TelegramTopic.CONTACT_FORM)
+    send_telegram_alert(
+        message=f"{conversation.subject}\n"
+                f"De : {message.from_email or conversation.email}\n\n"
+                f"{message.body[:MAX_ALERT_BODY]}\n\n"
+                f"{get_conversation_url(request, conversation)}",
+        topic=TelegramTopic.CONTACT_FORM)
 
 
 def _touch(conversation: Conversation) -> None:

@@ -1,6 +1,5 @@
 from django.conf import settings
 
-from core.utils.discord_utils import send_discord_alert, DiscordChanel
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from core.views import get_moderation_url
 from registry.models import Website
@@ -51,11 +50,10 @@ def notify_if_relevant(moderation: ValidatedSchedulesModeration,):
         return
 
     moderation_url = settings.REQUEST_BASE_URL + get_moderation_url(moderation)
-    message = (f"Schedules differ "
-               f"on website {moderation.website.name} "
-               f"{moderation_url}")
-    send_discord_alert(message, DiscordChanel.NEW_SCHEDULES)
-    send_telegram_alert(message, TelegramTopic.NEW_SCHEDULES)
+    send_telegram_alert(f"Schedules differ "
+                        f"on website {moderation.website.name} "
+                        f"{moderation_url}",
+                        TelegramTopic.NEW_SCHEDULES)
 
 
 def upsert_validated_schedules_moderation(website: Website,
