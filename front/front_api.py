@@ -22,7 +22,7 @@ from front.services.search.autocomplete_service import get_aggregated_response, 
 from front.services.search.search_service import TimeFilter, AggregationItem, BoundingBox, \
     get_dioceses_bounding_box, get_churches_by_uuid, get_churches_by_diocese, \
     get_churches_in_box, SearchResult, DEFAULT_LIMIT
-from registry.models import Church, Website, Diocese
+from registry.models import Church, Website, Diocese, City
 from scheduling.models import IndexEvent
 from scheduling.public_model import SourcedScheduleItem, BaseSource, ParsingSource, OClocherSource
 from scheduling.public_service import scheduling_get_indexed_scheduling, \
@@ -342,6 +342,28 @@ class DioceseOut(Schema):
         )
 
 
+class CityOut(Schema):
+    insee_code: str
+    name: str
+    slug: str
+    zipcode: str
+    population: int
+    latitude: float
+    longitude: float
+
+    @classmethod
+    def from_city(cls, city: City) -> 'CityOut':
+        return cls(
+            insee_code=city.insee_code,
+            name=city.name,
+            slug=city.slug,
+            zipcode=city.zipcode,
+            population=city.population,
+            latitude=city.location.y,
+            longitude=city.location.x,
+        )
+
+
 class ErrorSchema(Schema):
     detail: str
 
@@ -531,6 +553,24 @@ def api_front_get_dioceses(request) -> list[DioceseOut]:
     dioceses_and_box = get_dioceses_bounding_box()
     return [DioceseOut.from_diocese_and_box(diocese, bounding_box)
             for diocese, bounding_box in dioceses_and_box]
+
+
+@api.get("/cities", response=list[CityOut])
+def api_front_get_cities(request, limit: int = 100, offset: int = 0) -> list[CityOut]:
+    limit = max(0, min(1000, limit))
+    offset = max(0, offset)
+    cities = City.objects.filter(slug__isnull=False) \
+        .order_by('-population', 'insee_code')[offset:offset + limit]
+    return [CityOut.from_city(city) for city in cities]
+
+
+@api.get("/city/{city_slug}", response={200: CityOut, 404: ErrorSchema})
+def api_front_get_city(request, city_slug: str) -> CityOut:
+    try:
+        city = City.objects.get(slug=city_slug)
+    except City.DoesNotExist:
+        raise Http404(f'City with slug {city_slug} not found')
+    return CityOut.from_city(city)
 
 
 @api.post("/reports", response={200: ReportOut, 404: ErrorSchema})
