@@ -4,11 +4,6 @@
 # (host-independent, no public DNS/TLS round trip): the route checks the
 # CRON_SECRET bearer, then re-requests every page on the origin it was called on.
 ##
-- name: Remove the old revalidation cron (route renamed to /api/revalidate-pages)
-  cron:
-    name: front_revalidate_dioceses
-    state: absent
-
 - name: Add daily ISR revalidation cron for the front
   cron:
     name: front_revalidate_pages
