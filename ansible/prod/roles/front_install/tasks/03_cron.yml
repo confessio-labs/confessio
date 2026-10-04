@@ -1,11 +1,12 @@
 ##
-# Daily ISR revalidation (mirrors the Vercel cron in vercel.json). Hits the node
-# process directly on localhost (host-independent, no public DNS/TLS round trip);
-# the route checks the CRON_SECRET bearer and revalidatePath is host-agnostic.
+# Daily ISR revalidation at 1AM, so pages are rebuilt before anyone visits them
+# with a full day of events. Hits the node process directly on localhost
+# (host-independent, no public DNS/TLS round trip): the route checks the
+# CRON_SECRET bearer, then re-requests every page on the origin it was called on.
 ##
 - name: Add daily ISR revalidation cron for the front
   cron:
-    name: front_revalidate_dioceses
-    hour: "8"
+    name: front_revalidate_pages
+    hour: "1"
     minute: "0"
-    job: "curl -fsS -H 'Authorization: Bearer {{ cron_secret }}' http://127.0.0.1:{{ front_port }}/api/revalidate-dioceses > /dev/null"
+    job: "curl -fsS -H 'Authorization: Bearer {{ cron_secret }}' http://127.0.0.1:{{ front_port }}/api/revalidate-pages > /dev/null"
