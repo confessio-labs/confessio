@@ -13,6 +13,7 @@ class TelegramTopic(Enum):
     CONTACT_FORM = 29
     PB_OCLOCHER = 30
     NEW_SCHEDULES = 31
+    NEW_BUGS = 127
 
 
 MAX_TELEGRAM_TEXT = 4096

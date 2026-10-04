@@ -7,6 +7,7 @@ from django.http import HttpResponseBadRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from registry.models import ModerationMixin
 from registry.models.base_moderation_models import ModerationStatus
 from scheduling.utils.date_utils import datetime_to_ts_us, ts_us_to_datetime
@@ -163,6 +164,13 @@ def get_moderate_response(request, category: str, resource: str, status: str,
             moderation.comment = comment
             if new_status != moderation.status:
                 moderation.set_status(new_status, request.user)
+                if new_status == ModerationStatus.BUG:
+                    moderation_url = request.build_absolute_uri(get_moderation_url(moderation))
+                    send_telegram_alert(
+                        f"New bug on {resource} moderation ({category}) "
+                        f"by {request.user.username}\nurl: {moderation_url}"
+                        + (f"\n\ncomment:\n{comment}" if comment else ""),
+                        topic=TelegramTopic.NEW_BUGS)
             else:
                 moderation.save()
             do_redirect = False
