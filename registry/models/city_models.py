@@ -11,8 +11,7 @@ from core.models.db_functions import ImmutableUnaccent
 class City(TimeStampMixin):
     """French commune, seeded from geo.api.gouv.fr by `one_shot__seed_cities`.
 
-    Deliberately has no HistoricalRecords: the table is bulk-refreshed from an external dump,
-    and simple_history can not mirror a GeneratedField.
+    Deliberately has no HistoricalRecords: the table is bulk-refreshed from an external dump.
     """
     insee_code = models.CharField(max_length=5, unique=True)
     name = models.CharField(max_length=255)

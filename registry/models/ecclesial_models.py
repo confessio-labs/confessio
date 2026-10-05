@@ -14,8 +14,6 @@ def build_name_norm_field() -> models.GeneratedField:
     """Normalized name column used by autocomplete, identical on Website/Parish/Church/City.
 
     Keep in sync with registry.utils.city_name_utils.normalize_city_name.
-    simple_history can not mirror a GeneratedField, so models using it must declare
-    HistoricalRecords(excluded_fields=['name_norm']).
     """
     return models.GeneratedField(
         expression=Replace(
@@ -55,7 +53,7 @@ class Website(TimeStampMixin):
     unreliability_reason = models.CharField(choices=UnreliabilityReason, null=True, blank=True)
     contact_emails = ArrayField(models.CharField(max_length=100), null=True, blank=True)
     name_norm = build_name_norm_field()
-    history = HistoricalRecords(excluded_fields=['name_norm'])
+    history = HistoricalRecords()
 
     class Meta:
         indexes = [
@@ -92,7 +90,7 @@ class Parish(TimeStampMixin):
                                 null=True, blank=True)
     diocese = models.ForeignKey('Diocese', on_delete=models.CASCADE, related_name='parishes')
     name_norm = build_name_norm_field()
-    history = HistoricalRecords(excluded_fields=['name_norm'])
+    history = HistoricalRecords()
 
     class Meta:
         indexes = [
@@ -123,7 +121,7 @@ class Church(TimeStampMixin):
                                related_name='churches')
     is_active = models.BooleanField(default=True)
     name_norm = build_name_norm_field()
-    history = HistoricalRecords(excluded_fields=['name_norm'])
+    history = HistoricalRecords()
 
     class Meta:
         indexes = [
