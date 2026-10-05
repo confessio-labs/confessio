@@ -3,7 +3,6 @@ from uuid import UUID
 
 from django.db.models import Exists, OuterRef
 from ninja import NinjaAPI, Schema, Field
-from silk.profiling.profiler import silk_profile
 
 from registry.models import Church, ChurchModeration, Parish, Website
 from registry.models.base_moderation_models import ModerationStatus
@@ -273,7 +272,6 @@ class SchedulingOut(Schema):
         )
 
 
-@silk_profile
 @api.get("/schedulings", response=list[SchedulingOut])
 def api_public_schedulings(request, limit: int = 10, offset: int = 0, updated_from: datetime = None
                            ) -> list[SchedulingOut]:
