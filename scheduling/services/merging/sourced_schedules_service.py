@@ -131,12 +131,8 @@ def retrieve_schedulings_elements(schedulings: list[Scheduling]
     church_history_ids = {historical_church.church_history_id
                           for scheduling in schedulings
                           for historical_church in scheduling.historical_churches.all()}
-    # Not using .instance: it queries the live Church per item to fill the excluded name_norm
     church_by_history_id = {
-        historical_church.history_id: Church(**{
-            field.attname: getattr(historical_church, field.attname)
-            for field in historical_church.tracked_fields
-        })
+        historical_church.history_id: historical_church.instance
         for historical_church in Church.history.filter(history_id__in=church_history_ids)
     }
 
