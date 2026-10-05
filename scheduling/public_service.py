@@ -1,9 +1,11 @@
+from uuid import UUID
+
 from registry.models import Website
 from scheduling.models import Parsing, Scheduling
 from scheduling.models.pruning_models import Sentence, Pruning
 from scheduling.public_model import SchedulesList
 from scheduling.services.merging.sourced_schedules_service import SchedulingElements, \
-    retrieve_scheduling_elements
+    retrieve_scheduling_elements, retrieve_schedulings_elements
 from scheduling.services.parsing.parsing_service import has_schedules, get_dict_and_version, \
     get_parsing_church_desc_by_id, get_parsing_schedules_list, get_schedules_list_from_dict
 from scheduling.services.pruning.prune_scraping_service import create_pruning, \
@@ -108,6 +110,11 @@ def scheduling_get_indexed_scheduling(website: Website) -> Scheduling | None:
 
 def scheduling_retrieve_scheduling_elements(scheduling: Scheduling) -> SchedulingElements:
     return retrieve_scheduling_elements(scheduling)
+
+
+def scheduling_retrieve_schedulings_elements(schedulings: list[Scheduling]
+                                             ) -> dict[UUID, SchedulingElements]:
+    return retrieve_schedulings_elements(schedulings)
 
 
 def scheduling_get_scheduling_sources(scheduling: Scheduling | None) -> SchedulingSources:
