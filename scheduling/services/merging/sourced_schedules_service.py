@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from uuid import UUID
+
+from django.db.models import prefetch_related_objects
 
 from scheduling.services.merging.holiday_zone_service import get_website_holiday_zone
 from registry.models import Church, Website
@@ -119,19 +122,57 @@ def build_scheduling_elements(website: Website, scheduling: Scheduling | None
     )
 
 
+def retrieve_schedulings_elements(schedulings: list[Scheduling]
+                                  ) -> dict[UUID, SchedulingElements]:
+    # Load everything up front: a scheduling can be deleted (with its related objects) by a
+    # concurrent indexing while we are still serializing the others.
+    prefetch_related_objects(schedulings, 'historical_churches', 'pruning_parsings')
+
+    church_history_ids = {historical_church.church_history_id
+                          for scheduling in schedulings
+                          for historical_church in scheduling.historical_churches.all()}
+    church_by_history_id = {
+        historical_church.history_id: historical_church.instance
+        for historical_church in Church.history.filter(history_id__in=church_history_ids)
+    }
+
+    parsing_history_ids = {pruning_parsing.parsing_history_id
+                           for scheduling in schedulings
+                           for pruning_parsing in scheduling.pruning_parsings.all()}
+    parsing_by_history_id = {
+        historical_parsing.history_id: historical_parsing.instance
+        for historical_parsing in Parsing.history.filter(history_id__in=parsing_history_ids)
+    }
+
+    scheduling_elements_by_uuid = {}
+    for scheduling in schedulings:
+        assert scheduling.status == Scheduling.Status.INDEXED
+        assert scheduling.sourced_schedules_list is not None
+        assert scheduling.church_uuid_by_id is not None
+
+        sourced_schedules_list = SourcedSchedulesList(**scheduling.sourced_schedules_list)
+        church_by_uuid = {
+            str(church_by_history_id[historical_church.church_history_id].uuid):
+                church_by_history_id[historical_church.church_history_id]
+            for historical_church in scheduling.historical_churches.all()
+        }
+        church_by_id = {int(church_id): church_by_uuid[church_uuid]
+                        for church_id, church_uuid in scheduling.church_uuid_by_id.items()}
+
+        parsings = []
+        for pruning_parsing in scheduling.pruning_parsings.all():
+            parsing = parsing_by_history_id[pruning_parsing.parsing_history_id]
+            if parsing not in parsings:
+                parsings.append(parsing)
+
+        scheduling_elements_by_uuid[scheduling.uuid] = SchedulingElements(
+            sourced_schedules_list=sourced_schedules_list,
+            church_by_id=church_by_id,
+            parsings=parsings,
+        )
+
+    return scheduling_elements_by_uuid
+
+
 def retrieve_scheduling_elements(scheduling: Scheduling) -> SchedulingElements:
-    assert scheduling.status == Scheduling.Status.INDEXED
-    assert scheduling.sourced_schedules_list is not None
-    assert scheduling.church_uuid_by_id is not None
-
-    sourced_schedules_list = SourcedSchedulesList(**scheduling.sourced_schedules_list)
-    scheduling_sources = get_scheduling_sources(scheduling)
-    church_by_uuid = {str(church.uuid): church for church in scheduling_sources.churches}
-    church_by_id = {int(church_id): church_by_uuid[church_uuid]
-                    for church_id, church_uuid in scheduling.church_uuid_by_id.items()}
-
-    return SchedulingElements(
-        sourced_schedules_list=sourced_schedules_list,
-        church_by_id=church_by_id,
-        parsings=scheduling_sources.parsings,
-    )
+    return retrieve_schedulings_elements([scheduling])[scheduling.uuid]

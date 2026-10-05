@@ -8,7 +8,8 @@ from registry.models import Church, ChurchModeration, Parish, Website
 from registry.models.base_moderation_models import ModerationStatus
 from scheduling.models import Scheduling, IndexEvent
 from scheduling.public_model import SourcedScheduleItem
-from scheduling.public_service import scheduling_retrieve_scheduling_elements
+from scheduling.public_service import scheduling_retrieve_schedulings_elements, \
+    SchedulingElements
 
 api = NinjaAPI(urls_namespace='main_api')
 
@@ -233,7 +234,7 @@ class SchedulingOut(Schema):
     events_by_churches: list[EventsByChurchOut]
 
     @classmethod
-    def from_scheduling(cls, scheduling: Scheduling):
+    def from_scheduling(cls, scheduling: Scheduling, scheduling_elements: SchedulingElements):
         # Events
         index_events_by_church_uuid = {}
         for index_event in scheduling.index_events.all():
@@ -247,7 +248,6 @@ class SchedulingOut(Schema):
 
         # Schedules
         schedules_by_churches = []
-        scheduling_elements = scheduling_retrieve_scheduling_elements(scheduling)
         for schedules_of_church in scheduling_elements.sourced_schedules_list\
                 .sourced_schedules_of_churches:
             church = scheduling_elements.church_by_id.get(schedules_of_church.church_id, None)
@@ -281,7 +281,11 @@ def api_public_schedulings(request, limit: int = 10, offset: int = 0, updated_fr
     scheduling_query = Scheduling.objects.filter(status=Scheduling.Status.INDEXED)
     if updated_from:
         scheduling_query = scheduling_query.filter(updated_at__gte=updated_from)
-    schedulings = scheduling_query.order_by('updated_at').all()[offset:offset + limit]\
-        .prefetch_related('index_events')
+    schedulings = list(
+        scheduling_query.order_by('updated_at').all()[offset:offset + limit]
+        .prefetch_related('index_events', 'historical_churches', 'pruning_parsings')
+    )
+    scheduling_elements_by_uuid = scheduling_retrieve_schedulings_elements(schedulings)
 
-    return list(map(SchedulingOut.from_scheduling, schedulings))
+    return [SchedulingOut.from_scheduling(scheduling, scheduling_elements_by_uuid[scheduling.uuid])
+            for scheduling in schedulings]
