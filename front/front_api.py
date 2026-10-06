@@ -161,9 +161,11 @@ class ReportIn(Schema):
     feedback_type: FeedbackTypeEnum
     error_type: ErrorTypeEnum | None = None
     comment: str | None = None
+    main_report_uuid: UUID | None = None
 
 
 class ReportOut(Schema):
+    uuid: UUID
     created_at: datetime
     feedback_type: FeedbackTypeEnum
     comment: str | None
@@ -172,6 +174,7 @@ class ReportOut(Schema):
     @classmethod
     def from_report(cls, report: Report, sub_reports: list[Report]) -> 'ReportOut':
         return cls(
+            uuid=report.uuid,
             created_at=report.created_at,
             feedback_type=FeedbackTypeEnum(report.feedback_type),
             comment=report.comment,
@@ -573,7 +576,7 @@ def api_front_get_city(request, city_slug: str) -> CityOut:
     return CityOut.from_city(city)
 
 
-@api.post("/reports", response={200: ReportOut, 404: ErrorSchema})
+@api.post("/reports", response={200: ReportOut, 400: ErrorSchema, 404: ErrorSchema})
 def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
     try:
         website = Website.objects.get(uuid=report_in.website_uuid)
@@ -587,12 +590,23 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
         except Church.DoesNotExist:
             raise Http404(f'Church {report_in.church_uuid} does not exist')
 
+    main_report = None
+    if report_in.main_report_uuid:
+        try:
+            main_report = Report.objects.get(uuid=report_in.main_report_uuid, website=website)
+        except Report.DoesNotExist:
+            raise Http404(f'Report {report_in.main_report_uuid} does not exist')
+        # Threads are one level deep: listing reports groups replies by their direct main_report
+        if main_report.main_report_id:
+            raise HttpError(400, 'Cannot reply to a reply')
+
     report = Report(
         website=website,
         church=church,
         feedback_type=Report.FeedbackType(report_in.feedback_type),
         error_type=Report.ErrorType(report_in.error_type) if report_in.error_type else None,
         comment=report_in.comment,
+        main_report=main_report,
     )
     save_report(request, report)
     report.refresh_from_db()
