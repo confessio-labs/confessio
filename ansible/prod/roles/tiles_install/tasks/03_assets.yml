@@ -1,0 +1,60 @@
+##
+# MapLibre cannot draw a single label without glyphs, nor a one-way arrow without the
+# sprite sheet. Only the three Noto Sans stacks and the "light" sprite are kept out of
+# the protomaps/basemaps-assets repository.
+##
+- name: Download basemaps-assets at {{ basemaps_assets_commit[:7] }}
+  ansible.builtin.get_url:
+    url: "https://github.com/protomaps/basemaps-assets/archive/{{ basemaps_assets_commit }}.tar.gz"
+    dest: "{{ tiles_work_dir }}/basemaps-assets-{{ basemaps_assets_commit }}.tar.gz"
+    checksum: "sha256:{{ basemaps_assets_sha256 }}"
+    owner: "{{ deployer_user }}"
+    group: "{{ deployer_group }}"
+    mode: "0644"
+  become: true
+
+- name: Install the Noto Sans glyph ranges
+  ansible.builtin.command:
+    argv:
+      - tar
+      - -xzf
+      - "{{ tiles_work_dir }}/basemaps-assets-{{ basemaps_assets_commit }}.tar.gz"
+      - -C
+      - "{{ tiles_dir }}/fonts"
+      - --strip-components=2
+      - "basemaps-assets-{{ basemaps_assets_commit }}/fonts/Noto Sans Regular"
+      - "basemaps-assets-{{ basemaps_assets_commit }}/fonts/Noto Sans Medium"
+      - "basemaps-assets-{{ basemaps_assets_commit }}/fonts/Noto Sans Italic"
+    creates: "{{ tiles_dir }}/fonts/Noto Sans Italic/0-255.pbf"
+  become: true
+  become_user: "{{ deployer_user }}"
+
+- name: Install the light sprite sheets
+  ansible.builtin.command:
+    argv:
+      - tar
+      - -xzf
+      - "{{ tiles_work_dir }}/basemaps-assets-{{ basemaps_assets_commit }}.tar.gz"
+      - -C
+      - "{{ tiles_dir }}/sprites"
+      - --strip-components=3
+      - "basemaps-assets-{{ basemaps_assets_commit }}/sprites/v4/light.json"
+      - "basemaps-assets-{{ basemaps_assets_commit }}/sprites/v4/light.png"
+      - "basemaps-assets-{{ basemaps_assets_commit }}/sprites/v4/light@2x.json"
+      - "basemaps-assets-{{ basemaps_assets_commit }}/sprites/v4/light@2x.png"
+    creates: "{{ tiles_dir }}/sprites/light@2x.png"
+  become: true
+  become_user: "{{ deployer_user }}"
+
+- name: Ensure the glyphs and sprites are readable by nginx
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deployer_user }}"
+    group: www-data
+    mode: u=rwX,g=rX,o=rX
+    recurse: yes
+  loop:
+    - "{{ tiles_dir }}/fonts"
+    - "{{ tiles_dir }}/sprites"
+  become: true

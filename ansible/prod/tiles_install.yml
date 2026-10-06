@@ -1,0 +1,8 @@
+##
+# This playbook extracts the vector tileset and serves it, with its glyphs and sprites, from nginx
+##
+- name: install the tile-serving stack
+  hosts: all
+  user: ubuntu
+  roles:
+    - tiles_install

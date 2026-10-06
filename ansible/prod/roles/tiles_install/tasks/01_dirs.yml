@@ -1,0 +1,18 @@
+##
+# tiles_dir is served by nginx as-is. tiles_work_dir sits beside it, out of nginx's
+# reach, so the new archive is written on the same filesystem and the final mv into
+# tiles_dir is atomic.
+##
+- name: Create the tile directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deployer_user }}"
+    group: www-data
+    mode: "0755"
+  loop:
+    - "{{ tiles_dir }}"
+    - "{{ tiles_dir }}/fonts"
+    - "{{ tiles_dir }}/sprites"
+    - "{{ tiles_work_dir }}"
+  become: true

@@ -1,0 +1,34 @@
+##
+# The vhost in roles/install picks this snippet up through a wildcard include, so it
+# can be added and removed without the main config ever referencing a missing file.
+##
+- name: Install the tile-serving nginx snippet
+  block:
+    - name: Template the tile-serving nginx snippet
+      ansible.builtin.template:
+        src: confessio-tiles.conf
+        dest: /etc/nginx/snippets/{{ app_name }}-tiles.conf
+        mode: "0644"
+      become: true
+      notify:
+        - reload nginx
+
+    # validate: on the template above cannot do this -- nginx -t needs a whole config,
+    # not a location fragment.
+    - name: Check the nginx configuration
+      ansible.builtin.command: nginx -t
+      changed_when: false
+      become: true
+
+  # A snippet that fails nginx -t must not stay on disk: the running nginx ignores it
+  # until the next restart (reboot, certbot renewal), which would then fail.
+  rescue:
+    - name: Remove the rejected snippet
+      ansible.builtin.file:
+        path: /etc/nginx/snippets/{{ app_name }}-tiles.conf
+        state: absent
+      become: true
+
+    - name: Fail with the nginx error
+      ansible.builtin.fail:
+        msg: "nginx -t rejected the tiles snippet, so it was removed: {{ ansible_failed_result.stderr | default(ansible_failed_result.msg) }}"
