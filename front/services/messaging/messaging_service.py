@@ -20,17 +20,27 @@ from django.utils import timezone
 from email.utils import formataddr
 
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
-from front.models import Conversation, Message
+from front.models import Conversation, Message, MessageImage
 from front.services.messaging.conversation_moderation_service import (
     upsert_conversation_moderation)
-from front.utils.messaging_utils import (HistoryEntry, build_outbound_bodies,
+from front.utils.messaging_utils import (HistoryEntry, ImageAttachment, build_outbound_bodies,
                                          build_reply_subject, build_ses_message_id,
                                          build_thread_headers, extract_conversation_uuid,
                                          first_external_address, is_automated_sender,
-                                         is_same_email, parse_message_ids, parse_sender)
+                                         is_same_email, parse_message_ids, parse_sender,
+                                         select_inbound_images)
 
 # A long mail adds nothing to an alert whose job is to hand over the link.
 MAX_ALERT_BODY = 1200
+
+
+def read_image_attachments(files) -> list[ImageAttachment]:
+    """Uploaded files as the services take them. Mailgun and browsers may add parameters or
+    capitals to a content type."""
+    return [ImageAttachment(name=file.name or '',
+                            content_type=(file.content_type or '').split(';')[0].strip().lower(),
+                            content=file.read())
+            for file in files]
 
 
 def get_conversation_url(request, conversation: Conversation) -> str:
@@ -43,6 +53,7 @@ def get_home_url(request) -> str:
 
 def _build_mail(subject: str, content: str, entries: list[HistoryEntry], request,
                 conversation: Conversation, always_footer: bool = False,
+                images: list[MessageImage] | None = None,
                 **kwargs) -> EmailMultiAlternatives:
     """One mail, two parts. The text part is the one that matters on the way back: Mailgun strips
     it at the footer's `--` and we read the thread key out of it."""
@@ -52,10 +63,15 @@ def _build_mail(subject: str, content: str, entries: list[HistoryEntry], request
                                                  always_footer=always_footer)
     mail = EmailMultiAlternatives(subject=subject, body=text_body, **kwargs)
     mail.attach_alternative(html_body, 'text/html')
+    # Plain attachments rather than images inlined in the HTML: clients preview them anyway, and
+    # unlike inline ones they are not carried back along with every reply.
+    for image in images or []:
+        mail.attach(image.name, bytes(image.content), image.content_type)
     return mail
 
 
-def send_message(request, conversation: Conversation, body: str, author) -> Message:
+def send_message(request, conversation: Conversation, body: str, author,
+                 images: list[ImageAttachment] | None = None) -> Message:
     """Record an outgoing message and mail it to the correspondent.
 
     Sending is synchronous: a failure is stored on the row rather than raised, so the admin sees
@@ -73,6 +89,7 @@ def send_message(request, conversation: Conversation, body: str, author) -> Mess
         author=author,
         status=Message.Status.SENT,
     )
+    message_images = _store_images(message, images or [])
     email = _build_mail(
         # From is CONTACT_EMAIL, not DEFAULT_FROM_EMAIL: it is the address Mailgun routes back
         # to our webhook, so the answer reaches the thread by simply hitting reply. A no-reply@
@@ -83,6 +100,7 @@ def send_message(request, conversation: Conversation, body: str, author) -> Mess
         entries=_history_entries(previous),
         request=request,
         conversation=conversation,
+        images=message_images,
         from_email=formataddr(('Confessio', os.environ.get('CONTACT_EMAIL'))),
         to=[conversation.email],
         headers=build_thread_headers([one.message_id for one in previous]),
@@ -135,7 +153,8 @@ def record_contact_form(request, name: str, email: str, subject: str, body: str)
 def ingest_received_email(request, from_header: str, reply_to: str, subject: str,
                           body_plain: str, stripped_text: str, body_html: str = '',
                           message_id: str = '', in_reply_to: str = '',
-                          references: str = '') -> Message | None:
+                          references: str = '',
+                          attachments: list[ImageAttachment] | None = None) -> Message | None:
     """Turn one mail received on the contact address into a message.
 
     Returns None for mail nobody could answer (bounces, auto-responders) and for a delivery we
@@ -165,6 +184,7 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
         status=Message.Status.RECEIVED,
         message_id=_fit(Message, 'message_id', message_id),
     )
+    _store_inbound_images(message, attachments or [])
     _touch(conversation)
     upsert_conversation_moderation(conversation)
     _notify_admins(request, message)
@@ -177,7 +197,8 @@ def ingest_received_email(request, from_header: str, reply_to: str, subject: str
 def ingest_sent_email(from_header: str, to_header: str, subject: str,
                       body_plain: str, stripped_text: str, body_html: str = '',
                       message_id: str = '', in_reply_to: str = '',
-                      references: str = '') -> Message | None:
+                      references: str = '',
+                      attachments: list[ImageAttachment] | None = None) -> Message | None:
     """Record a reply the admin wrote in the contact mailbox, outside /messaging.
 
     Mailgun keeps no copy of what our domain sends, so the only way to see such a reply is to be
@@ -215,6 +236,7 @@ def ingest_sent_email(from_header: str, to_header: str, subject: str,
         status=Message.Status.SENT,
         message_id=_fit(Message, 'message_id', message_id),
     )
+    _store_inbound_images(message, attachments or [])
     _touch(conversation)
     return message
 
@@ -292,6 +314,28 @@ def _send_and_record(message: Message, email: EmailMultiAlternatives) -> None:
         message.save(update_fields=['message_id', 'updated_at'])
 
 
+def _store_images(message: Message, images: list[ImageAttachment]) -> list[MessageImage]:
+    return MessageImage.objects.bulk_create([MessageImage(
+        message=message,
+        name=_fit(MessageImage, 'name', image.name) or 'image',
+        content_type=image.content_type,
+        content=image.content,
+        sha256=image.sha256,
+    ) for image in images])
+
+
+def _store_inbound_images(message: Message, attachments: list[ImageAttachment]) -> None:
+    """Keep the images of a received mail, minus those the thread already shows: a reply carries
+    along the inline images of the mails it quotes."""
+    images = select_inbound_images(attachments)
+    known = set(MessageImage.objects
+                .filter(message__conversation=message.conversation,
+                        sha256__in=[image.sha256 for image in images])
+                .exclude(message=message)
+                .values_list('sha256', flat=True))
+    _store_images(message, [image for image in images if image.sha256 not in known])
+
+
 def _fit(model, field_name: str, value: str) -> str:
     """Clip a header to the column it lands in.
 
@@ -326,10 +370,13 @@ def _label(message: Message) -> str:
 
 def _notify_admins(request, message: Message) -> None:
     conversation = message.conversation
+    nb_images = message.images.count()
+    images_line = f"[{nb_images} image(s)]\n\n" if nb_images else ''
     send_telegram_alert(
         message=f"{conversation.subject}\n"
                 f"De : {message.from_email or conversation.email}\n\n"
                 f"{message.body[:MAX_ALERT_BODY]}\n\n"
+                f"{images_line}"
                 f"{get_conversation_url(request, conversation)}",
         topic=TelegramTopic.CONTACT_FORM)
 

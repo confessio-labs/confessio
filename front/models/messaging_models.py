@@ -64,6 +64,27 @@ class Message(TimeStampMixin):
         return f'{self.conversation_id} {self.direction} {self.created_at}'
 
 
+class MessageImage(TimeStampMixin):
+    """An image sent or received with a message, shown after its text.
+
+    Kept in Postgres rather than S3: our bucket is public-read, which private correspondence must
+    not be, and the volume is that of an admin inbox.
+    """
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='images')
+    name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100)
+    content = models.BinaryField()
+    # Gmail re-attaches the quoted inline images of a thread to every reply: this is what lets us
+    # recognise the ones we already have.
+    sha256 = models.CharField(max_length=64, db_index=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.message_id} {self.name}'
+
+
 class ConversationModeration(ModerationMixin):
     class Category(models.TextChoices):
         NEW_MESSAGE = "new_message"

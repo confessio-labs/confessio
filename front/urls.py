@@ -59,6 +59,7 @@ urlpatterns = [
     path('messaging/<uuid:conversation_uuid>', views.messaging, name='messaging_view'),
     path('messaging/<uuid:conversation_uuid>/message', views.messaging_message,
          name='messaging_message'),
+    path('messaging/images/<uuid:image_uuid>', views.messaging_image, name='messaging_image'),
 
     # moderation
     path('moderate', views.moderation_home, name='moderation_home'),

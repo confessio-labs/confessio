@@ -60,14 +60,19 @@
           </div>
 
           <form method="post" action="{% url 'messaging_message' conversation.uuid %}"
-                class="messaging-input">
+                class="messaging-compose" enctype="multipart/form-data" data-messaging-images>
             {% csrf_token %}
-            <textarea name="text" class="form-control" rows="3" required
-                      placeholder="Écris ta réponse…"></textarea>
-            <button type="submit" class="btn btn-primary">Envoyer</button>
+            <div class="messaging-input">
+              <textarea name="text" class="form-control" rows="3"
+                        placeholder="Écris ta réponse… (Ctrl+V pour coller une image)"></textarea>
+              {% include 'partials/messaging_attach_button.html' %}
+              <button type="submit" class="btn btn-primary">Envoyer</button>
+            </div>
+            <div class="messaging-thumbnails"></div>
           </form>
         {% else %}
-          <form method="post" action="{% url 'messaging_new' %}" class="messaging-new">
+          <form method="post" action="{% url 'messaging_new' %}" class="messaging-new"
+                enctype="multipart/form-data" data-messaging-images>
             {% csrf_token %}
             <h4>Nouvelle conversation</h4>
             <div class="mb-2">
@@ -82,9 +87,11 @@
             </div>
             <div class="mb-2">
               <label class="form-label" for="messaging-text">Message</label>
-              <textarea name="text" id="messaging-text" class="form-control" rows="6" required
-                        placeholder="Bonjour,…"></textarea>
+              <textarea name="text" id="messaging-text" class="form-control" rows="6"
+                        placeholder="Bonjour,… (Ctrl+V pour coller une image)"></textarea>
             </div>
+            <div class="messaging-thumbnails mb-2"></div>
+            {% include 'partials/messaging_attach_button.html' %}
             <button type="submit" class="btn btn-primary">Envoyer</button>
           </form>
         {% endif %}
@@ -95,3 +102,8 @@
 </section>
 </main>
 {% endblock content %}
+
+{% block javascripts %}
+    {{ block.super }}
+    <script src="{% static 'js/messaging_images0.js' %}"></script>
+{% endblock javascripts %}

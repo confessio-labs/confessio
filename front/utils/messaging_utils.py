@@ -8,10 +8,13 @@ the uuid back from when the correspondent replies with our message quoted. The M
 store are the second: `In-Reply-To`/`References` name them on the way back in, even when the
 correspondent's client dropped the quoted body.
 """
+import hashlib
 import re
 from dataclasses import dataclass
 from email.utils import getaddresses, parseaddr
 from html import escape
+
+from django.utils.html import urlize
 
 FOOTER_INTRO = "Ce message est traité par l'équipe de"
 FOOTER_LABEL = 'Espace administrateur'
@@ -32,6 +35,14 @@ MESSAGE_ID_RE = re.compile(r'<[^<>@\s]+@[^<>\s]+>')
 # Senders we never open a conversation for: bounces and auto-responders have nobody to reply to.
 AUTOMATED_LOCAL_PARTS = ('mailer-daemon', 'postmaster')
 
+IMAGE_CONTENT_TYPES = ('image/png', 'image/jpeg', 'image/webp', 'image/gif')
+# nginx caps a whole request body at 10m: the images of one message must fit in it together, and
+# so must those of an inbound mail, which Mailgun posts in a single request.
+MAX_IMAGES_SIZE = 9 * 1024 * 1024
+MAX_IMAGES_PER_MESSAGE = 10
+# Below this, an inbound image is a tracking pixel or a signature icon, not something sent to us.
+MIN_INBOUND_IMAGE_SIZE = 2 * 1024
+
 
 @dataclass(frozen=True)
 class HistoryEntry:
@@ -40,6 +51,43 @@ class HistoryEntry:
     sent_at: str  # already formatted for display
     body: str
     is_outbound: bool
+
+
+@dataclass(frozen=True)
+class ImageAttachment:
+    name: str
+    content_type: str
+    content: bytes
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.content).hexdigest()
+
+
+def find_error_in_outbound_images(images: list[ImageAttachment]) -> str | None:
+    if len(images) > MAX_IMAGES_PER_MESSAGE:
+        return f'{MAX_IMAGES_PER_MESSAGE} images maximum par message.'
+    if any(image.content_type not in IMAGE_CONTENT_TYPES for image in images):
+        return "Format d'image non supporté (PNG, JPEG, WEBP ou GIF)."
+    if sum(len(image.content) for image in images) > MAX_IMAGES_SIZE:
+        return "Les images d'un message ne doivent pas dépasser 9 Mo au total."
+    return None
+
+
+def select_inbound_images(attachments: list[ImageAttachment]) -> list[ImageAttachment]:
+    """The attachments of a received mail worth showing in the thread."""
+    selected = []
+    seen = set()
+    for attachment in attachments:
+        if attachment.content_type not in IMAGE_CONTENT_TYPES:
+            continue
+        if len(attachment.content) < MIN_INBOUND_IMAGE_SIZE:
+            continue
+        if attachment.sha256 in seen:
+            continue
+        seen.add(attachment.sha256)
+        selected.append(attachment)
+    return selected
 
 
 def conversation_footer(conversation_url: str, home_url: str) -> str:
@@ -74,10 +122,11 @@ def html_paragraphs(text: str) -> str:
     """Turn a plain-text block into paragraphs: one <p> per blank line, <br> inside.
 
     Everything is escaped — these bodies come from mail we received, and none of it is markup we
-    wrote.
+    wrote — except the links, which are made clickable like in /messaging.
     """
     blocks = [block for block in re.split(r'\n\s*\n', text.strip()) if block.strip()]
-    return ''.join('<p>' + '<br>'.join(escape(line) for line in block.split('\n')) + '</p>'
+    return ''.join('<p>' + '<br>'.join(urlize(line, autoescape=True)
+                                       for line in block.split('\n')) + '</p>'
                    for block in blocks)
 
 

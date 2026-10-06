@@ -18,7 +18,19 @@
         {% endif %}
       {% endif %}
     </div>
-    <div class="messaging-bubble messaging-bubble--{{ message.direction }}">{{ message.body|urlize|linebreaksbr }}</div>
+    {% if message.body %}
+      <div class="messaging-bubble messaging-bubble--{{ message.direction }}">{{ message.body|urlize|linebreaksbr }}</div>
+    {% endif %}
+    {% if message.images.all %}
+      <div class="messaging-images messaging-images--{{ message.direction }}">
+        {% for image in message.images.all %}
+          {% url 'messaging_image' image.uuid as image_url %}
+          <a href="{{ image_url }}" target="_blank" title="{{ image.name }}">
+            <img class="messaging-image" src="{{ image_url }}" alt="{{ image.name }}" loading="lazy">
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
     {% if message.status == 'failed' %}
       <div class="messaging-error">
         <i class="fas fa-exclamation-triangle"></i> Échec de l'envoi : {{ message.error_message }}
