@@ -18,7 +18,7 @@
         {% endif %}
       {% endif %}
     </div>
-    <div class="messaging-bubble messaging-bubble--{{ message.direction }}">{{ message.body|linebreaksbr }}</div>
+    <div class="messaging-bubble messaging-bubble--{{ message.direction }}">{{ message.body|urlize|linebreaksbr }}</div>
     {% if message.status == 'failed' %}
       <div class="messaging-error">
         <i class="fas fa-exclamation-triangle"></i> Échec de l'envoi : {{ message.error_message }}

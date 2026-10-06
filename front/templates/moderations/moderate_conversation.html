@@ -5,7 +5,7 @@
 
     Sujet : {{ conversation.subject }}<br>
     De : {{ conversation.name }} &lt;{{ conversation.email }}&gt;<br>
-    {% if last_message %}{{ last_message.body|linebreaks }}{% endif %}
+    {% if last_message %}{{ last_message.body|urlize|linebreaks }}{% endif %}
     Lien : <a href="{% url 'messaging_view' conversation.uuid %}" target="_blank">Ouvrir la
         conversation</a>
 
