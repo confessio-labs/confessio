@@ -51,10 +51,12 @@
 }
 .messaging-thumbnails { display: flex; flex-wrap: wrap; gap: .5rem; }
 .messaging-thumbnails:not(:empty) { margin-top: .5rem; }
-.messaging-thumbnail { position: relative; }
+.messaging-thumbnail { position: relative; max-width: 100%; }
 .messaging-thumbnail img {
+  display: block;
   max-height: 360px;
-  max-width: min(640px, 100%);
+  /* A % max-width is ignored for intrinsic sizing, which made the wrapper wider than the image */
+  max-width: min(640px, calc(100vw - 3rem));
   border-radius: .4rem;
   border: 1px solid #ddd;
 }
