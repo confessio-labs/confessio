@@ -1,0 +1,85 @@
+##
+# Cut the covered area out of a Protomaps planet build. pmtiles extract fetches only the
+# byte ranges it needs, so this is a download of a few GB, not a tile build.
+#
+# 00_preflight decides whether to run, from the stamp recording which build is live and
+# the region it was cut with: re-running with the same tiles_build_date is a no-op,
+# bumping it replaces the archive. The browser library notices the new ETag on its own,
+# so the replacement needs no front deploy.
+##
+- name: Extract and publish the {{ tiles_build_date }} tileset
+  when: tiles_needs_extract | bool
+  block:
+    - name: Install the coverage region
+      ansible.builtin.copy:
+        src: france.geojson
+        dest: "{{ tiles_work_dir }}/france.geojson"
+        owner: "{{ deployer_user }}"
+        group: "{{ deployer_group }}"
+        mode: "0644"
+      become: true
+
+    - name: Remove a partial archive left by an interrupted run
+      ansible.builtin.file:
+        path: "{{ tiles_work_dir }}/france.pmtiles.tmp"
+        state: absent
+      become: true
+
+    # Async: the download takes several minutes and would otherwise sit on an idle SSH
+    # channel long enough to be dropped. nice/ionice keep Postgres and gunicorn responsive.
+    - name: Extract the covered area from build {{ tiles_build_date }}
+      ansible.builtin.command:
+        argv:
+          - nice
+          - -n
+          - "19"
+          - ionice
+          - -c
+          - "2"
+          - -n
+          - "7"
+          - "{{ pmtiles_bin }}"
+          - extract
+          - "{{ tiles_build_url }}"
+          - "{{ tiles_work_dir }}/france.pmtiles.tmp"
+          - "--region={{ tiles_work_dir }}/france.geojson"
+      async: "{{ tiles_extract_timeout }}"
+      poll: 30
+      become: true
+      become_user: "{{ deployer_user }}"
+
+    - name: Verify the new archive
+      ansible.builtin.command:
+        argv:
+          - "{{ pmtiles_bin }}"
+          - verify
+          - "{{ tiles_work_dir }}/france.pmtiles.tmp"
+      changed_when: false
+      become: true
+      become_user: "{{ deployer_user }}"
+
+    - name: Make the new archive readable by nginx
+      ansible.builtin.file:
+        path: "{{ tiles_work_dir }}/france.pmtiles.tmp"
+        owner: "{{ deployer_user }}"
+        group: www-data
+        mode: "0644"
+      become: true
+
+    - name: Swap the new archive in
+      ansible.builtin.command:
+        argv:
+          - mv
+          - -f
+          - "{{ tiles_work_dir }}/france.pmtiles.tmp"
+          - "{{ tiles_archive }}"
+      become: true
+
+    - name: Record which build is live
+      ansible.builtin.copy:
+        content: "{{ tiles_build_date }}\n"
+        dest: "{{ tiles_work_dir }}/france.build"
+        owner: "{{ deployer_user }}"
+        group: "{{ deployer_group }}"
+        mode: "0644"
+      become: true

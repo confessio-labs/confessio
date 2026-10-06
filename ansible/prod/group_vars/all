@@ -124,3 +124,24 @@ map_tiler_api_key: "{{ lookup('ansible.builtin.env', 'NEXT_PUBLIC_MAP_TILER_API_
 cron_secret: "{{ lookup('ansible.builtin.env', 'CRON_SECRET') }}"
 posthog_project_token: "{{ lookup('ansible.builtin.env', 'NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN') }}"
 posthog_host: "{{ lookup('ansible.builtin.env', 'NEXT_PUBLIC_POSTHOG_HOST') }}"
+
+# Self-hosted map tiles
+# One PMTiles archive cut from a Protomaps daily build, served straight off disk by
+# nginx. To refresh it, set tiles_build_date to a build from the last 7 days (older
+# ones are deleted upstream) and re-run tiles_install.
+tiles_root: /var/www
+tiles_dir: "{{ tiles_root }}/tiles"
+tiles_work_dir: "{{ tiles_root }}/tiles-work"
+tiles_archive: "{{ tiles_dir }}/france.pmtiles"
+tiles_build_date: "20261005"
+tiles_build_url: "https://build.protomaps.com/{{ tiles_build_date }}.pmtiles"
+tiles_extract_timeout: 3600
+tiles_free_gb_required: 15  # the live archive, its replacement, and headroom
+
+pmtiles_version: "1.31.2"
+pmtiles_sha256: 3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f
+pmtiles_bin: "{{ tiles_work_dir }}/pmtiles-{{ pmtiles_version }}/pmtiles"
+
+# Glyphs and sprites the @protomaps/basemaps style asks for
+basemaps_assets_commit: 028c18f713baecad011301ff7a69acc39bcc2ae7
+basemaps_assets_sha256: 57e40e8c512bd8042d0a3a251f19d0d1c8523ad963c666c3c6643bada4dc92d0

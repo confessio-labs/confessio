@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [[ $# -eq 0 ]] ; then
-    echo 'please specify install, deploy, cron, manage or manage_tmux'
+    echo 'please specify install, deploy, cron, manage, manage_tmux or tiles_install'
     exit 1
 fi
 

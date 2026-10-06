@@ -1,0 +1,33 @@
+##
+# The pmtiles CLI: one static Go binary, used only to cut the extract
+##
+- name: Create the pmtiles {{ pmtiles_version }} directory
+  ansible.builtin.file:
+    path: "{{ pmtiles_bin | dirname }}"
+    state: directory
+    owner: "{{ deployer_user }}"
+    group: "{{ deployer_group }}"
+    mode: "0755"
+  become: true
+
+- name: Download pmtiles {{ pmtiles_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/protomaps/go-pmtiles/releases/download/v{{ pmtiles_version }}/go-pmtiles_{{ pmtiles_version }}_Linux_x86_64.tar.gz"
+    dest: "{{ pmtiles_bin | dirname }}/go-pmtiles.tar.gz"
+    checksum: "sha256:{{ pmtiles_sha256 }}"
+    owner: "{{ deployer_user }}"
+    group: "{{ deployer_group }}"
+    mode: "0644"
+  become: true
+
+- name: Unpack pmtiles {{ pmtiles_version }}
+  ansible.builtin.unarchive:
+    src: "{{ pmtiles_bin | dirname }}/go-pmtiles.tar.gz"
+    dest: "{{ pmtiles_bin | dirname }}"
+    remote_src: yes
+    include:
+      - pmtiles
+    owner: "{{ deployer_user }}"
+    group: "{{ deployer_group }}"
+    creates: "{{ pmtiles_bin }}"
+  become: true

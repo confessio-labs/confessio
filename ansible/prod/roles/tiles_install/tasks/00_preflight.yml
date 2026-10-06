@@ -1,0 +1,72 @@
+##
+# Read-only probes, run first on every install. They also run alone, as a dry run that
+# changes nothing on the host:
+#   ansible-playbook ansible/prod/tiles_install.yml --tags preflight ...
+##
+- name: Refuse to install the x86_64 pmtiles build on another architecture
+  ansible.builtin.assert:
+    that: ansible_architecture == "x86_64"
+    fail_msg: "pmtiles_sha256 is for the Linux x86_64 build, but this host is {{ ansible_architecture }}."
+
+- name: Check which build the live archive came from
+  ansible.builtin.slurp:
+    src: "{{ tiles_work_dir }}/france.build"
+  register: tiles_stamp
+  failed_when: false
+
+- name: Check whether the coverage region changed
+  ansible.builtin.stat:
+    path: "{{ tiles_work_dir }}/france.geojson"
+    checksum_algorithm: sha1
+  register: tiles_region_stat
+
+- name: Decide whether the archive must be (re)extracted
+  ansible.builtin.set_fact:
+    tiles_live_build: "{{ (tiles_stamp.content | b64decode | trim) if tiles_stamp.content is defined else 'none' }}"
+    tiles_needs_extract: >-
+      {{ tiles_stamp.content is not defined
+         or (tiles_stamp.content | b64decode | trim) != tiles_build_date
+         or not tiles_region_stat.stat.exists
+         or tiles_region_stat.stat.checksum != (lookup('ansible.builtin.file', 'france.geojson', rstrip=false) | hash('sha1')) }}
+
+- name: Check that build {{ tiles_build_date }} is still published
+  ansible.builtin.uri:
+    url: "{{ tiles_build_url }}"
+    method: HEAD
+  register: tiles_build_head
+  failed_when: false
+  check_mode: false
+  when: tiles_needs_extract | bool
+
+- name: Ensure build {{ tiles_build_date }} can be downloaded
+  ansible.builtin.assert:
+    that: tiles_build_head.status == 200
+    fail_msg: >-
+      {{ tiles_build_url }} answered {{ tiles_build_head.status }}. Protomaps keeps daily
+      builds for 7 days: set tiles_build_date to a recent one.
+    quiet: true
+  when: tiles_needs_extract | bool
+
+- name: Measure the free space where the archive lives
+  ansible.builtin.command:
+    argv: [df, --output=avail, -BG, "{{ tiles_root }}"]
+  register: tiles_df
+  changed_when: false
+  check_mode: false
+  when: tiles_needs_extract | bool
+
+- name: Ensure there is room for the new archive next to the live one
+  vars:
+    tiles_free_gb: "{{ tiles_df.stdout_lines[-1] | trim | regex_replace('G$', '') | int }}"
+  ansible.builtin.assert:
+    that:
+      - tiles_free_gb | int >= tiles_free_gb_required | int
+    fail_msg: "Need ~{{ tiles_free_gb_required }} GB free under {{ tiles_root }}, only {{ tiles_free_gb }} GB available."
+    success_msg: "{{ tiles_free_gb }} GB free under {{ tiles_root }}."
+  when: tiles_needs_extract | bool
+
+- name: Report what the install will do to the archive
+  ansible.builtin.debug:
+    msg: >-
+      {{ ('extract build ' ~ tiles_build_date ~ ' (live: ' ~ tiles_live_build ~ ', ~6 GB download)')
+         if tiles_needs_extract | bool else ('up to date with build ' ~ tiles_build_date) }}

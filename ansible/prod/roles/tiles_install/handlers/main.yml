@@ -1,0 +1,6 @@
+# reload, not restart: this snippet is bolted onto the vhost that also fronts Django
+# and the Next.js app. A reload leaves the running master serving the old config if
+# the new one is bad; a restart would take the whole site down with it.
+- name: reload nginx
+  service: name=nginx state=reloaded enabled=yes
+  become: yes

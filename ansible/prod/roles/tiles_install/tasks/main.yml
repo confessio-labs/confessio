@@ -1,0 +1,10 @@
+##
+# Serve the self-hosted vector tiles, their glyphs and sprites from the existing nginx
+##
+- import_tasks: 00_preflight.yml
+  tags: preflight
+- import_tasks: 01_dirs.yml
+- import_tasks: 02_pmtiles.yml
+- import_tasks: 03_assets.yml
+- import_tasks: 04_extract.yml
+- import_tasks: 05_nginx.yml

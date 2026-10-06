@@ -170,6 +170,30 @@ ansible-galaxy collection install grafana.grafana --force
 ```
 This is mainly inspired by https://realpython.com/automating-django-deployments-with-fabric-and-ansible/
 
+### Map tiles
+
+The front's map uses vector tiles served by our own nginx at `/tiles/`: one
+`france.pmtiles` archive (about 6 GB) cut from a [Protomaps](https://docs.protomaps.com/basemaps/downloads)
+daily build, plus the glyphs and sprites the style needs. There is no tile server and
+no build step: `pmtiles extract` downloads only the covered area.
+
+```shell
+# dry run: architecture, build availability, free disk, and what would change (writes nothing)
+source .env; ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook ansible/prod/tiles_install.yml --tags preflight -K -u ubuntu -i ansible/prod/hosts
+# install, or refresh after changing tiles_build_date in group_vars/all
+./prod.sh tiles_install
+```
+
+Refresh about every 6 months. Protomaps only keeps the last 7 days of builds, so pick a
+recent `tiles_build_date`. Re-running with the same date does nothing; the swap is
+atomic and needs no front deploy.
+
+The covered area is `roles/tiles_install/files/france.geojson`: mainland France,
+Corsica, the overseas departments, Saint-Pierre-et-Miquelon, Saint-Martin and
+Saint-Barthélemy, buffered by ~15 km. It was generated from the Natural Earth 10m
+admin-0 countries (`FRA`, `MAF`, `BLM`, `SPM`, `MCO`) with shapely: `unary_union`,
+`buffer(0.15)`, `simplify(0.03)`.
+
 ### Restore DB backup
 ```shell
 # SSH to server then grant confessio postgresql superuser privilege
