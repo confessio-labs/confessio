@@ -320,16 +320,6 @@ class HtmlRenderingTests(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-    def test_images_come_after_the_text_and_before_the_footer(self):
-        text, html = build_outbound_bodies('Bonjour', [], URL, HOME,
-                                           image_content_ids=[UUID, OTHER_UUID])
-        # The text part has nothing to say about them: they travel as MIME parts.
-        self.assertEqual(f'Bonjour\n\n{FOOTER}', text)
-        first, second = html.index(f'src="cid:{UUID}"'), html.index(f'src="cid:{OTHER_UUID}"')
-        self.assertLess(html.index('<p>Bonjour</p>'), first)
-        self.assertLess(first, second)
-        self.assertLess(second, html.index('<hr'))
-
 
 def image(content: bytes, content_type: str = 'image/png') -> ImageAttachment:
     return ImageAttachment(name='capture.png', content_type=content_type, content=content)

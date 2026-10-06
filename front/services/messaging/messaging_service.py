@@ -11,7 +11,6 @@ Everything we mail to the contact address goes out from no-reply@, which is prec
 inbound webhook filters on so our own mirrors never come back in as new messages.
 """
 import os
-from email.mime.image import MIMEImage
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
@@ -58,29 +57,17 @@ def _build_mail(subject: str, content: str, entries: list[HistoryEntry], request
                 **kwargs) -> EmailMultiAlternatives:
     """One mail, two parts. The text part is the one that matters on the way back: Mailgun strips
     it at the footer's `--` and we read the thread key out of it."""
-    images = images or []
     text_body, html_body = build_outbound_bodies(content, entries,
                                                  get_conversation_url(request, conversation),
                                                  get_home_url(request),
-                                                 always_footer=always_footer,
-                                                 image_content_ids=[str(image.uuid)
-                                                                    for image in images])
+                                                 always_footer=always_footer)
     mail = EmailMultiAlternatives(subject=subject, body=text_body, **kwargs)
     mail.attach_alternative(html_body, 'text/html')
-    if images:
-        # related, not mixed: the images are parts of the HTML body, which is what makes clients
-        # render them in place instead of listing them as attachments.
-        mail.mixed_subtype = 'related'
-        for image in images:
-            mail.attach(_mime_image(image))
+    # Plain attachments rather than images inlined in the HTML: clients preview them anyway, and
+    # unlike inline ones they are not carried back along with every reply.
+    for image in images or []:
+        mail.attach(image.name, bytes(image.content), image.content_type)
     return mail
-
-
-def _mime_image(image: MessageImage) -> MIMEImage:
-    part = MIMEImage(bytes(image.content), _subtype=image.content_type.split('/')[-1])
-    part.add_header('Content-ID', f'<{image.uuid}>')
-    part.add_header('Content-Disposition', 'inline', filename=image.name)
-    return part
 
 
 def send_message(request, conversation: Conversation, body: str, author,
@@ -339,7 +326,7 @@ def _store_images(message: Message, images: list[ImageAttachment]) -> list[Messa
 
 def _store_inbound_images(message: Message, attachments: list[ImageAttachment]) -> None:
     """Keep the images of a received mail, minus those the thread already shows: a reply carries
-    along the inline images of the mails it quotes, ours included."""
+    along the inline images of the mails it quotes."""
     images = select_inbound_images(attachments)
     known = set(MessageImage.objects
                 .filter(message__conversation=message.conversation,

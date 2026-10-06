@@ -40,7 +40,6 @@ MAX_IMAGES_SIZE = 9 * 1024 * 1024
 MAX_IMAGES_PER_MESSAGE = 10
 # Below this, an inbound image is a tracking pixel or a signature icon, not something sent to us.
 MIN_INBOUND_IMAGE_SIZE = 2 * 1024
-IMAGE_STYLE = 'max-width:100%;height:auto;margin:8px 0'
 
 
 @dataclass(frozen=True)
@@ -87,13 +86,6 @@ def select_inbound_images(attachments: list[ImageAttachment]) -> list[ImageAttac
         seen.add(attachment.sha256)
         selected.append(attachment)
     return selected
-
-
-def images_html(content_ids: list[str]) -> str:
-    """The images of a message, after its text. Mail clients block data: urls, so each one
-    points at the MIME part carrying it."""
-    return ''.join(f'<p><img src="cid:{escape(content_id, quote=True)}" style="{IMAGE_STYLE}">'
-                   f'</p>' for content_id in content_ids)
 
 
 def conversation_footer(conversation_url: str, home_url: str) -> str:
@@ -267,8 +259,7 @@ def build_history_block_html(entries: list[HistoryEntry], conversation_url: str,
 
 
 def build_outbound_bodies(content: str, entries: list[HistoryEntry], conversation_url: str,
-                          home_url: str, always_footer: bool = False,
-                          image_content_ids: list[str] | None = None) -> tuple[str, str]:
+                          home_url: str, always_footer: bool = False) -> tuple[str, str]:
     """Assemble one outgoing mail, text part first, HTML part second.
 
     Both carry the same thing in the same order — the new text, the conversation link, the quoted
@@ -286,7 +277,6 @@ def build_outbound_bodies(content: str, entries: list[HistoryEntry], conversatio
         parts.append(history)
 
     html = html_paragraphs(content) if content else ''
-    html += images_html(image_content_ids or [])
     if with_footer:
         html += '<hr style="border:none;border-top:1px solid #dddddd;margin:16px 0">'
         html += conversation_footer_html(conversation_url, home_url)
