@@ -2,15 +2,16 @@
 the dependency rules), so this runs in the fast suite."""
 import unittest
 
-from front.utils.messaging_utils import (HistoryEntry, append_conversation_footer,
-                                         build_history_block, build_history_block_html,
-                                         build_outbound_bodies,
+from front.utils.messaging_utils import (MAX_IMAGES_PER_MESSAGE, MAX_IMAGES_SIZE,
+                                         MIN_INBOUND_IMAGE_SIZE, HistoryEntry, ImageAttachment,
+                                         append_conversation_footer, build_history_block,
+                                         build_history_block_html, build_outbound_bodies,
                                          build_reply_subject, build_ses_message_id,
                                          build_thread_headers, conversation_footer,
                                          conversation_footer_html, extract_conversation_uuid,
-                                         first_external_address, html_paragraphs,
-                                         is_automated_sender, is_same_email, parse_message_ids,
-                                         parse_sender)
+                                         find_error_in_outbound_images, first_external_address,
+                                         html_paragraphs, is_automated_sender, is_same_email,
+                                         parse_message_ids, parse_sender, select_inbound_images)
 
 UUID = '3f2a1b4c-1111-2222-3333-444455556666'
 OTHER_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -318,3 +319,41 @@ class HtmlRenderingTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+    def test_images_come_after_the_text_and_before_the_footer(self):
+        text, html = build_outbound_bodies('Bonjour', [], URL, HOME,
+                                           image_content_ids=[UUID, OTHER_UUID])
+        # The text part has nothing to say about them: they travel as MIME parts.
+        self.assertEqual(f'Bonjour\n\n{FOOTER}', text)
+        first, second = html.index(f'src="cid:{UUID}"'), html.index(f'src="cid:{OTHER_UUID}"')
+        self.assertLess(html.index('<p>Bonjour</p>'), first)
+        self.assertLess(first, second)
+        self.assertLess(second, html.index('<hr'))
+
+
+def image(content: bytes, content_type: str = 'image/png') -> ImageAttachment:
+    return ImageAttachment(name='capture.png', content_type=content_type, content=content)
+
+
+class FindErrorInOutboundImagesTests(unittest.TestCase):
+    def test_find_error_in_outbound_images(self):
+        fixtures = [
+            ([], False),
+            ([image(b'x'), image(b'y', 'image/jpeg')], False),
+            ([image(b'x', 'application/pdf')], True),
+            ([image(b'x')] * (MAX_IMAGES_PER_MESSAGE + 1), True),
+            ([image(b'x' * (MAX_IMAGES_SIZE // 2 + 1))] * 2, True),
+        ]
+        for images, has_error in fixtures:
+            with self.subTest(images=len(images)):
+                self.assertEqual(has_error, find_error_in_outbound_images(images) is not None)
+
+
+class SelectInboundImagesTests(unittest.TestCase):
+    def test_select_inbound_images(self):
+        photo = image(b'p' * MIN_INBOUND_IMAGE_SIZE)
+        other_photo = image(b'q' * MIN_INBOUND_IMAGE_SIZE, 'image/jpeg')
+        pixel = image(b'p')
+        pdf = image(b'd' * MIN_INBOUND_IMAGE_SIZE, 'application/pdf')
+        self.assertEqual([photo, other_photo],
+                         select_inbound_images([pixel, photo, pdf, photo, other_photo]))

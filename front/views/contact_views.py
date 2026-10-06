@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.services.card.scraping_url_service import quote_path, unquote_path
 from front.services.messaging.messaging_service import (ingest_received_email, ingest_sent_email,
+                                                        read_image_attachments,
                                                         record_contact_form)
 from front.utils.cloudflare_utils import verify_token
 from front.utils.mailgun_utils import validate_token
@@ -96,6 +97,8 @@ def mail_received_webhook(request):
     message_id = request.POST.get('Message-Id', '')
     in_reply_to = request.POST.get('In-Reply-To', '')
     references = request.POST.get('References', '')
+    # Mailgun posts each attachment, inline images included, as an attachment-N file.
+    attachments = read_image_attachments(request.FILES.values())
 
     if is_same_email(recipient, os.environ.get('ARCHIVE_EMAIL', '')):
         try:
@@ -108,7 +111,8 @@ def mail_received_webhook(request):
                               body_html=body_html,
                               message_id=message_id,
                               in_reply_to=in_reply_to,
-                              references=references)
+                              references=references,
+                              attachments=attachments)
         except Exception as e:
             # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery. No
             # alert here — this is us talking, and it is already in the mailbox.
@@ -133,7 +137,8 @@ def mail_received_webhook(request):
                               body_html=body_html,
                               message_id=message_id,
                               in_reply_to=in_reply_to,
-                              references=references)
+                              references=references,
+                              attachments=attachments)
     except Exception as e:
         # Never fail the webhook on an ingestion problem: Mailgun would retry the delivery. Ring
         # Telegram with the raw mail instead — the conversation is lost, the message must not be.

@@ -8,6 +8,7 @@ the uuid back from when the correspondent replies with our message quoted. The M
 store are the second: `In-Reply-To`/`References` name them on the way back in, even when the
 correspondent's client dropped the quoted body.
 """
+import hashlib
 import re
 from dataclasses import dataclass
 from email.utils import getaddresses, parseaddr
@@ -32,6 +33,15 @@ MESSAGE_ID_RE = re.compile(r'<[^<>@\s]+@[^<>\s]+>')
 # Senders we never open a conversation for: bounces and auto-responders have nobody to reply to.
 AUTOMATED_LOCAL_PARTS = ('mailer-daemon', 'postmaster')
 
+IMAGE_CONTENT_TYPES = ('image/png', 'image/jpeg', 'image/webp', 'image/gif')
+# nginx caps a whole request body at 10m: the images of one message must fit in it together, and
+# so must those of an inbound mail, which Mailgun posts in a single request.
+MAX_IMAGES_SIZE = 9 * 1024 * 1024
+MAX_IMAGES_PER_MESSAGE = 10
+# Below this, an inbound image is a tracking pixel or a signature icon, not something sent to us.
+MIN_INBOUND_IMAGE_SIZE = 2 * 1024
+IMAGE_STYLE = 'max-width:100%;height:auto;margin:8px 0'
+
 
 @dataclass(frozen=True)
 class HistoryEntry:
@@ -40,6 +50,50 @@ class HistoryEntry:
     sent_at: str  # already formatted for display
     body: str
     is_outbound: bool
+
+
+@dataclass(frozen=True)
+class ImageAttachment:
+    name: str
+    content_type: str
+    content: bytes
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.content).hexdigest()
+
+
+def find_error_in_outbound_images(images: list[ImageAttachment]) -> str | None:
+    if len(images) > MAX_IMAGES_PER_MESSAGE:
+        return f'{MAX_IMAGES_PER_MESSAGE} images maximum par message.'
+    if any(image.content_type not in IMAGE_CONTENT_TYPES for image in images):
+        return "Format d'image non supporté (PNG, JPEG, WEBP ou GIF)."
+    if sum(len(image.content) for image in images) > MAX_IMAGES_SIZE:
+        return "Les images d'un message ne doivent pas dépasser 9 Mo au total."
+    return None
+
+
+def select_inbound_images(attachments: list[ImageAttachment]) -> list[ImageAttachment]:
+    """The attachments of a received mail worth showing in the thread."""
+    selected = []
+    seen = set()
+    for attachment in attachments:
+        if attachment.content_type not in IMAGE_CONTENT_TYPES:
+            continue
+        if len(attachment.content) < MIN_INBOUND_IMAGE_SIZE:
+            continue
+        if attachment.sha256 in seen:
+            continue
+        seen.add(attachment.sha256)
+        selected.append(attachment)
+    return selected
+
+
+def images_html(content_ids: list[str]) -> str:
+    """The images of a message, after its text. Mail clients block data: urls, so each one
+    points at the MIME part carrying it."""
+    return ''.join(f'<p><img src="cid:{escape(content_id, quote=True)}" style="{IMAGE_STYLE}">'
+                   f'</p>' for content_id in content_ids)
 
 
 def conversation_footer(conversation_url: str, home_url: str) -> str:
@@ -213,7 +267,8 @@ def build_history_block_html(entries: list[HistoryEntry], conversation_url: str,
 
 
 def build_outbound_bodies(content: str, entries: list[HistoryEntry], conversation_url: str,
-                          home_url: str, always_footer: bool = False) -> tuple[str, str]:
+                          home_url: str, always_footer: bool = False,
+                          image_content_ids: list[str] | None = None) -> tuple[str, str]:
     """Assemble one outgoing mail, text part first, HTML part second.
 
     Both carry the same thing in the same order — the new text, the conversation link, the quoted
@@ -231,6 +286,7 @@ def build_outbound_bodies(content: str, entries: list[HistoryEntry], conversatio
         parts.append(history)
 
     html = html_paragraphs(content) if content else ''
+    html += images_html(image_content_ids or [])
     if with_footer:
         html += '<hr style="border:none;border-top:1px solid #dddddd;margin:16px 0">'
         html += conversation_footer_html(conversation_url, home_url)

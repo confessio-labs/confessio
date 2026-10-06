@@ -41,3 +41,34 @@
 .messaging-tick--read { color: #2d6cdf; }
 .messaging-input { display: flex; gap: .5rem; margin-top: .5rem; align-items: flex-end; }
 .messaging-new { max-width: 640px; }
+.messaging-images { clear: both; display: flex; flex-wrap: wrap; gap: .4rem; padding-top: .3rem; }
+.messaging-images--outbound { justify-content: flex-end; }
+.messaging-image {
+  max-height: 240px;
+  max-width: 100%;
+  border-radius: .6rem;
+  border: 1px solid #e3e6ea;
+}
+.messaging-thumbnails { display: flex; flex-wrap: wrap; gap: .5rem; }
+.messaging-thumbnails:not(:empty) { margin-top: .5rem; }
+.messaging-thumbnail { position: relative; }
+.messaging-thumbnail img {
+  max-height: 360px;
+  max-width: min(640px, 100%);
+  border-radius: .4rem;
+  border: 1px solid #ddd;
+}
+.messaging-thumbnail-remove {
+  position: absolute;
+  top: -.4rem;
+  right: -.4rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #333;
+  color: #fff;
+  font-size: .9rem;
+  line-height: 1.3rem;
+}

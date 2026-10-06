@@ -6,6 +6,9 @@
     Sujet : {{ conversation.subject }}<br>
     De : {{ conversation.name }} &lt;{{ conversation.email }}&gt;<br>
     {% if last_message %}{{ last_message.body|urlize|linebreaks }}{% endif %}
+    {% with nb_images=last_message.images.count %}
+      {% if nb_images %}<p class="text-muted">{{ nb_images }} image(s)</p>{% endif %}
+    {% endwith %}
     Lien : <a href="{% url 'messaging_view' conversation.uuid %}" target="_blank">Ouvrir la
         conversation</a>
 
