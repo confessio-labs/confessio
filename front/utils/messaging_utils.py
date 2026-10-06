@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from email.utils import getaddresses, parseaddr
 from html import escape
 
+from django.utils.html import urlize
+
 FOOTER_INTRO = "Ce message est traité par l'équipe de"
 FOOTER_LABEL = 'Espace administrateur'
 
@@ -120,10 +122,11 @@ def html_paragraphs(text: str) -> str:
     """Turn a plain-text block into paragraphs: one <p> per blank line, <br> inside.
 
     Everything is escaped — these bodies come from mail we received, and none of it is markup we
-    wrote.
+    wrote — except the links, which are made clickable like in /messaging.
     """
     blocks = [block for block in re.split(r'\n\s*\n', text.strip()) if block.strip()]
-    return ''.join('<p>' + '<br>'.join(escape(line) for line in block.split('\n')) + '</p>'
+    return ''.join('<p>' + '<br>'.join(urlize(line, autoescape=True)
+                                       for line in block.split('\n')) + '</p>'
                    for block in blocks)
 
 

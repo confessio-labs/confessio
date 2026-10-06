@@ -300,6 +300,12 @@ class HtmlRenderingTests(unittest.TestCase):
         self.assertEqual('<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; co</p>',
                          html_paragraphs('<script>alert(1)</script> & co'))
 
+    def test_links_are_clickable(self):
+        self.assertEqual('<p>Voir <a href="https://confessio.fr/a?b=1&amp;c=2">'
+                         'https://confessio.fr/a?b=1&amp;c=2</a> &lt;b&gt;</p>',
+                         html_paragraphs('Voir https://confessio.fr/a?b=1&c=2 <b>'))
+        self.assertIn('<a href="http://www.confessio.fr"', html_paragraphs('www.confessio.fr'))
+
     def test_both_links_are_carried_by_their_words(self):
         html = conversation_footer_html(URL, HOME)
         self.assertIn(f'<a href="{HOME}" style="color:#888888">Confessio</a>', html)
