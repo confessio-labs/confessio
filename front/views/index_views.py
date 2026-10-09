@@ -458,6 +458,17 @@ def dioceses_list(request):
     return render(request, 'pages/dioceses.html', context)
 
 
+def cities_list(request):
+    cities = City.objects.filter(slug__isnull=False).order_by('-population')[:100]
+
+    context = {
+        'cities': cities,
+        'meta_title': gettext('citiesPageTitle'),
+    }
+
+    return render(request, 'pages/cities.html', context)
+
+
 def website_upload_image(request, website_uuid: str):
     try:
         website = Website.objects.get(uuid=website_uuid)
