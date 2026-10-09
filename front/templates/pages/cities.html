@@ -1,0 +1,11 @@
+{% extends 'layouts/single_card.html' %}
+{% load static %}
+
+{% load i18n %}
+
+{% block card %}
+    <h1>{% trans 'citiesTitle' %}</h1>
+    {% for city in cities %}
+        <p><a href="{% url 'city_view' city.slug %}">{{ city.name }}</a></p>
+    {% endfor %}
+{% endblock card %}

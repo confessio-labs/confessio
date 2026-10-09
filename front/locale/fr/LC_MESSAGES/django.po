@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-09 09:14+0200\n"
+"POT-Creation-Date: 2026-10-09 13:55+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -70,15 +70,15 @@ msgstr "Pas de confessions trouvées"
 msgid "JumpBelow"
 msgstr "Voir ci-dessous"
 
-#: templates/includes/footer.html:24
+#: templates/includes/footer.html:25
 msgid "footerAboutUs"
 msgstr "Ce site, d'initiative laïque, est en phase de développement."
 
-#: templates/includes/footer.html:25 templates/pages/contact.html:11
+#: templates/includes/footer.html:26 templates/pages/contact.html:11
 msgid "contactUs"
 msgstr "Nous contacter"
 
-#: templates/includes/footer.html:58
+#: templates/includes/footer.html:77
 msgid "footerFranceCookie"
 msgstr "Made in 🇫🇷 with ✝️ without 🍪"
 
@@ -86,21 +86,21 @@ msgstr "Made in 🇫🇷 with ✝️ without 🍪"
 msgid "navContact"
 msgstr "Contact"
 
-#: templates/includes/navigation.html:53
+#: templates/includes/navigation.html:50
 msgid "navLogout"
 msgstr "Se déconnecter"
 
-#: templates/includes/navigation.html:62
+#: templates/includes/navigation.html:58 templates/pages/moderation_home.html:5
 msgid "moderationMenu"
 msgstr "Modération"
 
-#: templates/includes/website_card.html:105
+#: templates/includes/website_card.html:138
 msgid "goToParishSite"
 msgstr "Aller sur le site"
 
 #: templates/layouts/base.html:26 templates/layouts/base.html:28
 #: templates/layouts/base.html:40 templates/layouts/base.html:48
-#: views/index_views.py:232
+#: views/index_views.py:243
 msgid "confessioPageTitle"
 msgstr "Confessio - Horaires des confessions"
 
@@ -110,10 +110,14 @@ msgid "confessioDescription"
 msgstr "Planifiez votre prochaine confession !"
 
 #: templates/layouts/base.html:30 templates/layouts/base.html:31
-#: templates/layouts/base.html:43 views/index_views.py:231
-#: views/index_views.py:270 views/index_views.py:281 views/index_views.py:303
+#: templates/layouts/base.html:43 views/index_views.py:242
+#: views/index_views.py:281 views/index_views.py:295 views/index_views.py:316
 msgid "confessioTitle"
 msgstr "Confessio"
+
+#: templates/pages/cities.html:7
+msgid "citiesTitle"
+msgstr "Liste des 100 plus grandes villes"
 
 #: templates/pages/contact.html:24
 msgid "contactTitle"
@@ -152,43 +156,43 @@ msgstr "Liste des diocèses opérés"
 msgid "BeforeConfessionHTML %(url)s"
 msgstr "Extrait de cette <a href=\"%(url)s\" class=\"link-info\">page</a> : "
 
-#: templates/pages/index.html:54
+#: templates/pages/index.html:60
 msgid "searchPlaceHolder"
 msgstr "🔍 Chercher une ville, une paroisse, une église ..."
 
-#: templates/pages/index.html:115
+#: templates/pages/index.html:119
 msgid "tooManyResultsStrong"
 msgstr "Beaucoup d'églises dans cette région !"
 
-#: templates/pages/index.html:115
+#: templates/pages/index.html:119
 msgid "tooManyResultsWithDate"
 msgstr "Veuillez zoomer et cliquer sur 'Rechercher dans cette zone'."
 
-#: templates/pages/index.html:115
+#: templates/pages/index.html:119
 msgid "tooManyResultsWithoutDate"
 msgstr "Veuillez zoomer ou bien préciser le jour souhaité."
 
-#: templates/pages/index.html:125
+#: templates/pages/index.html:129
 msgid "noResultsStrong"
 msgstr "Pas de résultats..."
 
-#: templates/pages/index.html:127
+#: templates/pages/index.html:131
 msgid "noResultsWithDate"
 msgstr "Essayez sans filtre de date et heure."
 
-#: templates/pages/index.html:148
+#: templates/pages/index.html:152
 msgid "searchAroundMe"
 msgstr "Autour de moi"
 
-#: templates/pages/index.html:164
+#: templates/pages/index.html:168
 msgid "searchInThisArea"
 msgstr "Dans cette zone"
 
-#: templates/pages/index.html:254 templates/pages/index.html:295
+#: templates/pages/index.html:258 templates/pages/index.html:299
 msgid "report_feedback_good"
 msgstr "👍 Tout semble bon !"
 
-#: templates/pages/index.html:260 templates/pages/index.html:293
+#: templates/pages/index.html:264 templates/pages/index.html:297
 msgid "report_feedback_error"
 msgstr "👎 Il y a une erreur"
 
@@ -216,13 +220,17 @@ msgstr "Edit parsing"
 msgid "NoConfessionExtractFound"
 msgstr "Pas d'extraits trouvés concernant les confessions."
 
-#: views/contact_views.py:25
+#: views/contact_views.py:31
 msgid "contactPageTitle"
 msgstr "Confessio - Nous contacter"
 
-#: views/index_views.py:441
+#: views/index_views.py:455
 msgid "diocesesPageTitle"
 msgstr "Confessio - Liste des diocèses"
+
+#: views/index_views.py:466
+msgid "citiesPageTitle"
+msgstr "Confessio - Liste des villes"
 
 #~ msgid "footerDiocesesList"
 #~ msgstr "Voir la liste des diocèses opérés"
