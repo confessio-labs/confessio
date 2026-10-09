@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from attaching.models import ImageModeration
 from crawling.models import CrawlingModeration
 from fetching.models import OClocherOrganizationModeration, OClocherMatchingModeration
-from front.models import ConversationModeration, ReportModeration
+from front.models import ApprovalModeration, ConversationModeration, IssueModeration
 from registry.models import WebsiteModeration, ChurchModeration, ParishModeration
 from registry.models.base_moderation_models import ModerationStatus
 from scheduling.models import ParsingModeration, SchedulingModeration, \
@@ -17,7 +17,8 @@ MODERATION_CLASSES = [
     PruningModeration,
     SentenceModeration,
     ParsingModeration,
-    ReportModeration,
+    IssueModeration,
+    ApprovalModeration,
     CrawlingModeration,
     SchedulingModeration,
     ValidatedSchedulesModeration,
@@ -34,7 +35,8 @@ DEVELOPER_GROUP_NAME = 'developer'
 # A moderator only handles what visitors send us, and only the rows still to validate:
 # a bug is always a developer matter.
 MODERATOR_RESOURCES = {
-    ReportModeration.resource,
+    IssueModeration.resource,
+    ApprovalModeration.resource,
     ConversationModeration.resource,
     ImageModeration.resource,
 }
@@ -48,7 +50,7 @@ def get_moderation_stats(user: User) -> tuple[list[dict], list[dict]]:
     """Return (mine, others): the stats this user is expected to handle, then all the rest.
 
     Runs one grouped query per moderation model. The two scopes are complementary: a moderator
-    owns the to_validate rows of the report/conversation/image resources, a developer owns
+    owns the to_validate rows of the issue/approval/conversation/image resources, a developer owns
     everything else, every bug included.
     """
     moderator_stats = []

@@ -69,7 +69,8 @@ def build_church_query(time_filter: TimeFilter) -> QuerySet[Church]:
 
     church_query = build_base_church_query().select_related('parish__website')
     if time_filter.legacy_search:
-        church_query = church_query.prefetch_related('parish__website__reports')
+        church_query = church_query.prefetch_related('parish__website__issues',
+                                                     'parish__website__approvals')
     church_query = church_query.annotate(next_event_uuid=Subquery(event_query[:1])) \
         .only("name",
               "address",

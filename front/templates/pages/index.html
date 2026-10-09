@@ -282,48 +282,40 @@
                 </div>
             </div>
 
-            {% if previous_reports %}
+            {% if report_threads %}
                 <div>
                     <h4 class="text-white mt-5" id="previous-reports">Retours précédents</h4>
                 </div>
 
-                {% for reports in previous_reports %}
-                    {% with main_report=reports|get_ith:0 %}
-                    {% if main_report.comment %}
+                {% for thread in report_threads %}
+                    {% if thread.head.content %}
                         <div class="card border-0 mt-4">
                             <div class="card-body">
                                 <strong>
-                                    {% if main_report.feedback_type == 'error' %}
-                                        {% trans 'report_feedback_error' %}
-                                    {% elif main_report.feedback_type == 'good' %}
+                                    {% if thread.is_approval %}
                                         {% trans 'report_feedback_good' %}
+                                    {% else %}
+                                        {% trans 'report_feedback_error' %}
                                     {% endif %}
                                 </strong><small> - </small>
-                                {% for report in reports %}
-                                    {% if report.user %}
-                                    <span class="fw-bold text-success">{{ report.user.first_name }} <i class="fas fa-user-check"></i></span>
-                                    {% endif %}
-                                    <small>le {{ report.created_at|date:"d M Y" }}</small>
-                                    {% if report.church and request|is_staff %}
-                                        <small class="text-muted">- {{ report.church.name }}</small>
-                                    {% endif %}
-                                    <div>{{ report.comment|urlize|linebreaksbr }}</div>
-                                    {% if request|is_staff %}
-                                        <a class="text-muted" href="{% url 'admin:front_report_change' report.uuid %}" target="_blank">
-                                            - Admin <i class="fas fa-up-right-from-square"></i>
+                                {% if request|is_staff %}
+                                    {% for moderation in moderations_by_thread_uuid|get_item:thread.head.uuid %}
+                                        <a href="{{ moderation|get_url }}" target="_blank">
+                                            {% display_status_badge moderation.status %}
                                         </a>
-                                        {% with report_moderation=moderation_by_report_uuid|get_item:report.uuid %}
-                                            {% if report_moderation %}
-                                                <a href="{{ report_moderation|get_url }}" target="_blank">
-                                                    {% display_status_badge report_moderation.status %}
-                                                </a>
-                                            {% endif %}
-                                        {% endwith %}
-                                    {% endif %}
-                                    <hr class="hr" />
+                                    {% endfor %}
+                                {% endif %}
+                                {% if thread.is_approval %}
+                                    {% url 'admin:front_approval_change' thread.head.uuid as admin_url %}
+                                {% else %}
+                                    {% url 'admin:front_issue_change' thread.head.uuid as admin_url %}
+                                {% endif %}
+                                {% include 'includes/report_message.html' with message=thread.head %}
+                                {% for comment in thread.comments %}
+                                    {% include 'includes/report_message.html' with message=comment %}
                                 {% endfor %}
                                 <form method="POST">
-                                    <input type="hidden" name="main_report_uuid" value="{{ main_report.uuid }}">
+                                    <input type="hidden" name="main_report_uuid" value="{{ thread.head.uuid }}">
                                     <input type="hidden" name="feedback_type" value="comment">
                                     {% csrf_token %}
                                     <div class="row">
@@ -338,7 +330,6 @@
                             </div>
                         </div>
                     {% endif %}
-                    {% endwith %}
                 {% endfor %}
             {% else %}
                 <div class="text-white mt-5 text-center">
