@@ -1,10 +1,12 @@
 from uuid import UUID
 
+from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpRequest
 from django.urls import reverse
 
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
-from front.models import Report, ReportModeration
+from front.models import Approval, ApprovalComment, Issue, IssueComment, Report, \
+    ReportModeration
 from registry.models import Website
 from registry.models.base_moderation_models import ModerationStatus
 from core.services.admin_email_service import send_email_to_admin
@@ -29,7 +31,9 @@ def save_report(request: HttpRequest, report: Report):
     report.user_agent = user_agent
     report.ip_address_hash = ip_address_hash
     report.user = user
-    report.save()
+    with transaction.atomic():
+        report.save()
+        mirror_report(report)
 
     if not user:
         add_necessary_moderation_for_report(report)
@@ -46,6 +50,35 @@ def save_report(request: HttpRequest, report: Report):
         subject = f'New report on confessio for {report.website.name}'
         send_email_to_admin(subject, email_body)
         send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
+
+
+def mirror_report(report: Report):
+    # Same uuid as the report, so that replies find their parent and backfill is idempotent
+    user_fields = {
+        'uuid': report.uuid,
+        'user': report.user,
+        'user_agent': report.user_agent,
+        'ip_address_hash': report.ip_address_hash,
+    }
+
+    if report.main_report_id is None:
+        if report.feedback_type == Report.FeedbackType.GOOD:
+            Approval.objects.create(website=report.website, church=report.church,
+                                    content=report.comment, **user_fields)
+        else:
+            Issue.objects.create(website=report.website, church=report.church,
+                                 content=report.comment or '', **user_fields)
+        return
+
+    content = report.comment or ''
+    # Parent may predate the double write: the backfill command will handle it
+    if report.main_report.feedback_type == Report.FeedbackType.GOOD:
+        if Approval.objects.filter(uuid=report.main_report_id).exists():
+            ApprovalComment.objects.create(approval_id=report.main_report_id, content=content,
+                                           **user_fields)
+    elif Issue.objects.filter(uuid=report.main_report_id).exists():
+        IssueComment.objects.create(issue_id=report.main_report_id, content=content,
+                                    **user_fields)
 
 
 def new_report(request, website: Website) -> str:
