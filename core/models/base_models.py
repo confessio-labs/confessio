@@ -33,11 +33,11 @@ class BaseComment(BaseUserReport):
 
 class BaseNote(BaseUserReport):
     class Status(models.TextChoices):
-        OPEN = "open"
         ACTIVE = "active"
+        EXPIRED = "expired"
         CENSORED = "censored"
 
-    status = models.CharField(max_length=8, choices=Status.choices, default=Status.OPEN)
+    status = models.CharField(max_length=8, choices=Status.choices, default=Status.ACTIVE)
     expire_at = models.DateTimeField()
 
     class Meta(BaseUserReport.Meta):
