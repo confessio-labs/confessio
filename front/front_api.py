@@ -14,7 +14,7 @@ from attaching.public_service import attaching_get_image_public_url, \
     attaching_recognize_and_extract_image
 from front.models import Approval, ApprovalComment, AutocompleteHit, Issue, IssueComment
 from front.services.card.report_service import save_report, get_report_threads, ReportThread, \
-    NewReportError, FeedbackType, ErrorType
+    NewReportError, FeedbackType
 from front.services.card.scraping_url_service import get_scraping_parsing_urls
 from front.services.card.sources_service import get_website_parsings_and_prunings, \
     WebsiteParsingsAndPrunings
@@ -149,18 +149,10 @@ class FeedbackTypeEnum(str, Enum):
     COMMENT = "comment"
 
 
-class ErrorTypeEnum(str, Enum):
-    OUTDATED = "outdated"
-    CHURCHES = "churches"
-    PARAGRAPHS = "paragraphs"
-    SCHEDULES = "schedules"
-
-
 class ReportIn(Schema):
     website_uuid: UUID
     church_uuid: UUID | None = None
     feedback_type: FeedbackTypeEnum
-    error_type: ErrorTypeEnum | None = None
     comment: str | None = None
     main_report_uuid: UUID | None = None
 
@@ -597,7 +589,6 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
         report = save_report(
             request, website, church,
             FeedbackType(report_in.feedback_type),
-            ErrorType(report_in.error_type) if report_in.error_type else None,
             report_in.comment, report_in.main_report_uuid,
         )
     except NewReportError as e:

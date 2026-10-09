@@ -20,13 +20,6 @@ class FeedbackType(StrEnum):
     COMMENT = "comment"
 
 
-class ErrorType(StrEnum):
-    OUTDATED = "outdated"
-    CHURCHES = "churches"
-    PARAGRAPHS = "paragraphs"
-    SCHEDULES = "schedules"
-
-
 ##############
 # NEW REPORT #
 ##############
@@ -56,8 +49,8 @@ def get_thread_head(website: Website, head_uuid: UUID | str) -> Issue | Approval
 
 
 def save_report(request: HttpRequest, website: Website, church: Church | None,
-                feedback_type: FeedbackType, error_type: ErrorType | None,
-                comment: str | None, main_report_uuid: UUID | str | None
+                feedback_type: FeedbackType, comment: str | None,
+                main_report_uuid: UUID | str | None
                 ) -> Issue | Approval | IssueComment | ApprovalComment:
     head = get_thread_head(website, main_report_uuid) if main_report_uuid else None
 
@@ -90,8 +83,7 @@ def save_report(request: HttpRequest, website: Website, church: Church | None,
         email_body = (f"New report on website {website.name}\n"
                       f"url: {website_url}\n"
                       + (f"church: {church.name}\n" if church else "")
-                      + f"feedback_type: {feedback_type}\n"
-                      f"error_type: {error_type}\n\ncomment:\n{comment}")
+                      + f"feedback_type: {feedback_type}\n\ncomment:\n{comment}")
         subject = f'New report on confessio for {website.name}'
         send_email_to_admin(subject, email_body)
         send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
@@ -101,7 +93,6 @@ def save_report(request: HttpRequest, website: Website, church: Church | None,
 
 def new_report(request, website: Website) -> str:
     feedback_type_str = request.POST.get('feedback_type')
-    error_type_str = request.POST.get('error_type')
     comment = request.POST.get('comment')
     main_report_uuid = request.POST.get('main_report_uuid')
 
@@ -113,12 +104,7 @@ def new_report(request, website: Website) -> str:
     except ValueError:
         raise NewReportError(400, f'Invalid feedback type: {feedback_type_str}')
 
-    try:
-        error_type = ErrorType(error_type_str) if error_type_str else None
-    except ValueError:
-        raise NewReportError(400, f'Invalid error type: {error_type_str}')
-
-    save_report(request, website, None, feedback_type, error_type, comment, main_report_uuid)
+    save_report(request, website, None, feedback_type, comment, main_report_uuid)
 
     return 'Merci pour votre retour !'
 

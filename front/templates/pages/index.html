@@ -258,17 +258,10 @@
                                 {% trans 'report_feedback_good' %}
                             </label>
                         </div>
-                        <div class="radio-group disable-select-until-check">
+                        <div class="radio-group">
                             <label>
-                                <input class='check-necessary' type="radio" name="feedback_type" value="error">
+                                <input type="radio" name="feedback_type" value="error">
                                 {% trans 'report_feedback_error' %}
-                                <select name="error_type">
-                                    <option value="">Sélectionnez le type d'erreur</option>
-                                    <option value="churches">Dans les églises ou leur position</option>
-                                    <option value="schedules">Dans l'analyse des horaires</option>
-                                    <option value="paragraphs">Dans les sources</option>
-                                    <option value="outdated">Le site de la paroisse n'est pas à jour</option>
-                                </select>
                             </label>
                         </div>
                         <div class="mt-1">
