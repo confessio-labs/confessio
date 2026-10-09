@@ -1,0 +1,14 @@
+{% extends 'layouts/moderation_card.html' %}
+
+{% block card %}
+    {% include 'moderations/_header.html' with title_prefix='Approval' %}
+
+    Website: {{ approval.website.name }}<br>
+    Content: {{ approval.content|urlize|linebreaksbr }}<br>
+    {% for comment in comments %}
+        Comment ({{ comment.created_at|date:"d M Y" }}): {{ comment.content|urlize|linebreaksbr }}<br>
+    {% endfor %}
+    Link: <a href="{% url 'website_view' approval.website.uuid %}#previous-reports" target="_blank">Go to approval</a>
+
+    {% include 'moderations/_footer.html' %}
+{% endblock card %}

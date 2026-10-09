@@ -5,7 +5,6 @@ from crawling.models import CrawlingModeration
 from fetching.models.oclocher_moderation_models import (
     OClocherOrganizationModeration, OClocherMatchingModeration,
 )
-from front.models.report_models import ReportModeration
 from registry.models.moderation_models import (
     WebsiteModeration, ParishModeration, ChurchModeration,
 )
@@ -27,7 +26,6 @@ ALL_MODERATION_MODELS = [
     SentenceModeration,
     OClocherOrganizationModeration,
     OClocherMatchingModeration,
-    ReportModeration,
 ]
 
 

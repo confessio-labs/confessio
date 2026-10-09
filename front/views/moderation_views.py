@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.shortcuts import render
 
 from core.views import get_moderate_response
-from front.models import ConversationModeration, Message, ReportModeration
+from front.models import ApprovalModeration, ConversationModeration, IssueModeration, Message
 from front.services.moderation_stats_service import get_moderation_stats
 
 
@@ -18,18 +18,31 @@ def moderation_home(request):
 
 @login_required
 @permission_required("scheduling.change_sentence")
-def moderate_report(request, category, status, moderation_uuid=None):
-    return get_moderate_response(request, category, 'report', status,
-                                 ReportModeration, moderation_uuid,
-                                 create_report_moderation_context)
+def moderate_issue(request, category, status, moderation_uuid=None):
+    return get_moderate_response(request, category, 'issue', status,
+                                 IssueModeration, moderation_uuid,
+                                 create_issue_moderation_context)
 
 
-def create_report_moderation_context(moderation: ReportModeration) -> dict:
-    report = moderation.report
-    assert report is not None
-
+def create_issue_moderation_context(moderation: IssueModeration) -> dict:
     return {
-        'report': report,
+        'issue': moderation.issue,
+        'comments': moderation.issue.comments.order_by('created_at'),
+    }
+
+
+@login_required
+@permission_required("scheduling.change_sentence")
+def moderate_approval(request, category, status, moderation_uuid=None):
+    return get_moderate_response(request, category, 'approval', status,
+                                 ApprovalModeration, moderation_uuid,
+                                 create_approval_moderation_context)
+
+
+def create_approval_moderation_context(moderation: ApprovalModeration) -> dict:
+    return {
+        'approval': moderation.approval,
+        'comments': moderation.approval.comments.order_by('created_at'),
     }
 
 

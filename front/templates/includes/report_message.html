@@ -1,0 +1,15 @@
+{% load custom_tags %}
+{% if message.user %}
+<span class="fw-bold text-success">{{ message.user.first_name }} <i class="fas fa-user-check"></i></span>
+{% endif %}
+<small>le {{ message.created_at|date:"d M Y" }}</small>
+{% if message.church and request|is_staff %}
+    <small class="text-muted">- {{ message.church.name }}</small>
+{% endif %}
+<div>{{ message.content|urlize|linebreaksbr }}</div>
+{% if request|is_staff %}
+    <a class="text-muted" href="{{ admin_url }}" target="_blank">
+        - Admin <i class="fas fa-up-right-from-square"></i>
+    </a>
+{% endif %}
+<hr class="hr" />

@@ -64,10 +64,14 @@ urlpatterns = [
 
     # moderation
     path('moderate', views.moderation_home, name='moderation_home'),
-    path('moderate/report/<category>/<str:status>',
-         views.moderate_report, name='moderate_next_report'),
-    path('moderate/report/<category>/<str:status>/<uuid:moderation_uuid>',
-         views.moderate_report, name='moderate_one_report'),
+    path('moderate/issue/<category>/<str:status>',
+         views.moderate_issue, name='moderate_next_issue'),
+    path('moderate/issue/<category>/<str:status>/<uuid:moderation_uuid>',
+         views.moderate_issue, name='moderate_one_issue'),
+    path('moderate/approval/<category>/<str:status>',
+         views.moderate_approval, name='moderate_next_approval'),
+    path('moderate/approval/<category>/<str:status>/<uuid:moderation_uuid>',
+         views.moderate_approval, name='moderate_one_approval'),
     path('moderate/conversation/<category>/<str:status>',
          views.moderate_conversation, name='moderate_next_conversation'),
     path('moderate/conversation/<category>/<str:status>/<uuid:moderation_uuid>',

@@ -11,7 +11,7 @@ from attaching.public_service import attaching_upload_image, \
     attaching_recognize_and_extract_image, attaching_find_error_in_document_to_upload
 from fetching.models import OClocherOrganization
 from front.services.card.report_service import get_count_and_label, new_report, NewReportError, \
-    get_previous_reports, get_moderation_by_report_uuid
+    get_report_threads, get_moderations_by_thread_uuid
 from front.services.card.scraping_url_service import get_scraping_parsing_urls
 from front.services.card.sources_service import get_website_parsings_and_prunings, get_empty_sources
 from front.services.card.website_events_service import get_website_events
@@ -128,10 +128,10 @@ def render_map(request, center,
     latitude, longitude = center
 
     # only staff sees the badge, so only staff pays for the query
-    previous_reports = get_previous_reports(page_website) if page_website else None
-    moderation_by_report_uuid = {}
-    if previous_reports and is_staff_user(request):
-        moderation_by_report_uuid = get_moderation_by_report_uuid(previous_reports)
+    report_threads = get_report_threads(page_website) if page_website else None
+    moderations_by_thread_uuid = {}
+    if report_threads and is_staff_user(request):
+        moderations_by_thread_uuid = get_moderations_by_thread_uuid(report_threads)
 
     return render(request, 'pages/index.html', {
         'h1_title': h1_title,
@@ -160,8 +160,8 @@ def render_map(request, center,
         'hidden_inputs': hidden_inputs,
         'page_website': page_website,
         'success_message': success_message,
-        'previous_reports': previous_reports,
-        'moderation_by_report_uuid': moderation_by_report_uuid,
+        'report_threads': report_threads,
+        'moderations_by_thread_uuid': moderations_by_thread_uuid,
         'upload_error_message': upload_error_message,
         'website_images': page_website.images.all() if page_website else None,
         'scheduling_moderation_by_website': scheduling_moderation_by_website,
@@ -261,7 +261,7 @@ def index(request, diocese_slug=None, city_slug: str = None, website_uuid: str =
             try:
                 success_message = new_report(request, website)
             except NewReportError as e:
-                return e.response
+                return HttpResponse(e.message, status=e.status)
 
         search_result = get_churches_by_website(website,
                                                 time_filter.model_copy(update={'limit': 80}))

@@ -1,16 +1,23 @@
+from dataclasses import dataclass
+from enum import StrEnum
 from uuid import UUID
 
-from django.db import transaction
-from django.http import HttpResponse, HttpResponseBadRequest, HttpRequest
+from django.http import HttpRequest
 from django.urls import reverse
 
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
-from front.models import Approval, ApprovalComment, Issue, IssueComment, Report, \
-    ReportModeration
-from registry.models import Website
-from registry.models.base_moderation_models import ModerationStatus
+from front.models import Approval, ApprovalComment, ApprovalModeration, Issue, IssueComment, \
+    IssueModeration
+from registry.models import Church, Website
+from registry.models.base_moderation_models import ModerationStatus, ModerationMixin
 from core.services.admin_email_service import send_email_to_admin
 from front.utils.web_utils import get_user_user_agent_and_ip
+
+
+class FeedbackType(StrEnum):
+    GOOD = "good"
+    ERROR = "error"
+    COMMENT = "comment"
 
 
 ##############
@@ -18,162 +25,149 @@ from front.utils.web_utils import get_user_user_agent_and_ip
 ##############
 
 class NewReportError(Exception):
-    response: HttpResponse
+    def __init__(self, status: int, message: str):
+        self.status = status
+        self.message = message
+        super().__init__(message)
 
-    def __init__(self, response: HttpResponse):
-        self.response = response
-        super().__init__()
+
+def get_thread_head(website: Website, head_uuid: UUID | str) -> Issue | Approval:
+    issue = Issue.objects.filter(uuid=head_uuid, website=website).first()
+    if issue:
+        return issue
+
+    approval = Approval.objects.filter(uuid=head_uuid, website=website).first()
+    if approval:
+        return approval
+
+    # Threads are one level deep
+    if IssueComment.objects.filter(uuid=head_uuid).exists() \
+            or ApprovalComment.objects.filter(uuid=head_uuid).exists():
+        raise NewReportError(400, 'Cannot reply to a reply')
+
+    raise NewReportError(404, f'Report {head_uuid} does not exist')
 
 
-def save_report(request: HttpRequest, report: Report):
+def save_report(request: HttpRequest, website: Website, church: Church | None,
+                feedback_type: FeedbackType, comment: str | None,
+                main_report_uuid: UUID | str | None
+                ) -> Issue | Approval | IssueComment | ApprovalComment:
+    head = get_thread_head(website, main_report_uuid) if main_report_uuid else None
+
     user, user_agent, ip_address_hash = get_user_user_agent_and_ip(request)
+    user_fields = {
+        'user': user,
+        'user_agent': user_agent,
+        'ip_address_hash': ip_address_hash,
+    }
 
-    report.user_agent = user_agent
-    report.ip_address_hash = ip_address_hash
-    report.user = user
-    with transaction.atomic():
-        report.save()
-        mirror_report(report)
+    if isinstance(head, Approval):
+        report = ApprovalComment.objects.create(approval=head, content=comment or '',
+                                                **user_fields)
+    elif isinstance(head, Issue):
+        report = IssueComment.objects.create(issue=head, content=comment or '', **user_fields)
+    elif feedback_type == FeedbackType.GOOD:
+        report = Approval.objects.create(website=website, church=church, content=comment,
+                                         **user_fields)
+    else:
+        report = Issue.objects.create(website=website, church=church, content=comment or '',
+                                      **user_fields)
 
     if not user:
-        add_necessary_moderation_for_report(report)
+        add_necessary_moderation(website, head or report, is_comment=head is not None)
 
         website_url = request.build_absolute_uri(
-            reverse('website_view', kwargs={'website_uuid': report.website.uuid})
+            reverse('website_view', kwargs={'website_uuid': website.uuid})
         )
 
-        email_body = (f"New report on website {report.website.name}\n"
+        email_body = (f"New report on website {website.name}\n"
                       f"url: {website_url}\n"
-                      + (f"church: {report.church.name}\n" if report.church else "")
-                      + f"feedback_type: {report.feedback_type}\n"
-                      f"error_type: {report.error_type}\n\ncomment:\n{report.comment}")
-        subject = f'New report on confessio for {report.website.name}'
+                      + (f"church: {church.name}\n" if church else "")
+                      + f"feedback_type: {feedback_type}\n\ncomment:\n{comment}")
+        subject = f'New report on confessio for {website.name}'
         send_email_to_admin(subject, email_body)
         send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
 
-
-def mirror_report(report: Report):
-    # Same uuid as the report, so that replies find their parent and backfill is idempotent
-    user_fields = {
-        'uuid': report.uuid,
-        'user': report.user,
-        'user_agent': report.user_agent,
-        'ip_address_hash': report.ip_address_hash,
-    }
-
-    if report.main_report_id is None:
-        if report.feedback_type == Report.FeedbackType.GOOD:
-            Approval.objects.create(website=report.website, church=report.church,
-                                    content=report.comment, **user_fields)
-        else:
-            Issue.objects.create(website=report.website, church=report.church,
-                                 content=report.comment or '', **user_fields)
-        return
-
-    content = report.comment or ''
-    # Parent may predate the double write: the backfill command will handle it
-    if report.main_report.feedback_type == Report.FeedbackType.GOOD:
-        if Approval.objects.filter(uuid=report.main_report_id).exists():
-            ApprovalComment.objects.create(approval_id=report.main_report_id, content=content,
-                                           **user_fields)
-    elif Issue.objects.filter(uuid=report.main_report_id).exists():
-        IssueComment.objects.create(issue_id=report.main_report_id, content=content,
-                                    **user_fields)
+    return report
 
 
 def new_report(request, website: Website) -> str:
     feedback_type_str = request.POST.get('feedback_type')
-    error_type_str = request.POST.get('error_type')
     comment = request.POST.get('comment')
     main_report_uuid = request.POST.get('main_report_uuid')
 
-    main_report = None
-    if main_report_uuid is not None:
-        try:
-            main_report = Report.objects.get(uuid=main_report_uuid)
-        except Report.DoesNotExist:
-            raise NewReportError(HttpResponseBadRequest('Main report does not exist'))
-
     if not feedback_type_str:
-        raise NewReportError(HttpResponseBadRequest('Feedback type is None'))
+        raise NewReportError(400, 'Feedback type is None')
 
     try:
-        feedback_type = Report.FeedbackType(feedback_type_str)
+        feedback_type = FeedbackType(feedback_type_str)
     except ValueError:
-        raise NewReportError(HttpResponseBadRequest(
-            f'Invalid feedback type: {feedback_type_str}'))
+        raise NewReportError(400, f'Invalid feedback type: {feedback_type_str}')
 
-    try:
-        error_type = Report.ErrorType(error_type_str) if error_type_str else None
-    except ValueError:
-        raise NewReportError(HttpResponseBadRequest(f'Invalid error type: {error_type_str}'))
-
-    report = Report(
-        website=website,
-        feedback_type=feedback_type,
-        error_type=error_type,
-        comment=comment,
-        main_report=main_report,
-    )
-    save_report(request, report)
+    save_report(request, website, None, feedback_type, comment, main_report_uuid)
 
     return 'Merci pour votre retour !'
 
 
-def get_report_moderation_category(report: Report) -> ReportModeration.Category:
-    if report.feedback_type == Report.FeedbackType.GOOD:
-        return ReportModeration.Category.GOOD
-    elif report.feedback_type == Report.FeedbackType.ERROR:
-        return ReportModeration.Category.ERROR
-    elif report.feedback_type == Report.FeedbackType.COMMENT:
-        return ReportModeration.Category.COMMENT
+def add_necessary_moderation(website: Website, head: Issue | Approval, is_comment: bool):
+    if isinstance(head, Approval):
+        # A thumbs-up with no comment says nothing a moderator could act on
+        if not is_comment and not head.content:
+            return
+        category = ApprovalModeration.Category.NEW_COMMENT if is_comment \
+            else ApprovalModeration.Category.NEW_APPROVAL
+        moderation_class, thread_field = ApprovalModeration, 'approval'
+    else:
+        category = IssueModeration.Category.NEW_COMMENT if is_comment \
+            else IssueModeration.Category.NEW_ISSUE
+        moderation_class, thread_field = IssueModeration, 'issue'
 
-    raise NotImplementedError
-
-
-def is_empty_good_report(report: Report) -> bool:
-    """A thumbs-up with no comment says nothing a moderator could act on."""
-    return report.feedback_type == Report.FeedbackType.GOOD and not report.comment
-
-
-def add_necessary_moderation_for_report(report: Report):
-    if is_empty_good_report(report):
-        return
-
-    category = get_report_moderation_category(report)
-    report_moderation = ReportModeration(report=report, category=category,
-                                         diocese=report.website.get_diocese(),
-                                         status=ModerationStatus.TO_VALIDATE)
-    report_moderation.save()
+    # One moderation per thread and category: a new comment reopens it
+    moderation, created = moderation_class.objects.get_or_create(
+        **{thread_field: head},
+        category=category,
+        defaults={'diocese': website.get_diocese(), 'status': ModerationStatus.TO_VALIDATE},
+    )
+    if not created and moderation.status != ModerationStatus.TO_VALIDATE:
+        moderation.status = ModerationStatus.TO_VALIDATE
+        moderation.save()
 
 
 ####################
 # PREVIOUS REPORTS #
 ####################
 
-def get_previous_reports(website: Website) -> list[list[Report]]:
-    all_reports = list(Report.objects.filter(website=website).order_by('created_at').all())
+@dataclass
+class ReportThread:
+    head: Issue | Approval
+    comments: list[IssueComment | ApprovalComment]
 
-    main_reports = []
-    reports_by_main_report = {}
-    for report in all_reports:
-        if report.main_report:
-            reports_by_main_report[report.main_report.uuid].append(report)
-        else:
-            main_reports.append(report)
-            reports_by_main_report[report.uuid] = [report]
-
-    return [reports_by_main_report[main_report.uuid] for main_report in reversed(main_reports)]
+    @property
+    def is_approval(self) -> bool:
+        return isinstance(self.head, Approval)
 
 
-def get_moderation_by_report_uuid(previous_reports: list[list[Report]]
-                                  ) -> dict[UUID, ReportModeration]:
-    all_reports = [report for reports in previous_reports for report in reports]
+def get_report_threads(website: Website) -> list[ReportThread]:
+    heads = list(Issue.objects.filter(website=website).prefetch_related('comments__user')) \
+        + list(Approval.objects.filter(website=website).prefetch_related('comments__user'))
+    heads.sort(key=lambda head: head.created_at, reverse=True)
 
-    return {
-        moderation.report_id: moderation
-        for moderation in ReportModeration.objects.filter(report__in=all_reports).all()
-    }
+    return [ReportThread(head=head,
+                         comments=sorted(head.comments.all(), key=lambda c: c.created_at))
+            for head in heads]
+
+
+def get_moderations_by_thread_uuid(threads: list[ReportThread]
+                                   ) -> dict[UUID, list[ModerationMixin]]:
+    head_uuids = [thread.head.uuid for thread in threads]
+
+    moderations_by_thread_uuid = {}
+    for moderation in IssueModeration.objects.filter(issue_id__in=head_uuids):
+        moderations_by_thread_uuid.setdefault(moderation.issue_id, []).append(moderation)
+    for moderation in ApprovalModeration.objects.filter(approval_id__in=head_uuids):
+        moderations_by_thread_uuid.setdefault(moderation.approval_id, []).append(moderation)
+
+    return moderations_by_thread_uuid
 
 
 ##################
@@ -181,18 +175,12 @@ def get_moderation_by_report_uuid(previous_reports: list[list[Report]]
 ##################
 
 def get_count_and_label(website: Website):
-    count_by_type = {}
-    for report in website.reports.all():
-        count_by_type[report.feedback_type] = count_by_type.get(report.feedback_type, 0) + 1
-
     count_and_label = []
-    for feedback_type, label, singular_tooltip, plural_tooltip in [
-        (Report.FeedbackType.GOOD, '👍', 'avis positif', 'avis positifs'),
-        (Report.FeedbackType.ERROR, '👎', 'erreur signalée', 'erreurs signalées'),
-        (Report.FeedbackType.COMMENT, '💬', 'commentaire', 'commentaires'),
+    for count, label, singular_tooltip, plural_tooltip in [
+        (len(website.approvals.all()), '👍', 'avis positif', 'avis positifs'),
+        (len(website.issues.all()), '👎', 'erreur signalée', 'erreurs signalées'),
     ]:
-        if feedback_type in count_by_type:
-            count = count_by_type[feedback_type]
+        if count:
             count_and_label.append({
                 'count': count,
                 'label': label,

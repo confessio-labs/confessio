@@ -288,14 +288,6 @@ UI widget
 }
 
 /*
- * Forms
- */
-.disable-select-until-check:has(input.check-necessary:not(:checked)) select {
-    pointer-events: none;
-    opacity: 0.5;
-}
-
-/*
  * Navbar scroll
  */
 @media (min-width: 992px) {
