@@ -27,7 +27,8 @@ def find_error_in_text_note_content(content: str | None) -> str | None:
     return None
 
 
-def add_text_note(content: str, website: Website, request) -> tuple[TextNote | None, str | None]:
+def add_text_note(content: str, website: Website, request, email: str | None = None
+                  ) -> tuple[TextNote | None, str | None]:
     if too_many_recent_text_notes():
         subject = 'Too many text notes added recently'
         send_email_to_admin(subject, subject)
@@ -44,6 +45,7 @@ def add_text_note(content: str, website: Website, request) -> tuple[TextNote | N
         user=user,
         user_agent=user_agent,
         ip_address_hash=ip_address_hash,
+        email=email,
     )
 
     if not user:
@@ -54,7 +56,8 @@ def add_text_note(content: str, website: Website, request) -> tuple[TextNote | N
         )
         email_body = (f"New text note on website {website.name}\n"
                       f"url: {website_url}\n"
-                      f"\n\ncontent:\n{content}")
+                      + (f"email: {email}\n" if email else "")
+                      + f"\n\ncontent:\n{content}")
         subject = f'New text note on confessio for {website.name}'
         send_email_to_admin(subject, email_body)
         send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)

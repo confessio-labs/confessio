@@ -49,7 +49,7 @@ def find_error_in_document_to_upload(document) -> str | None:
 
 
 def upload_file_note(document, website: Website, request, caption: str | None = None,
-                     ) -> tuple[FileNote | None, str | None]:
+                     email: str | None = None) -> tuple[FileNote | None, str | None]:
     if too_many_recent_file_notes():
         subject = 'Too many images uploaded recently'
         send_email_to_admin(subject, subject)
@@ -70,6 +70,7 @@ def upload_file_note(document, website: Website, request, caption: str | None = 
         user=user,
         user_agent=user_agent,
         ip_address_hash=ip_address_hash,
+        email=email,
     )
     file_note.save()
     unique_filename = f"{file_note.uuid}/{image_name}"
@@ -86,7 +87,8 @@ def upload_file_note(document, website: Website, request, caption: str | None = 
             )
             email_body = (f"New image on website {website.name}\n"
                           f"url: {website_url}\n"
-                          f"\n\ncomment:\n{caption}")
+                          + (f"email: {email}\n" if email else "")
+                          + f"\n\ncomment:\n{caption}")
             subject = f'New image on confessio for {website.name}'
             send_email_to_admin(subject, email_body)
             send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_IMAGES)

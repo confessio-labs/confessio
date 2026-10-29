@@ -19,6 +19,7 @@ class BaseUserReport(TimeStampMixin):
                              related_name='+')
     user_agent = models.TextField(null=True, blank=True)
     ip_address_hash = models.CharField(max_length=64, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
 
     class Meta(TimeStampMixin.Meta):
         abstract = True

@@ -13,7 +13,8 @@ from front.models import Approval, ApprovalComment, ApprovalModeration, Issue, I
 from registry.models import Church, Website
 from registry.models.base_moderation_models import ModerationStatus
 from core.services.admin_email_service import send_email_to_admin
-from front.utils.web_utils import get_user_user_agent_and_ip, is_staff_user
+from front.utils.web_utils import clean_email, find_error_in_email, \
+    get_user_user_agent_and_ip, is_staff_user
 
 
 class FeedbackType(StrEnum):
@@ -51,7 +52,7 @@ def get_thread_head(website: Website, head_uuid: UUID | str
 
 def save_report(request: HttpRequest, website: Website, church: Church | None,
                 feedback_type: FeedbackType, comment: str | None,
-                main_report_uuid: UUID | str | None
+                main_report_uuid: UUID | str | None, email: str | None = None
                 ) -> Issue | Approval | IssueComment | ApprovalComment | FileNoteComment \
         | TextNoteComment:
     head = get_thread_head(website, main_report_uuid) if main_report_uuid else None
@@ -61,6 +62,7 @@ def save_report(request: HttpRequest, website: Website, church: Church | None,
         'user': user,
         'user_agent': user_agent,
         'ip_address_hash': ip_address_hash,
+        'email': email,
     }
 
     if isinstance(head, Approval):
@@ -91,6 +93,7 @@ def save_report(request: HttpRequest, website: Website, church: Church | None,
         email_body = (f"New report on website {website.name}\n"
                       f"url: {website_url}\n"
                       + (f"church: {church.name}\n" if church else "")
+                      + (f"email: {email}\n" if email else "")
                       + f"feedback_type: {feedback_type}\n\ncomment:\n{comment}")
         subject = f'New report on confessio for {website.name}'
         send_email_to_admin(subject, email_body)
@@ -103,6 +106,7 @@ def new_report(request, website: Website) -> str:
     feedback_type_str = request.POST.get('feedback_type')
     comment = request.POST.get('comment')
     main_report_uuid = request.POST.get('main_report_uuid')
+    email = clean_email(request.POST.get('email'))
 
     if not feedback_type_str:
         raise NewReportError(400, 'Feedback type is None')
@@ -112,7 +116,11 @@ def new_report(request, website: Website) -> str:
     except ValueError:
         raise NewReportError(400, f'Invalid feedback type: {feedback_type_str}')
 
-    save_report(request, website, None, feedback_type, comment, main_report_uuid)
+    email_error = find_error_in_email(email)
+    if email_error:
+        raise NewReportError(400, email_error)
+
+    save_report(request, website, None, feedback_type, comment, main_report_uuid, email)
 
     if is_staff_user(request) and request.POST.get('mark_solved') and main_report_uuid:
         head = get_thread_head(website, main_report_uuid)

@@ -14,7 +14,8 @@ class FileNoteCommentInline(admin.TabularInline):
 @admin.register(FileNote)
 class FileNoteAdmin(ModelAdmin):
     list_display = ['website', 'name', 'caption', 'status', 'expire_at', 'created_at']
-    fields = ['name', 'caption', 'status', 'expire_at', 'human_html', 'llm_html']
+    fields = ['name', 'caption', 'email', 'status', 'expire_at', 'human_html', 'llm_html']
+    readonly_fields = ['email']
     inlines = [FileNoteCommentInline]
 
 
@@ -28,5 +29,6 @@ class TextNoteCommentInline(admin.TabularInline):
 @admin.register(TextNote)
 class TextNoteAdmin(ModelAdmin):
     list_display = ['website', 'content', 'status', 'expire_at', 'created_at']
-    fields = ['content', 'status', 'expire_at']
+    fields = ['content', 'email', 'status', 'expire_at']
+    readonly_fields = ['email']
     inlines = [TextNoteCommentInline]

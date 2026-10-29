@@ -23,6 +23,7 @@ from front.services.search.autocomplete_service import get_aggregated_response, 
 from front.services.search.search_service import TimeFilter, AggregationItem, BoundingBox, \
     get_dioceses_bounding_box, get_churches_by_uuid, get_churches_by_diocese, \
     get_churches_in_box, SearchResult, DEFAULT_LIMIT
+from front.utils.web_utils import clean_email, find_error_in_email
 from registry.models import Church, Website, Diocese, City
 from scheduling.models import IndexEvent
 from scheduling.public_model import SourcedScheduleItem, BaseSource, ParsingSource, OClocherSource
@@ -155,6 +156,7 @@ class ReportIn(Schema):
     feedback_type: FeedbackTypeEnum
     comment: str | None = None
     main_report_uuid: UUID | None = None
+    email: str | None = None
 
 
 class ReportOut(Schema):
@@ -586,11 +588,16 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
         except Church.DoesNotExist:
             raise Http404(f'Church {report_in.church_uuid} does not exist')
 
+    email = clean_email(report_in.email)
+    email_error = find_error_in_email(email)
+    if email_error:
+        raise HttpError(400, email_error)
+
     try:
         report = save_report(
             request, website, church,
             FeedbackType(report_in.feedback_type),
-            report_in.comment, report_in.main_report_uuid,
+            report_in.comment, report_in.main_report_uuid, email,
         )
     except NewReportError as e:
         if e.status == 404:
@@ -604,18 +611,21 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
 def api_front_post_images(request,
                           website_uuid: UUID = Form(...),
                           document: UploadedFile = File(...),
-                          comment: str | None = Form(None)) -> ImageOut:
+                          comment: str | None = Form(None),
+                          email: str | None = Form(None)) -> ImageOut:
     try:
         website = Website.objects.get(uuid=website_uuid)
     except Website.DoesNotExist:
         raise Http404(f'Website {website_uuid} does not exist')
 
-    validation_error = attaching_find_error_in_document_to_upload(document)
+    email = clean_email(email)
+    validation_error = attaching_find_error_in_document_to_upload(document) \
+        or find_error_in_email(email)
     if validation_error:
         raise HttpError(400, validation_error)
 
     file_note, error_message = attaching_upload_file_note(document, website, request,
-                                                          caption=comment)
+                                                          caption=comment, email=email)
     if file_note is None:
         raise HttpError(400, error_message or 'Upload failed')
 
