@@ -32,7 +32,8 @@ from front.services.search.search_service import TimeFilter, get_churches_in_box
     get_churches_by_website, get_churches_around, get_churches_by_diocese, \
     fetch_events, DEFAULT_SEARCH_BOX, SearchResult, get_box_center
 from front.services.search.stat_service import new_search_hit
-from front.utils.web_utils import redirect_with_url_params, is_staff_user
+from front.utils.web_utils import clean_email, find_error_in_email, redirect_with_url_params, \
+    is_staff_user
 from registry.models import Website, Diocese, Church, City
 from registry.utils.string_utils import lower_first, city_and_prefix
 from scheduling.public_service import scheduling_get_indexed_scheduling, \
@@ -490,11 +491,13 @@ def website_upload_image(request, website_uuid: str):
 
     if request.method == 'POST':
         document = request.FILES.get('file-input', None)
-        upload_error_message = attaching_find_error_in_document_to_upload(document)
+        email = clean_email(request.POST.get('email'))
+        upload_error_message = attaching_find_error_in_document_to_upload(document) \
+            or find_error_in_email(email)
         if not upload_error_message:
             comment = request.POST.get('comment', None)
             file_note, error_message = attaching_upload_file_note(document, website, request,
-                                                                  caption=comment)
+                                                                  caption=comment, email=email)
             if file_note:
                 success = True
                 attaching_recognize_and_extract_file_note(file_note)
@@ -525,9 +528,11 @@ def website_add_text_note(request, website_uuid: str):
         return HttpResponseNotFound("Website does not exist with this uuid")
 
     content = request.POST.get('content', None)
-    error_message = attaching_find_error_in_text_note_content(content)
+    email = clean_email(request.POST.get('email'))
+    error_message = attaching_find_error_in_text_note_content(content) \
+        or find_error_in_email(email)
     if not error_message:
-        text_note, error_message = attaching_add_text_note(content, website, request)
+        text_note, error_message = attaching_add_text_note(content, website, request, email)
         if text_note:
             attaching_extract_text_note(text_note)
 

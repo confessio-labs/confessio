@@ -1,6 +1,8 @@
 import os
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -30,6 +32,24 @@ def get_user_user_agent_and_ip(request) -> tuple[User | None, str | None, str | 
     ip_address_hash = hash_string_to_hex(ip_hash_salt + get_client_ip(request))
 
     return user, user_agent, ip_address_hash
+
+
+def clean_email(email: str | None) -> str | None:
+    if email is None:
+        return None
+    return email.strip() or None
+
+
+def find_error_in_email(email: str | None) -> str | None:
+    if email is None:
+        return None
+
+    try:
+        validate_email(email)
+    except ValidationError:
+        return "Adresse email invalide."
+
+    return None
 
 
 def redirect_with_url_params(url_name: str, query_params: dict, **kwargs):

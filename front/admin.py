@@ -15,8 +15,8 @@ class IssueCommentInline(admin.TabularInline):
 @admin.register(Issue)
 class IssueAdmin(ModelAdmin):
     list_display = ['content', 'website', 'solved_at', 'created_at']
-    fields = ['content', 'website', 'church', 'solved_at', 'user', 'created_at']
-    readonly_fields = ['website', 'church', 'user', 'created_at']
+    fields = ['content', 'website', 'church', 'solved_at', 'user', 'email', 'created_at']
+    readonly_fields = ['website', 'church', 'user', 'email', 'created_at']
     inlines = [IssueCommentInline]
 
 
@@ -30,8 +30,8 @@ class ApprovalCommentInline(admin.TabularInline):
 @admin.register(Approval)
 class ApprovalAdmin(ModelAdmin):
     list_display = ['content', 'website', 'created_at']
-    fields = ['content', 'website', 'church', 'user', 'created_at']
-    readonly_fields = ['website', 'church', 'user', 'created_at']
+    fields = ['content', 'website', 'church', 'user', 'email', 'created_at']
+    readonly_fields = ['website', 'church', 'user', 'email', 'created_at']
     inlines = [ApprovalCommentInline]
 
 

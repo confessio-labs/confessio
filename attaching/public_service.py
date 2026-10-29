@@ -13,8 +13,8 @@ from registry.models import Website
 
 
 def attaching_upload_file_note(document, website: Website, request, caption: str | None = None,
-                               ) -> tuple[FileNote | None, str | None]:
-    return upload_file_note(document, website, request, caption=caption)
+                               email: str | None = None) -> tuple[FileNote | None, str | None]:
+    return upload_file_note(document, website, request, caption=caption, email=email)
 
 
 def attaching_find_error_in_document_to_upload(document) -> str | None:
@@ -33,9 +33,9 @@ def attaching_get_new_file_note_moderation(file_note: FileNote) -> FileNoteModer
     return get_new_file_note_moderation(file_note)
 
 
-def attaching_add_text_note(content: str, website: Website, request
+def attaching_add_text_note(content: str, website: Website, request, email: str | None = None
                             ) -> tuple[TextNote | None, str | None]:
-    return add_text_note(content, website, request)
+    return add_text_note(content, website, request, email)
 
 
 def attaching_find_error_in_text_note_content(content: str | None) -> str | None:
