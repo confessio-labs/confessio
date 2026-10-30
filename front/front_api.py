@@ -295,6 +295,7 @@ class ApprovalOut(Schema):
 
 class TextNoteIn(Schema):
     website_uuid: UUID
+    church_uuid: UUID | None = None
     content: str
     email: str | None = None
 
@@ -302,6 +303,7 @@ class TextNoteIn(Schema):
 class TextNoteOut(Schema):
     uuid: UUID
     created_at: datetime
+    church_uuid: UUID | None
     content: str
     expire_at: datetime
     comments: list[CommentOut]
@@ -312,6 +314,7 @@ class TextNoteOut(Schema):
         return cls(
             uuid=text_note.uuid,
             created_at=text_note.created_at,
+            church_uuid=text_note.church_id,
             content=text_note.content,
             expire_at=text_note.expire_at,
             comments=[CommentOut.from_comment(comment) for comment in comments],
@@ -321,6 +324,7 @@ class TextNoteOut(Schema):
 class FileNoteOut(Schema):
     uuid: UUID
     created_at: datetime
+    church_uuid: UUID | None
     public_url: str
     caption: str | None
     expire_at: datetime
@@ -332,6 +336,7 @@ class FileNoteOut(Schema):
         return cls(
             uuid=file_note.uuid,
             created_at=file_note.created_at,
+            church_uuid=file_note.church_id,
             public_url=attaching_get_file_note_public_url(file_note),
             caption=file_note.caption,
             expire_at=file_note.expire_at,
@@ -771,7 +776,7 @@ def api_front_post_images(request,
                           document: UploadedFile = File(...),
                           comment: str | None = Form(None),
                           email: str | None = Form(None)) -> ImageOut:
-    file_note = upload_file_note(request, website_uuid, document, comment, email)
+    file_note = upload_file_note(request, website_uuid, None, document, comment, email)
     return ImageOut.from_file_note(file_note)
 
 
@@ -798,13 +803,14 @@ def api_front_post_approval(request, approval_in: ApprovalIn) -> ApprovalOut:
 @api.post("/text_notes", response={200: TextNoteOut, 400: ErrorSchema, 404: ErrorSchema})
 def api_front_post_text_note(request, text_note_in: TextNoteIn) -> TextNoteOut:
     website = get_website_or_404(text_note_in.website_uuid)
+    church = get_church_or_404(text_note_in.church_uuid)
     content_error = attaching_find_error_in_text_note_content(text_note_in.content)
     if content_error:
         raise HttpError(400, content_error)
     email = clean_and_check_email(text_note_in.email)
 
     text_note, error_message = attaching_add_text_note(text_note_in.content, website, request,
-                                                       email)
+                                                       email, church)
     if text_note is None:
         raise HttpError(400, error_message or 'Text note creation failed')
 
@@ -816,16 +822,19 @@ def api_front_post_text_note(request, text_note_in: TextNoteIn) -> TextNoteOut:
 @api.post("/file_notes", response={200: FileNoteOut, 400: ErrorSchema, 404: ErrorSchema})
 def api_front_post_file_note(request,
                              website_uuid: UUID = Form(...),
+                             church_uuid: UUID | None = Form(None),
                              document: UploadedFile = File(...),
                              caption: str | None = Form(None),
                              email: str | None = Form(None)) -> FileNoteOut:
-    file_note = upload_file_note(request, website_uuid, document, caption, email)
+    file_note = upload_file_note(request, website_uuid, church_uuid, document, caption, email)
     return FileNoteOut.from_file_note(file_note, [])
 
 
-def upload_file_note(request, website_uuid: UUID, document: UploadedFile,
-                     caption: str | None, email: str | None) -> FileNote:
+def upload_file_note(request, website_uuid: UUID, church_uuid: UUID | None,
+                     document: UploadedFile, caption: str | None, email: str | None
+                     ) -> FileNote:
     website = get_website_or_404(website_uuid)
+    church = get_church_or_404(church_uuid)
 
     email = clean_email(email)
     validation_error = attaching_find_error_in_document_to_upload(document) \
@@ -834,7 +843,8 @@ def upload_file_note(request, website_uuid: UUID, document: UploadedFile,
         raise HttpError(400, validation_error)
 
     file_note, error_message = attaching_upload_file_note(document, website, request,
-                                                          caption=caption, email=email)
+                                                          caption=caption, email=email,
+                                                          church=church)
     if file_note is None:
         raise HttpError(400, error_message or 'Upload failed')
 

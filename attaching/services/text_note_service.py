@@ -11,7 +11,7 @@ from attaching.services.upload_file_note_service import NOTE_DEFAULT_TTL
 from core.services.admin_email_service import send_email_to_admin
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.utils.web_utils import get_user_user_agent_and_ip
-from registry.models import Website
+from registry.models import Church, Website
 
 TEXT_NOTE_MAX_LENGTH = 10000
 MAX_TEXT_NOTES_IN_30_DAYS = 2000
@@ -27,8 +27,8 @@ def find_error_in_text_note_content(content: str | None) -> str | None:
     return None
 
 
-def add_text_note(content: str, website: Website, request, email: str | None = None
-                  ) -> tuple[TextNote | None, str | None]:
+def add_text_note(content: str, website: Website, request, email: str | None = None,
+                  church: Church | None = None) -> tuple[TextNote | None, str | None]:
     if too_many_recent_text_notes():
         subject = 'Too many text notes added recently'
         send_email_to_admin(subject, subject)
@@ -40,6 +40,7 @@ def add_text_note(content: str, website: Website, request, email: str | None = N
 
     text_note = TextNote.objects.create(
         website=website,
+        church=church,
         content=content,
         expire_at=timezone.now() + NOTE_DEFAULT_TTL,
         user=user,
