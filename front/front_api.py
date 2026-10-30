@@ -10,6 +10,7 @@ from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
 from attaching.models import FileNote, TextNote
+from attaching.public_model import NoteTtl
 from attaching.public_service import attaching_get_file_note_public_url, \
     attaching_upload_file_note, attaching_find_error_in_document_to_upload, \
     attaching_recognize_and_extract_file_note, attaching_add_text_note, \
@@ -294,6 +295,7 @@ class TextNoteIn(Schema):
     church_uuid: UUID | None = None
     content: str
     email: str | None = None
+    ttl: NoteTtl = NoteTtl.ONE_YEAR
 
 
 class TextNoteOut(Schema):
@@ -768,7 +770,8 @@ def api_front_post_images(request,
                           document: UploadedFile = File(...),
                           comment: str | None = Form(None),
                           email: str | None = Form(None)) -> ImageOut:
-    file_note = upload_file_note(request, website_uuid, None, document, comment, email)
+    file_note = upload_file_note(request, website_uuid, None, document, comment, email,
+                                 NoteTtl.ONE_YEAR)
     return ImageOut.from_file_note(file_note)
 
 
@@ -802,7 +805,7 @@ def api_front_post_text_note(request, text_note_in: TextNoteIn) -> TextNoteOut:
     email = clean_and_check_email(text_note_in.email)
 
     text_note, error_message = attaching_add_text_note(text_note_in.content, website, request,
-                                                       email, church)
+                                                       text_note_in.ttl, email, church)
     if text_note is None:
         raise HttpError(400, error_message or 'Text note creation failed')
 
@@ -817,14 +820,16 @@ def api_front_post_file_note(request,
                              church_uuid: UUID | None = Form(None),
                              document: UploadedFile = File(...),
                              caption: str | None = Form(None),
-                             email: str | None = Form(None)) -> FileNoteOut:
-    file_note = upload_file_note(request, website_uuid, church_uuid, document, caption, email)
+                             email: str | None = Form(None),
+                             ttl: NoteTtl = Form(NoteTtl.ONE_YEAR)) -> FileNoteOut:
+    file_note = upload_file_note(request, website_uuid, church_uuid, document, caption, email,
+                                 ttl)
     return FileNoteOut.from_file_note(file_note, [])
 
 
 def upload_file_note(request, website_uuid: UUID, church_uuid: UUID | None,
-                     document: UploadedFile, caption: str | None, email: str | None
-                     ) -> FileNote:
+                     document: UploadedFile, caption: str | None, email: str | None,
+                     ttl: NoteTtl) -> FileNote:
     website = get_website_or_404(website_uuid)
     church = get_church_or_404(church_uuid)
 
@@ -834,7 +839,7 @@ def upload_file_note(request, website_uuid: UUID, church_uuid: UUID | None,
     if validation_error:
         raise HttpError(400, validation_error)
 
-    file_note, error_message = attaching_upload_file_note(document, website, request,
+    file_note, error_message = attaching_upload_file_note(document, website, request, ttl,
                                                           caption=caption, email=email,
                                                           church=church)
     if file_note is None:

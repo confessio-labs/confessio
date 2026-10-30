@@ -233,6 +233,14 @@
                             <label for="file-note-email" style="display: none"></label>
                             <input type="email" placeholder="Adresse email facultative (pour vous recontacter)" class="form-control" id="file-note-email" name="email" maxlength="254">
                         </div>
+                        <div class="mt-2">
+                            <label for="file-note-ttl" class="form-label">Durée de validité</label>
+                            <select class="form-select" id="file-note-ttl" name="ttl">
+                                <option value="one_week">Une semaine</option>
+                                <option value="one_month">Un mois</option>
+                                <option value="one_year" selected>Un an</option>
+                            </select>
+                        </div>
                         <div class="mt-3">
                             <button type="submit" class="btn rounded btn-secondary">Charger l'image !</button>
                         </div>
@@ -254,6 +262,14 @@
                         <div class="mt-2">
                             <label for="text-note-email" style="display: none"></label>
                             <input type="email" placeholder="Adresse email facultative (pour vous recontacter)" class="form-control" id="text-note-email" name="email" maxlength="254">
+                        </div>
+                        <div class="mt-2">
+                            <label for="text-note-ttl" class="form-label">Durée de validité</label>
+                            <select class="form-select" id="text-note-ttl" name="ttl">
+                                <option value="one_week">Une semaine</option>
+                                <option value="one_month">Un mois</option>
+                                <option value="one_year" selected>Un an</option>
+                            </select>
                         </div>
                         <div class="mt-3">
                             <button type="submit" class="btn rounded btn-secondary">Ajouter le texte !</button>
