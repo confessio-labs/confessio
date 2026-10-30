@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
+from attaching.public_model import NoteTtl
 from attaching.public_service import attaching_upload_file_note, \
     attaching_recognize_and_extract_file_note, attaching_find_error_in_document_to_upload, \
     attaching_add_text_note, attaching_extract_text_note, \
@@ -483,6 +484,17 @@ def cities_list(request):
     return render(request, 'pages/cities.html', context)
 
 
+def extract_note_ttl(request) -> NoteTtl | None:
+    try:
+        return NoteTtl(request.POST.get('ttl'))
+    except ValueError:
+        return None
+
+
+def find_error_in_note_ttl(ttl: NoteTtl | None) -> str | None:
+    return None if ttl else "Durée de validité invalide."
+
+
 def website_upload_image(request, website_uuid: str):
     try:
         website = Website.objects.get(uuid=website_uuid)
@@ -492,11 +504,12 @@ def website_upload_image(request, website_uuid: str):
     if request.method == 'POST':
         document = request.FILES.get('file-input', None)
         email = clean_email(request.POST.get('email'))
+        ttl = extract_note_ttl(request)
         upload_error_message = attaching_find_error_in_document_to_upload(document) \
-            or find_error_in_email(email)
+            or find_error_in_email(email) or find_error_in_note_ttl(ttl)
         if not upload_error_message:
             comment = request.POST.get('comment', None)
-            file_note, error_message = attaching_upload_file_note(document, website, request,
+            file_note, error_message = attaching_upload_file_note(document, website, request, ttl,
                                                                   caption=comment, email=email)
             if file_note:
                 success = True
@@ -529,10 +542,11 @@ def website_add_text_note(request, website_uuid: str):
 
     content = request.POST.get('content', None)
     email = clean_email(request.POST.get('email'))
+    ttl = extract_note_ttl(request)
     error_message = attaching_find_error_in_text_note_content(content) \
-        or find_error_in_email(email)
+        or find_error_in_email(email) or find_error_in_note_ttl(ttl)
     if not error_message:
-        text_note, error_message = attaching_add_text_note(content, website, request, email)
+        text_note, error_message = attaching_add_text_note(content, website, request, ttl, email)
         if text_note:
             attaching_extract_text_note(text_note)
 

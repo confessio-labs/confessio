@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 
 from attaching.models import FileNote
+from attaching.public_model import NoteTtl
 from attaching.services.file_note_moderation_service import \
     add_necessary_moderation_for_file_note
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
@@ -20,7 +21,6 @@ IMAGE_SIZE_LIMIT = 10 * 1024 * 1024  # 10MB limit for uploaded images
 MAX_IMAGES_IN_30_DAYS = 2000  # Maximum number of images allowed in the last 30 days
 ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 ALLOWED_IMAGE_MIME_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
-NOTE_DEFAULT_TTL = timedelta(days=365)
 
 
 def find_error_in_document_to_upload(document) -> str | None:
@@ -48,9 +48,9 @@ def find_error_in_document_to_upload(document) -> str | None:
     return None
 
 
-def upload_file_note(document, website: Website, request, caption: str | None = None,
-                     email: str | None = None, church: Church | None = None
-                     ) -> tuple[FileNote | None, str | None]:
+def upload_file_note(document, website: Website, request, ttl: NoteTtl,
+                     caption: str | None = None, email: str | None = None,
+                     church: Church | None = None) -> tuple[FileNote | None, str | None]:
     if too_many_recent_file_notes():
         subject = 'Too many images uploaded recently'
         send_email_to_admin(subject, subject)
@@ -68,7 +68,7 @@ def upload_file_note(document, website: Website, request, caption: str | None = 
         name=image_name,
         caption=caption,
         mime_type=get_mime_type(document, image_name),
-        expire_at=timezone.now() + NOTE_DEFAULT_TTL,
+        expire_at=timezone.now() + ttl.duration,
         user=user,
         user_agent=user_agent,
         ip_address_hash=ip_address_hash,

@@ -1,4 +1,5 @@
 from attaching.models import FileNote, FileNoteModeration, TextNote, TextNoteModeration
+from attaching.public_model import NoteTtl
 from attaching.services.file_note_moderation_service import get_new_file_note_moderation
 from attaching.services.file_note_progress_service import \
     get_file_note_recognition_status_by_website_uuid
@@ -12,10 +13,11 @@ from core.services.background_task_service import TaskStatus
 from registry.models import Church, Website
 
 
-def attaching_upload_file_note(document, website: Website, request, caption: str | None = None,
-                               email: str | None = None, church: Church | None = None
+def attaching_upload_file_note(document, website: Website, request, ttl: NoteTtl,
+                               caption: str | None = None, email: str | None = None,
+                               church: Church | None = None
                                ) -> tuple[FileNote | None, str | None]:
-    return upload_file_note(document, website, request, caption=caption, email=email,
+    return upload_file_note(document, website, request, ttl, caption=caption, email=email,
                             church=church)
 
 
@@ -35,9 +37,10 @@ def attaching_get_new_file_note_moderation(file_note: FileNote) -> FileNoteModer
     return get_new_file_note_moderation(file_note)
 
 
-def attaching_add_text_note(content: str, website: Website, request, email: str | None = None,
-                            church: Church | None = None) -> tuple[TextNote | None, str | None]:
-    return add_text_note(content, website, request, email, church)
+def attaching_add_text_note(content: str, website: Website, request, ttl: NoteTtl,
+                            email: str | None = None, church: Church | None = None
+                            ) -> tuple[TextNote | None, str | None]:
+    return add_text_note(content, website, request, ttl, email, church)
 
 
 def attaching_find_error_in_text_note_content(content: str | None) -> str | None:
