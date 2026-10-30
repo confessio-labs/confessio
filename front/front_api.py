@@ -250,7 +250,6 @@ class IssueIn(Schema):
 class IssueOut(Schema):
     uuid: UUID
     created_at: datetime
-    church_uuid: UUID | None
     content: str
     solved_at: datetime | None
     comments: list[CommentOut]
@@ -260,7 +259,6 @@ class IssueOut(Schema):
         return cls(
             uuid=issue.uuid,
             created_at=issue.created_at,
-            church_uuid=issue.church_id,
             content=issue.content,
             solved_at=issue.solved_at,
             comments=[CommentOut.from_comment(comment) for comment in comments],
@@ -277,7 +275,6 @@ class ApprovalIn(Schema):
 class ApprovalOut(Schema):
     uuid: UUID
     created_at: datetime
-    church_uuid: UUID | None
     content: str | None
     comments: list[CommentOut]
 
@@ -287,7 +284,6 @@ class ApprovalOut(Schema):
         return cls(
             uuid=approval.uuid,
             created_at=approval.created_at,
-            church_uuid=approval.church_id,
             content=approval.content or None,
             comments=[CommentOut.from_comment(comment) for comment in comments],
         )
@@ -303,7 +299,6 @@ class TextNoteIn(Schema):
 class TextNoteOut(Schema):
     uuid: UUID
     created_at: datetime
-    church_uuid: UUID | None
     content: str
     expire_at: datetime
     comments: list[CommentOut]
@@ -314,7 +309,6 @@ class TextNoteOut(Schema):
         return cls(
             uuid=text_note.uuid,
             created_at=text_note.created_at,
-            church_uuid=text_note.church_id,
             content=text_note.content,
             expire_at=text_note.expire_at,
             comments=[CommentOut.from_comment(comment) for comment in comments],
@@ -324,7 +318,6 @@ class TextNoteOut(Schema):
 class FileNoteOut(Schema):
     uuid: UUID
     created_at: datetime
-    church_uuid: UUID | None
     public_url: str
     caption: str | None
     expire_at: datetime
@@ -336,7 +329,6 @@ class FileNoteOut(Schema):
         return cls(
             uuid=file_note.uuid,
             created_at=file_note.created_at,
-            church_uuid=file_note.church_id,
             public_url=attaching_get_file_note_public_url(file_note),
             caption=file_note.caption,
             expire_at=file_note.expire_at,
