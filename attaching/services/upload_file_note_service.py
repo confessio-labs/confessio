@@ -11,7 +11,7 @@ from attaching.models import FileNote
 from attaching.services.file_note_moderation_service import \
     add_necessary_moderation_for_file_note
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
-from registry.models import Website
+from registry.models import Church, Website
 from core.services.admin_email_service import send_email_to_admin
 from front.utils.web_utils import get_user_user_agent_and_ip
 
@@ -49,7 +49,8 @@ def find_error_in_document_to_upload(document) -> str | None:
 
 
 def upload_file_note(document, website: Website, request, caption: str | None = None,
-                     email: str | None = None) -> tuple[FileNote | None, str | None]:
+                     email: str | None = None, church: Church | None = None
+                     ) -> tuple[FileNote | None, str | None]:
     if too_many_recent_file_notes():
         subject = 'Too many images uploaded recently'
         send_email_to_admin(subject, subject)
@@ -63,6 +64,7 @@ def upload_file_note(document, website: Website, request, caption: str | None = 
 
     file_note = FileNote(
         website=website,
+        church=church,
         name=image_name,
         caption=caption,
         mime_type=get_mime_type(document, image_name),

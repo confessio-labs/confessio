@@ -9,12 +9,14 @@ from attaching.services.text_note_service import add_text_note, find_error_in_te
 from attaching.services.worker_recognize_service import recognize_pdf
 from attaching.tasks import worker_recognize_and_extract_file_note, worker_extract_text_note
 from core.services.background_task_service import TaskStatus
-from registry.models import Website
+from registry.models import Church, Website
 
 
 def attaching_upload_file_note(document, website: Website, request, caption: str | None = None,
-                               email: str | None = None) -> tuple[FileNote | None, str | None]:
-    return upload_file_note(document, website, request, caption=caption, email=email)
+                               email: str | None = None, church: Church | None = None
+                               ) -> tuple[FileNote | None, str | None]:
+    return upload_file_note(document, website, request, caption=caption, email=email,
+                            church=church)
 
 
 def attaching_find_error_in_document_to_upload(document) -> str | None:
@@ -33,9 +35,9 @@ def attaching_get_new_file_note_moderation(file_note: FileNote) -> FileNoteModer
     return get_new_file_note_moderation(file_note)
 
 
-def attaching_add_text_note(content: str, website: Website, request, email: str | None = None
-                            ) -> tuple[TextNote | None, str | None]:
-    return add_text_note(content, website, request, email)
+def attaching_add_text_note(content: str, website: Website, request, email: str | None = None,
+                            church: Church | None = None) -> tuple[TextNote | None, str | None]:
+    return add_text_note(content, website, request, email, church)
 
 
 def attaching_find_error_in_text_note_content(content: str | None) -> str | None:

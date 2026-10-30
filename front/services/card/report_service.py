@@ -51,60 +51,110 @@ def get_thread_head(website: Website, head_uuid: UUID | str
 
 
 def save_report(request: HttpRequest, website: Website, church: Church | None,
-                feedback_type: FeedbackType, comment: str | None,
+                feedback_type: FeedbackType, content: str | None,
                 main_report_uuid: UUID | str | None, email: str | None = None
                 ) -> Issue | Approval | IssueComment | ApprovalComment | FileNoteComment \
         | TextNoteComment:
     head = get_thread_head(website, main_report_uuid) if main_report_uuid else None
 
+    if head:
+        return save_comment(request, website, church, head, content, email)
+    if feedback_type == FeedbackType.GOOD:
+        return save_approval(request, website, church, content, email)
+    return save_issue(request, website, church, content, email)
+
+
+def save_issue(request: HttpRequest, website: Website, church: Church | None,
+               content: str | None, email: str | None) -> Issue:
+    user_fields = get_user_fields(request, email)
+    issue = Issue.objects.create(website=website, church=church, content=content or '',
+                                 **user_fields)
+    if not user_fields['user']:
+        notify_new_report(request, website, church, issue, False, content, email)
+
+    return issue
+
+
+def save_approval(request: HttpRequest, website: Website, church: Church | None,
+                  content: str | None, email: str | None) -> Approval:
+    user_fields = get_user_fields(request, email)
+    approval = Approval.objects.create(website=website, church=church, content=content,
+                                       **user_fields)
+    if not user_fields['user']:
+        notify_new_report(request, website, church, approval, False, content, email)
+
+    return approval
+
+
+def save_comment(request: HttpRequest, website: Website, church: Church | None,
+                 head: Issue | Approval | FileNote | TextNote, content: str | None,
+                 email: str | None
+                 ) -> IssueComment | ApprovalComment | FileNoteComment | TextNoteComment:
+    user_fields = get_user_fields(request, email)
+    content = content or ''
+    if isinstance(head, Approval):
+        comment = ApprovalComment.objects.create(approval=head, content=content, **user_fields)
+    elif isinstance(head, Issue):
+        comment = IssueComment.objects.create(issue=head, content=content, **user_fields)
+    elif isinstance(head, FileNote):
+        comment = FileNoteComment.objects.create(file_note=head, content=content, **user_fields)
+    else:
+        comment = TextNoteComment.objects.create(text_note=head, content=content, **user_fields)
+
+    if not user_fields['user']:
+        notify_new_report(request, website, church, head, True, content, email)
+
+    return comment
+
+
+def get_user_fields(request: HttpRequest, email: str | None) -> dict:
     user, user_agent, ip_address_hash = get_user_user_agent_and_ip(request)
-    user_fields = {
+    return {
         'user': user,
         'user_agent': user_agent,
         'ip_address_hash': ip_address_hash,
         'email': email,
     }
 
+
+def notify_new_report(request: HttpRequest, website: Website, church: Church | None,
+                      head: Issue | Approval | FileNote | TextNote, is_comment: bool,
+                      content: str | None, email: str | None):
+    # A thumbs-up with no content says nothing a moderator could act on
+    if isinstance(head, Approval) and not is_comment and not content:
+        return
+
+    add_necessary_moderation(website, head, is_comment=is_comment)
+
+    website_url = request.build_absolute_uri(
+        reverse('website_view', kwargs={'website_uuid': website.uuid})
+    )
+
+    thread_type = get_thread_type(head)
+    label = f'{thread_type} comment' if is_comment else thread_type
+    email_body = (f"New {label} on website {website.name}\n"
+                  f"url: {website_url}\n"
+                  + (f"church: {church.name}\n" if church else "")
+                  + (f"email: {email}\n" if email else "")
+                  + f"\ncontent:\n{content}")
+    subject = f'New {label} on confessio for {website.name}'
+    send_email_to_admin(subject, email_body)
+    send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
+
+
+def get_thread_type(head: Issue | Approval | FileNote | TextNote) -> str:
+    if isinstance(head, Issue):
+        return 'issue'
     if isinstance(head, Approval):
-        report = ApprovalComment.objects.create(approval=head, content=comment or '',
-                                                **user_fields)
-    elif isinstance(head, Issue):
-        report = IssueComment.objects.create(issue=head, content=comment or '', **user_fields)
-    elif isinstance(head, FileNote):
-        report = FileNoteComment.objects.create(file_note=head, content=comment or '',
-                                                **user_fields)
-    elif isinstance(head, TextNote):
-        report = TextNoteComment.objects.create(text_note=head, content=comment or '',
-                                                **user_fields)
-    elif feedback_type == FeedbackType.GOOD:
-        report = Approval.objects.create(website=website, church=church, content=comment,
-                                         **user_fields)
-    else:
-        report = Issue.objects.create(website=website, church=church, content=comment or '',
-                                      **user_fields)
-
-    if not user:
-        add_necessary_moderation(website, head or report, is_comment=head is not None)
-
-        website_url = request.build_absolute_uri(
-            reverse('website_view', kwargs={'website_uuid': website.uuid})
-        )
-
-        email_body = (f"New report on website {website.name}\n"
-                      f"url: {website_url}\n"
-                      + (f"church: {church.name}\n" if church else "")
-                      + (f"email: {email}\n" if email else "")
-                      + f"feedback_type: {feedback_type}\n\ncomment:\n{comment}")
-        subject = f'New report on confessio for {website.name}'
-        send_email_to_admin(subject, email_body)
-        send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
-
-    return report
+        return 'approval'
+    if isinstance(head, FileNote):
+        return 'file_note'
+    return 'text_note'
 
 
 def new_report(request, website: Website) -> str:
     feedback_type_str = request.POST.get('feedback_type')
-    comment = request.POST.get('comment')
+    content = request.POST.get('comment')
     main_report_uuid = request.POST.get('main_report_uuid')
     email = clean_email(request.POST.get('email'))
 
@@ -120,7 +170,7 @@ def new_report(request, website: Website) -> str:
     if email_error:
         raise NewReportError(400, email_error)
 
-    save_report(request, website, None, feedback_type, comment, main_report_uuid, email)
+    save_report(request, website, None, feedback_type, content, main_report_uuid, email)
 
     if is_staff_user(request) and request.POST.get('mark_solved') and main_report_uuid:
         head = get_thread_head(website, main_report_uuid)
@@ -133,9 +183,6 @@ def new_report(request, website: Website) -> str:
 def add_necessary_moderation(website: Website, head: Issue | Approval | FileNote | TextNote,
                              is_comment: bool):
     if isinstance(head, Approval):
-        # A thumbs-up with no comment says nothing a moderator could act on
-        if not is_comment and not head.content:
-            return
         category = ApprovalModeration.Category.NEW_COMMENT if is_comment \
             else ApprovalModeration.Category.NEW_APPROVAL
         moderation_class, thread_field = ApprovalModeration, 'approval'
