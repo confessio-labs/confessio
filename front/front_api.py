@@ -4,16 +4,19 @@ from typing import Literal
 from uuid import UUID
 
 from django.http import Http404
-from ninja import NinjaAPI, Schema, File, Form
+from ninja import NinjaAPI, Schema, File, Form, Field
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
-from attaching.models import FileNote
+from attaching.models import FileNote, TextNote
 from attaching.public_service import attaching_get_file_note_public_url, \
     attaching_upload_file_note, attaching_find_error_in_document_to_upload, \
-    attaching_recognize_and_extract_file_note
+    attaching_recognize_and_extract_file_note, attaching_add_text_note, \
+    attaching_extract_text_note, attaching_find_error_in_text_note_content
+from core.models.base_models import BaseComment
 from front.models import Approval, ApprovalComment, AutocompleteHit, Issue, IssueComment
-from front.services.card.report_service import save_report, NewReportError, FeedbackType
+from front.services.card.report_service import save_report, NewReportError, FeedbackType, \
+    save_issue, save_approval, save_comment
 from front.services.card.report_thread_service import get_report_threads, ReportThread
 from front.services.card.scraping_url_service import get_scraping_parsing_urls
 from front.services.card.sources_service import get_website_parsings_and_prunings, \
@@ -203,25 +206,158 @@ class ImageOut(Schema):
         )
 
 
+class CommentIn(Schema):
+    content: str
+    email: str | None = None
+
+
+class CommentOut(Schema):
+    uuid: UUID
+    created_at: datetime
+    content: str
+
+    @classmethod
+    def from_comment(cls, comment: BaseComment) -> 'CommentOut':
+        return cls(
+            uuid=comment.uuid,
+            created_at=comment.created_at,
+            content=comment.content,
+        )
+
+
+class IssueIn(Schema):
+    website_uuid: UUID
+    church_uuid: UUID | None = None
+    content: str | None = None
+    email: str | None = None
+
+
+class IssueOut(Schema):
+    uuid: UUID
+    created_at: datetime
+    church_uuid: UUID | None
+    content: str
+    solved_at: datetime | None
+    comments: list[CommentOut]
+
+    @classmethod
+    def from_issue(cls, issue: Issue, comments: list[IssueComment]) -> 'IssueOut':
+        return cls(
+            uuid=issue.uuid,
+            created_at=issue.created_at,
+            church_uuid=issue.church_id,
+            content=issue.content,
+            solved_at=issue.solved_at,
+            comments=[CommentOut.from_comment(comment) for comment in comments],
+        )
+
+
+class ApprovalIn(Schema):
+    website_uuid: UUID
+    church_uuid: UUID | None = None
+    content: str | None = None
+    email: str | None = None
+
+
+class ApprovalOut(Schema):
+    uuid: UUID
+    created_at: datetime
+    church_uuid: UUID | None
+    content: str | None
+    comments: list[CommentOut]
+
+    @classmethod
+    def from_approval(cls, approval: Approval, comments: list[ApprovalComment]
+                      ) -> 'ApprovalOut':
+        return cls(
+            uuid=approval.uuid,
+            created_at=approval.created_at,
+            church_uuid=approval.church_id,
+            content=approval.content or None,
+            comments=[CommentOut.from_comment(comment) for comment in comments],
+        )
+
+
+class TextNoteIn(Schema):
+    website_uuid: UUID
+    content: str
+    email: str | None = None
+
+
+class TextNoteOut(Schema):
+    uuid: UUID
+    created_at: datetime
+    content: str
+    expire_at: datetime
+    comments: list[CommentOut]
+
+    @classmethod
+    def from_text_note(cls, text_note: TextNote, comments: list[BaseComment]
+                       ) -> 'TextNoteOut':
+        return cls(
+            uuid=text_note.uuid,
+            created_at=text_note.created_at,
+            content=text_note.content,
+            expire_at=text_note.expire_at,
+            comments=[CommentOut.from_comment(comment) for comment in comments],
+        )
+
+
+class FileNoteOut(Schema):
+    uuid: UUID
+    created_at: datetime
+    public_url: str
+    caption: str | None
+    expire_at: datetime
+    comments: list[CommentOut]
+
+    @classmethod
+    def from_file_note(cls, file_note: FileNote, comments: list[BaseComment]
+                       ) -> 'FileNoteOut':
+        return cls(
+            uuid=file_note.uuid,
+            created_at=file_note.created_at,
+            public_url=attaching_get_file_note_public_url(file_note),
+            caption=file_note.caption,
+            expire_at=file_note.expire_at,
+            comments=[CommentOut.from_comment(comment) for comment in comments],
+        )
+
+
 class WebsiteOut(Schema):
     uuid: UUID
     name: str
     home_url: str
-    reports: list[ReportOut]
-    images: list[ImageOut]
+    reports: list[ReportOut] = Field(deprecated='Use issues and approvals instead')
+    images: list[ImageOut] = Field(deprecated='Use file_notes instead')
+    issues: list[IssueOut]
+    approvals: list[ApprovalOut]
+    text_notes: list[TextNoteOut]
+    file_notes: list[FileNoteOut]
 
     @classmethod
-    def from_website(cls,
-                     website: Website,
-                     reports: list[ReportOut],
-                     images: list[ImageOut],
-                     ):
+    def from_website_and_threads(cls,
+                                 website: Website,
+                                 threads: list[ReportThread],
+                                 ):
+        # Legacy images are listed oldest first, threads newest first
+        file_notes = FileNote.objects.filter(website=website).order_by('created_at')
+
         return cls(
             uuid=website.uuid,
             name=website.name,
             home_url=website.home_url,
-            reports=reports,
-            images=images,
+            reports=[ReportOut.from_thread(thread) for thread in threads
+                     if thread.is_issue or thread.is_approval],
+            images=[ImageOut.from_file_note(file_note) for file_note in file_notes],
+            issues=[IssueOut.from_issue(thread.head, thread.comments)
+                    for thread in threads if thread.is_issue],
+            approvals=[ApprovalOut.from_approval(thread.head, thread.comments)
+                       for thread in threads if thread.is_approval],
+            text_notes=[TextNoteOut.from_text_note(thread.head, thread.comments)
+                        for thread in threads if thread.is_text_note],
+            file_notes=[FileNoteOut.from_file_note(thread.head, thread.comments)
+                        for thread in threads if thread.is_file_note],
         )
 
 
@@ -476,15 +612,7 @@ def api_front_church_details(request, church_uuid: UUID,
 
     website = church.parish.website
 
-    # Reports
-    reports = [ReportOut.from_thread(thread) for thread in get_report_threads(website)
-               if not thread.is_file_note and not thread.is_text_note]
-
-    # Images
-    file_notes = FileNote.objects.filter(website=website).order_by('created_at')
-    images = [ImageOut.from_file_note(file_note) for file_note in file_notes]
-
-    website_out = WebsiteOut.from_website(website, reports, images)
+    website_out = WebsiteOut.from_website_and_threads(website, get_report_threads(website))
 
     # Schedules
     scheduling = scheduling_get_indexed_scheduling(website)
@@ -574,24 +702,38 @@ def api_front_get_city(request, city_slug: str) -> CityOut:
     return CityOut.from_city(city)
 
 
-@api.post("/reports", response={200: ReportOut, 400: ErrorSchema, 404: ErrorSchema})
-def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
+def get_website_or_404(website_uuid: UUID) -> Website:
     try:
-        website = Website.objects.get(uuid=report_in.website_uuid)
+        return Website.objects.get(uuid=website_uuid)
     except Website.DoesNotExist:
-        raise Http404(f'Website {report_in.website_uuid} does not exist')
+        raise Http404(f'Website {website_uuid} does not exist')
 
-    church = None
-    if report_in.church_uuid:
-        try:
-            church = Church.objects.get(uuid=report_in.church_uuid)
-        except Church.DoesNotExist:
-            raise Http404(f'Church {report_in.church_uuid} does not exist')
 
-    email = clean_email(report_in.email)
+def get_church_or_404(church_uuid: UUID | None) -> Church | None:
+    if church_uuid is None:
+        return None
+
+    try:
+        return Church.objects.get(uuid=church_uuid)
+    except Church.DoesNotExist:
+        raise Http404(f'Church {church_uuid} does not exist')
+
+
+def clean_and_check_email(email: str | None) -> str | None:
+    email = clean_email(email)
     email_error = find_error_in_email(email)
     if email_error:
         raise HttpError(400, email_error)
+
+    return email
+
+
+@api.post("/reports", response={200: ReportOut, 400: ErrorSchema, 404: ErrorSchema},
+          deprecated=True)
+def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
+    website = get_website_or_404(report_in.website_uuid)
+    church = get_church_or_404(report_in.church_uuid)
+    email = clean_and_check_email(report_in.email)
 
     try:
         report = save_report(
@@ -607,16 +749,68 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
     return ReportOut.from_report(report, [])
 
 
-@api.post("/images", response={200: ImageOut, 400: ErrorSchema, 404: ErrorSchema})
+@api.post("/images", response={200: ImageOut, 400: ErrorSchema, 404: ErrorSchema},
+          deprecated=True)
 def api_front_post_images(request,
                           website_uuid: UUID = Form(...),
                           document: UploadedFile = File(...),
                           comment: str | None = Form(None),
                           email: str | None = Form(None)) -> ImageOut:
-    try:
-        website = Website.objects.get(uuid=website_uuid)
-    except Website.DoesNotExist:
-        raise Http404(f'Website {website_uuid} does not exist')
+    file_note = upload_file_note(request, website_uuid, document, comment, email)
+    return ImageOut.from_file_note(file_note)
+
+
+@api.post("/issues", response={200: IssueOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_issue(request, issue_in: IssueIn) -> IssueOut:
+    website = get_website_or_404(issue_in.website_uuid)
+    church = get_church_or_404(issue_in.church_uuid)
+    email = clean_and_check_email(issue_in.email)
+
+    issue = save_issue(request, website, church, issue_in.content, email)
+    return IssueOut.from_issue(issue, [])
+
+
+@api.post("/approvals", response={200: ApprovalOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_approval(request, approval_in: ApprovalIn) -> ApprovalOut:
+    website = get_website_or_404(approval_in.website_uuid)
+    church = get_church_or_404(approval_in.church_uuid)
+    email = clean_and_check_email(approval_in.email)
+
+    approval = save_approval(request, website, church, approval_in.content, email)
+    return ApprovalOut.from_approval(approval, [])
+
+
+@api.post("/text_notes", response={200: TextNoteOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_text_note(request, text_note_in: TextNoteIn) -> TextNoteOut:
+    website = get_website_or_404(text_note_in.website_uuid)
+    content_error = attaching_find_error_in_text_note_content(text_note_in.content)
+    if content_error:
+        raise HttpError(400, content_error)
+    email = clean_and_check_email(text_note_in.email)
+
+    text_note, error_message = attaching_add_text_note(text_note_in.content, website, request,
+                                                       email)
+    if text_note is None:
+        raise HttpError(400, error_message or 'Text note creation failed')
+
+    attaching_extract_text_note(text_note)
+
+    return TextNoteOut.from_text_note(text_note, [])
+
+
+@api.post("/file_notes", response={200: FileNoteOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_file_note(request,
+                             website_uuid: UUID = Form(...),
+                             document: UploadedFile = File(...),
+                             caption: str | None = Form(None),
+                             email: str | None = Form(None)) -> FileNoteOut:
+    file_note = upload_file_note(request, website_uuid, document, caption, email)
+    return FileNoteOut.from_file_note(file_note, [])
+
+
+def upload_file_note(request, website_uuid: UUID, document: UploadedFile,
+                     caption: str | None, email: str | None) -> FileNote:
+    website = get_website_or_404(website_uuid)
 
     email = clean_email(email)
     validation_error = attaching_find_error_in_document_to_upload(document) \
@@ -625,10 +819,53 @@ def api_front_post_images(request,
         raise HttpError(400, validation_error)
 
     file_note, error_message = attaching_upload_file_note(document, website, request,
-                                                          caption=comment, email=email)
+                                                          caption=caption, email=email)
     if file_note is None:
         raise HttpError(400, error_message or 'Upload failed')
 
     attaching_recognize_and_extract_file_note(file_note)
 
-    return ImageOut.from_file_note(file_note)
+    return file_note
+
+
+def post_comment(request, head: Issue | Approval | FileNote | TextNote,
+                 comment_in: CommentIn) -> CommentOut:
+    email = clean_and_check_email(comment_in.email)
+    comment = save_comment(request, head.website, head.church, head, comment_in.content, email)
+    return CommentOut.from_comment(comment)
+
+
+def get_head_or_404(model: type[Issue | Approval | FileNote | TextNote], head_uuid: UUID
+                    ) -> Issue | Approval | FileNote | TextNote:
+    try:
+        return model.objects.select_related('website', 'church').get(uuid=head_uuid)
+    except model.DoesNotExist:
+        raise Http404(f'{model.__name__} {head_uuid} does not exist')
+
+
+@api.post("/issues/{issue_uuid}/comments",
+          response={200: CommentOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_issue_comment(request, issue_uuid: UUID, comment_in: CommentIn
+                                 ) -> CommentOut:
+    return post_comment(request, get_head_or_404(Issue, issue_uuid), comment_in)
+
+
+@api.post("/approvals/{approval_uuid}/comments",
+          response={200: CommentOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_approval_comment(request, approval_uuid: UUID, comment_in: CommentIn
+                                    ) -> CommentOut:
+    return post_comment(request, get_head_or_404(Approval, approval_uuid), comment_in)
+
+
+@api.post("/text_notes/{text_note_uuid}/comments",
+          response={200: CommentOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_text_note_comment(request, text_note_uuid: UUID, comment_in: CommentIn
+                                     ) -> CommentOut:
+    return post_comment(request, get_head_or_404(TextNote, text_note_uuid), comment_in)
+
+
+@api.post("/file_notes/{file_note_uuid}/comments",
+          response={200: CommentOut, 400: ErrorSchema, 404: ErrorSchema})
+def api_front_post_file_note_comment(request, file_note_uuid: UUID, comment_in: CommentIn
+                                     ) -> CommentOut:
+    return post_comment(request, get_head_or_404(FileNote, file_note_uuid), comment_in)

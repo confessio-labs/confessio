@@ -57,49 +57,86 @@ def save_report(request: HttpRequest, website: Website, church: Church | None,
         | TextNoteComment:
     head = get_thread_head(website, main_report_uuid) if main_report_uuid else None
 
+    if head:
+        return save_comment(request, website, church, head, comment, email)
+    if feedback_type == FeedbackType.GOOD:
+        return save_approval(request, website, church, comment, email)
+    return save_issue(request, website, church, comment, email)
+
+
+def save_issue(request: HttpRequest, website: Website, church: Church | None,
+               content: str | None, email: str | None) -> Issue:
+    user_fields = get_user_fields(request, email)
+    issue = Issue.objects.create(website=website, church=church, content=content or '',
+                                 **user_fields)
+    if not user_fields['user']:
+        notify_new_report(request, website, church, issue, False, FeedbackType.ERROR,
+                          content, email)
+
+    return issue
+
+
+def save_approval(request: HttpRequest, website: Website, church: Church | None,
+                  content: str | None, email: str | None) -> Approval:
+    user_fields = get_user_fields(request, email)
+    approval = Approval.objects.create(website=website, church=church, content=content,
+                                       **user_fields)
+    if not user_fields['user']:
+        notify_new_report(request, website, church, approval, False, FeedbackType.GOOD,
+                          content, email)
+
+    return approval
+
+
+def save_comment(request: HttpRequest, website: Website, church: Church | None,
+                 head: Issue | Approval | FileNote | TextNote, content: str | None,
+                 email: str | None
+                 ) -> IssueComment | ApprovalComment | FileNoteComment | TextNoteComment:
+    user_fields = get_user_fields(request, email)
+    content = content or ''
+    if isinstance(head, Approval):
+        comment = ApprovalComment.objects.create(approval=head, content=content, **user_fields)
+    elif isinstance(head, Issue):
+        comment = IssueComment.objects.create(issue=head, content=content, **user_fields)
+    elif isinstance(head, FileNote):
+        comment = FileNoteComment.objects.create(file_note=head, content=content, **user_fields)
+    else:
+        comment = TextNoteComment.objects.create(text_note=head, content=content, **user_fields)
+
+    if not user_fields['user']:
+        notify_new_report(request, website, church, head, True, FeedbackType.COMMENT,
+                          content, email)
+
+    return comment
+
+
+def get_user_fields(request: HttpRequest, email: str | None) -> dict:
     user, user_agent, ip_address_hash = get_user_user_agent_and_ip(request)
-    user_fields = {
+    return {
         'user': user,
         'user_agent': user_agent,
         'ip_address_hash': ip_address_hash,
         'email': email,
     }
 
-    if isinstance(head, Approval):
-        report = ApprovalComment.objects.create(approval=head, content=comment or '',
-                                                **user_fields)
-    elif isinstance(head, Issue):
-        report = IssueComment.objects.create(issue=head, content=comment or '', **user_fields)
-    elif isinstance(head, FileNote):
-        report = FileNoteComment.objects.create(file_note=head, content=comment or '',
-                                                **user_fields)
-    elif isinstance(head, TextNote):
-        report = TextNoteComment.objects.create(text_note=head, content=comment or '',
-                                                **user_fields)
-    elif feedback_type == FeedbackType.GOOD:
-        report = Approval.objects.create(website=website, church=church, content=comment,
-                                         **user_fields)
-    else:
-        report = Issue.objects.create(website=website, church=church, content=comment or '',
-                                      **user_fields)
 
-    if not user:
-        add_necessary_moderation(website, head or report, is_comment=head is not None)
+def notify_new_report(request: HttpRequest, website: Website, church: Church | None,
+                      head: Issue | Approval | FileNote | TextNote, is_comment: bool,
+                      feedback_type: FeedbackType, comment: str | None, email: str | None):
+    add_necessary_moderation(website, head, is_comment=is_comment)
 
-        website_url = request.build_absolute_uri(
-            reverse('website_view', kwargs={'website_uuid': website.uuid})
-        )
+    website_url = request.build_absolute_uri(
+        reverse('website_view', kwargs={'website_uuid': website.uuid})
+    )
 
-        email_body = (f"New report on website {website.name}\n"
-                      f"url: {website_url}\n"
-                      + (f"church: {church.name}\n" if church else "")
-                      + (f"email: {email}\n" if email else "")
-                      + f"feedback_type: {feedback_type}\n\ncomment:\n{comment}")
-        subject = f'New report on confessio for {website.name}'
-        send_email_to_admin(subject, email_body)
-        send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
-
-    return report
+    email_body = (f"New report on website {website.name}\n"
+                  f"url: {website_url}\n"
+                  + (f"church: {church.name}\n" if church else "")
+                  + (f"email: {email}\n" if email else "")
+                  + f"feedback_type: {feedback_type}\n\ncomment:\n{comment}")
+    subject = f'New report on confessio for {website.name}'
+    send_email_to_admin(subject, email_body)
+    send_telegram_alert(message=email_body, topic=TelegramTopic.NEW_REPORTS)
 
 
 def new_report(request, website: Website) -> str:
