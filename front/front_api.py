@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Literal
 from uuid import UUID
 
+from django.contrib.auth.models import User
 from django.http import Http404
 from ninja import NinjaAPI, Schema, File, Form, Field
 from ninja.errors import HttpError
@@ -211,10 +212,23 @@ class CommentIn(Schema):
     email: str | None = None
 
 
+class UserOut(Schema):
+    first_name: str
+    is_staff: bool
+
+    @classmethod
+    def from_user(cls, user: User) -> 'UserOut':
+        return cls(
+            first_name=user.first_name,
+            is_staff=user.is_staff,
+        )
+
+
 class CommentOut(Schema):
     uuid: UUID
     created_at: datetime
     content: str
+    user: UserOut | None
 
     @classmethod
     def from_comment(cls, comment: BaseComment) -> 'CommentOut':
@@ -222,6 +236,7 @@ class CommentOut(Schema):
             uuid=comment.uuid,
             created_at=comment.created_at,
             content=comment.content,
+            user=UserOut.from_user(comment.user) if comment.user else None,
         )
 
 
