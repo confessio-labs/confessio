@@ -5,6 +5,7 @@ from uuid import UUID
 
 from django.contrib.auth.models import User
 from django.http import Http404
+from django.utils import timezone
 from ninja import NinjaAPI, Schema, File, Form, Field
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
@@ -162,6 +163,7 @@ class ReportIn(Schema):
     comment: str | None = None
     main_report_uuid: UUID | None = None
     email: str | None = None
+    valid_until: datetime | None = None
 
 
 class ReportOut(Schema):
@@ -172,8 +174,8 @@ class ReportOut(Schema):
     sub_reports: list['ReportOut']
 
     @classmethod
-    def from_report(cls, report: Issue | Approval | IssueComment | ApprovalComment,
-                    sub_reports: list[IssueComment | ApprovalComment]) -> 'ReportOut':
+    def from_report(cls, report: Issue | Approval | TextNote | BaseComment,
+                    sub_reports: list[BaseComment]) -> 'ReportOut':
         if isinstance(report, Approval):
             feedback_type = FeedbackTypeEnum.GOOD
         elif isinstance(report, Issue):
@@ -342,7 +344,7 @@ class WebsiteOut(Schema):
     uuid: UUID
     name: str
     home_url: str
-    reports: list[ReportOut] = Field(deprecated='Use issues and approvals instead')
+    reports: list[ReportOut] = Field(deprecated='Use issues, approvals and text_notes instead')
     images: list[ImageOut] = Field(deprecated='Use file_notes instead')
     issues: list[IssueOut]
     approvals: list[ApprovalOut]
@@ -362,7 +364,7 @@ class WebsiteOut(Schema):
             name=website.name,
             home_url=website.home_url,
             reports=[ReportOut.from_thread(thread) for thread in threads
-                     if thread.is_issue or thread.is_approval],
+                     if thread.is_issue or thread.is_approval or thread.is_text_note],
             images=[ImageOut.from_file_note(file_note) for file_note in file_notes],
             issues=[IssueOut.from_issue(thread.head, thread.comments)
                     for thread in threads if thread.is_issue],
@@ -749,6 +751,12 @@ def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
     church = get_church_or_404(report_in.church_uuid)
     email = clean_and_check_email(report_in.email)
 
+    # Temporary, until the front posts its complements to /text_notes
+    if report_in.feedback_type == FeedbackTypeEnum.COMMENT and not report_in.main_report_uuid:
+        text_note = create_text_note(request, website, church, report_in.comment, email,
+                                     get_closest_note_ttl(report_in.valid_until))
+        return ReportOut.from_report(text_note, [])
+
     try:
         report = save_report(
             request, website, church,
@@ -799,19 +807,36 @@ def api_front_post_approval(request, approval_in: ApprovalIn) -> ApprovalOut:
 def api_front_post_text_note(request, text_note_in: TextNoteIn) -> TextNoteOut:
     website = get_website_or_404(text_note_in.website_uuid)
     church = get_church_or_404(text_note_in.church_uuid)
-    content_error = attaching_find_error_in_text_note_content(text_note_in.content)
-    if content_error:
-        raise HttpError(400, content_error)
     email = clean_and_check_email(text_note_in.email)
 
-    text_note, error_message = attaching_add_text_note(text_note_in.content, website, request,
-                                                       text_note_in.ttl, email, church)
+    text_note = create_text_note(request, website, church, text_note_in.content, email,
+                                 text_note_in.ttl)
+    return TextNoteOut.from_text_note(text_note, [])
+
+
+def create_text_note(request, website: Website, church: Church | None, content: str | None,
+                     email: str | None, ttl: NoteTtl) -> TextNote:
+    content_error = attaching_find_error_in_text_note_content(content)
+    if content_error:
+        raise HttpError(400, content_error)
+
+    text_note, error_message = attaching_add_text_note(content, website, request, ttl, email,
+                                                       church)
     if text_note is None:
         raise HttpError(400, error_message or 'Text note creation failed')
 
     attaching_extract_text_note(text_note)
 
-    return TextNoteOut.from_text_note(text_note, [])
+    return text_note
+
+
+def get_closest_note_ttl(valid_until: datetime | None) -> NoteTtl:
+    if valid_until is None:
+        return NoteTtl.ONE_YEAR
+
+    # Closest rather than a threshold, to absorb the client clock skew
+    remaining = valid_until - timezone.now()
+    return min(NoteTtl, key=lambda ttl: abs(ttl.duration - remaining))
 
 
 @api.post("/file_notes", response={200: FileNoteOut, 400: ErrorSchema, 404: ErrorSchema})
