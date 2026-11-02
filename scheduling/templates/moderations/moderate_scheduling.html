@@ -4,7 +4,12 @@
     {% include 'moderations/_header.html' with title_prefix='Scheduling' %}
 
     Website: {{ website.name }}<br>
-    Link: <a href="{% url 'website_view' website.uuid %}" target="_blank">Go to website</a>
+    <p>
+        <a class="btn btn-tertiary" href="{% url 'website_view' website.uuid %}"
+           target="_blank" role="button">
+            Open website <i class="fas fa-up-right-from-square"></i>
+        </a>
+    </p>
 
     {% include 'moderations/_footer.html' %}
 {% endblock card %}

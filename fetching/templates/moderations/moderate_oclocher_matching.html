@@ -25,7 +25,12 @@
 
     {% if moderation.oclocher_organization %}
         Website: {{ moderation.oclocher_organization.website.name }}<br>
-        Link: <a href="{% url 'website_view' moderation.oclocher_organization.website.uuid %}" target="_blank">Go to website</a>
+        <p>
+            <a class="btn btn-tertiary" href="{% url 'website_view' moderation.oclocher_organization.website.uuid %}"
+               target="_blank" role="button">
+                Open website <i class="fas fa-up-right-from-square"></i>
+            </a>
+        </p>
             <h4>Parishes</h4>
         {% for parish in moderation.oclocher_organization.website.parishes.all %}
             {% display_parish parish %}

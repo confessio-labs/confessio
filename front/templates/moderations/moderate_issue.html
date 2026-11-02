@@ -8,7 +8,12 @@
     {% for comment in comments %}
         Comment ({{ comment.created_at|date:"d M Y" }}): {{ comment.content|urlize|linebreaksbr }}<br>
     {% endfor %}
-    Link: <a href="{% url 'website_view' issue.website.uuid %}#previous-reports" target="_blank">Go to issue</a>
+    <p>
+        <a class="btn btn-tertiary" href="{% url 'website_view' issue.website.uuid %}#previous-reports"
+           target="_blank" role="button">
+            Open issue <i class="fas fa-up-right-from-square"></i>
+        </a>
+    </p>
 
     {% include 'moderations/_footer.html' %}
 {% endblock card %}

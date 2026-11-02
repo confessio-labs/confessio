@@ -5,7 +5,12 @@
     {% include 'moderations/_header.html' with title_prefix='File note' %}
 
     Website: {{ file_note.website.name }}<br>
-    Link: <a href="{% url 'website_view' file_note.website.uuid %}" target="_blank">Go to website</a>
+    <p>
+        <a class="btn btn-tertiary" href="{% url 'website_view' file_note.website.uuid %}"
+           target="_blank" role="button">
+            Open website <i class="fas fa-up-right-from-square"></i>
+        </a>
+    </p>
 
     {% display_file_note file_note request show_moderation=False %}
 
@@ -16,7 +21,12 @@
     {% for comment in comments %}
         Comment ({{ comment.created_at|date:"d M Y" }}): {{ comment.content|urlize|linebreaksbr }}<br>
     {% endfor %}
-    Link: <a href="{% url 'website_view' file_note.website.uuid %}#previous-reports" target="_blank">Go to thread</a>
+    <p>
+        <a class="btn btn-tertiary" href="{% url 'website_view' file_note.website.uuid %}#previous-reports"
+           target="_blank" role="button">
+            Open thread <i class="fas fa-up-right-from-square"></i>
+        </a>
+    </p>
 
     {% include 'moderations/_footer.html' %}
 {% endblock card %}
