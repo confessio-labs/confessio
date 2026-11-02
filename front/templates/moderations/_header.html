@@ -14,6 +14,11 @@
         <a class="btn btn-info" role="button" href="{{ back_path }}">Back</a>
     </div>
 {% else %}
+    {% if position > 1 %}
+        <div class="d-inline-block">
+            <a class="btn btn-info" role="button" href="{{ previous_url }}">Previous</a>
+        </div>
+    {% endif %}
     <div class="d-inline-block">
         <a class="btn btn-info" role="button" href="{{ next_url }}">Next</a>
     </div>
