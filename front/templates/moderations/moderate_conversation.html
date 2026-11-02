@@ -9,8 +9,12 @@
     {% with nb_images=last_message.images.count %}
       {% if nb_images %}<p class="text-muted">{{ nb_images }} image(s)</p>{% endif %}
     {% endwith %}
-    Lien : <a href="{% url 'messaging_view' conversation.uuid %}" target="_blank">Ouvrir la
-        conversation</a>
+    <p>
+        <a class="btn btn-tertiary" href="{% url 'messaging_view' conversation.uuid %}"
+           target="_blank" role="button">
+            Ouvrir la conversation <i class="fas fa-up-right-from-square"></i>
+        </a>
+    </p>
 
     {% include 'moderations/_footer.html' %}
 {% endblock card %}
