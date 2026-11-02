@@ -4,7 +4,7 @@
     {% include 'moderations/_header.html' with title_prefix='Approval' %}
 
     Website: {{ approval.website.name }}<br>
-    Content: {{ approval.content|urlize|linebreaksbr }}<br>
+    {% if approval.content %}Content: {{ approval.content|urlize|linebreaksbr }}{% else %}No content{% endif %}<br>
     {% for comment in comments %}
         Comment ({{ comment.created_at|date:"d M Y" }}): {{ comment.content|urlize|linebreaksbr }}<br>
     {% endfor %}
