@@ -15,10 +15,11 @@ from attaching.public_service import attaching_upload_file_note, \
     attaching_recognize_and_extract_file_note, attaching_find_error_in_document_to_upload, \
     attaching_add_text_note, attaching_extract_text_note, \
     attaching_find_error_in_text_note_content
+from attaching.models import TextNote
 from fetching.models import OClocherOrganization
 from front.models import Issue
 from front.services.card.report_service import get_count_and_label, new_report, NewReportError, \
-    solve_issue, unsolve_issue
+    solve_issue, unsolve_issue, convert_issue_to_text_note, convert_text_note_to_issue
 from front.services.card.report_thread_service import get_report_threads, \
     get_moderations_by_thread_uuid
 from front.services.card.scraping_url_service import get_scraping_parsing_urls
@@ -572,6 +573,42 @@ def website_issue_solved(request, website_uuid: str, issue_uuid: str):
         solve_issue(issue)
     else:
         unsolve_issue(issue)
+
+    return redirect(reverse('website_view', kwargs={'website_uuid': website_uuid})
+                    + '#previous-reports')
+
+
+@require_POST
+def website_issue_to_text_note(request, website_uuid: str, issue_uuid: str):
+    if not is_staff_user(request):
+        return HttpResponseForbidden()
+
+    try:
+        issue = Issue.objects.get(uuid=issue_uuid, website_id=website_uuid)
+    except Issue.DoesNotExist:
+        return HttpResponseNotFound("Issue does not exist for this website")
+
+    error_message = attaching_find_error_in_text_note_content(issue.content)
+    if error_message:
+        return HttpResponseBadRequest(error_message)
+
+    convert_issue_to_text_note(issue, NoteTtl.ONE_YEAR)
+
+    return redirect(reverse('website_view', kwargs={'website_uuid': website_uuid})
+                    + '#previous-reports')
+
+
+@require_POST
+def website_text_note_to_issue(request, website_uuid: str, text_note_uuid: str):
+    if not is_staff_user(request):
+        return HttpResponseForbidden()
+
+    try:
+        text_note = TextNote.objects.get(uuid=text_note_uuid, website_id=website_uuid)
+    except TextNote.DoesNotExist:
+        return HttpResponseNotFound("Text note does not exist for this website")
+
+    convert_text_note_to_issue(text_note)
 
     return redirect(reverse('website_view', kwargs={'website_uuid': website_uuid})
                     + '#previous-reports')

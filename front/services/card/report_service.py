@@ -1,12 +1,17 @@
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from django.db import transaction
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils import timezone
 
 from attaching.models import FileNote, FileNoteComment, FileNoteModeration, TextNote, \
     TextNoteComment, TextNoteModeration
+from attaching.public_model import NoteTtl
+from attaching.public_service import attaching_extract_text_note
+from core.models.base_models import BaseUserReport
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.models import Approval, ApprovalComment, ApprovalModeration, Issue, IssueComment, \
     IssueModeration
@@ -233,6 +238,115 @@ def unsolve_issue(issue: Issue):
     for moderation in issue.moderations.filter(status=ModerationStatus.VALIDATED):
         moderation.status = ModerationStatus.TO_VALIDATE
         moderation.save()
+
+
+##################
+# CONVERT REPORT #
+##################
+
+# uuids and created_at are kept, so that the thread keeps its links and its place
+
+ISSUE_CATEGORY_BY_TEXT_NOTE_CATEGORY = {
+    TextNoteModeration.Category.NEW_TEXT_NOTE: IssueModeration.Category.NEW_ISSUE,
+    TextNoteModeration.Category.NEW_COMMENT: IssueModeration.Category.NEW_COMMENT,
+}
+TEXT_NOTE_CATEGORY_BY_ISSUE_CATEGORY = {
+    issue_category: text_note_category
+    for text_note_category, issue_category in ISSUE_CATEGORY_BY_TEXT_NOTE_CATEGORY.items()
+}
+
+
+def get_user_report_fields(report: BaseUserReport) -> dict:
+    return {
+        'user_id': report.user_id,
+        'user_agent': report.user_agent,
+        'ip_address_hash': report.ip_address_hash,
+        'email': report.email,
+    }
+
+
+def create_with_created_at(model_class, created_at: datetime, **fields):
+    instance = model_class.objects.create(**fields)
+    # auto_now_add overrides any created_at given to create()
+    model_class.objects.filter(pk=instance.pk).update(created_at=created_at)
+    instance.created_at = created_at
+    return instance
+
+
+@transaction.atomic
+def convert_text_note_to_issue(text_note: TextNote) -> Issue:
+    moderations = list(text_note.moderations.all())
+    # Same rule as IssueModeration.validate: a validated moderation means a solved issue
+    is_solved = any(m.status == ModerationStatus.VALIDATED for m in moderations)
+    issue = create_with_created_at(
+        Issue, text_note.created_at,
+        uuid=text_note.uuid,
+        website_id=text_note.website_id,
+        church_id=text_note.church_id,
+        content=text_note.content,
+        solved_at=timezone.now() if is_solved else None,
+        **get_user_report_fields(text_note),
+    )
+
+    for comment in text_note.comments.all():
+        create_with_created_at(
+            IssueComment, comment.created_at,
+            uuid=comment.uuid, issue=issue, content=comment.content,
+            **get_user_report_fields(comment),
+        )
+
+    diocese = text_note.website.get_diocese()
+    for moderation in moderations:
+        create_with_created_at(
+            IssueModeration, moderation.created_at,
+            issue=issue,
+            category=ISSUE_CATEGORY_BY_TEXT_NOTE_CATEGORY[moderation.category],
+            status=moderation.status,
+            comment=moderation.comment,
+            diocese=diocese,
+        )
+
+    # its pre_delete signal re-inits the scheduling, which drops the text note prunings
+    text_note.delete()
+
+    return issue
+
+
+@transaction.atomic
+def convert_issue_to_text_note(issue: Issue, ttl: NoteTtl) -> TextNote:
+    text_note = create_with_created_at(
+        TextNote, issue.created_at,
+        uuid=issue.uuid,
+        website_id=issue.website_id,
+        church_id=issue.church_id,
+        content=issue.content,
+        expire_at=timezone.now() + ttl.duration,
+        **get_user_report_fields(issue),
+    )
+
+    for comment in issue.comments.all():
+        create_with_created_at(
+            TextNoteComment, comment.created_at,
+            uuid=comment.uuid, text_note=text_note, content=comment.content,
+            **get_user_report_fields(comment),
+        )
+
+    diocese = issue.website.get_diocese()
+    for moderation in issue.moderations.all():
+        create_with_created_at(
+            TextNoteModeration, moderation.created_at,
+            text_note=text_note,
+            category=TEXT_NOTE_CATEGORY_BY_ISSUE_CATEGORY[moderation.category],
+            status=moderation.status,
+            comment=moderation.comment,
+            diocese=diocese,
+        )
+
+    issue.delete()
+
+    transaction.on_commit(lambda: attaching_extract_text_note(text_note))
+
+    return text_note
 
 
 ##################

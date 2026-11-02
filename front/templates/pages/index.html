@@ -350,6 +350,15 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-success">Solve issue</button>
                                             {% endif %}
                                         </form>
+                                        <form method="POST" class="d-inline" action="{% url 'website_issue_to_text_note' website_uuid=page_website.uuid issue_uuid=thread.head.uuid %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">Convert to text note</button>
+                                        </form>
+                                    {% elif thread.is_text_note %}
+                                        <form method="POST" class="d-inline" action="{% url 'website_text_note_to_issue' website_uuid=page_website.uuid text_note_uuid=thread.head.uuid %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Convert to issue</button>
+                                        </form>
                                     {% endif %}
                                 {% endif %}
                                 {% if thread.is_file_note %}
