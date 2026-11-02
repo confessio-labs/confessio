@@ -4,6 +4,12 @@
     {% include 'moderations/_header.html' with title_prefix='Approval' %}
 
     Website: {{ approval.website.name }}<br>
+    <p>
+        <a class="btn btn-tertiary" href="{% url 'website_view' approval.website.uuid %}"
+           target="_blank" role="button">
+            Open website <i class="fas fa-up-right-from-square"></i>
+        </a>
+    </p>
     {% if approval.content %}Content: {{ approval.content|urlize|linebreaksbr }}{% else %}No content{% endif %}<br>
     {% for comment in comments %}
         Comment ({{ comment.created_at|date:"d M Y" }}): {{ comment.content|urlize|linebreaksbr }}<br>
