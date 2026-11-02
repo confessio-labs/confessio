@@ -61,6 +61,16 @@ def get_next_url(request, moderation: ModerationMixin) -> str:
     return next_url
 
 
+def get_previous_url(moderation: ModerationMixin) -> str:
+    created_at_ts_us = datetime_to_ts_us(moderation.created_at)
+    return reverse('moderate_next_' + moderation.resource,
+                   kwargs={
+                       'category': moderation.category,
+                       'status': moderation.status,
+                   }) \
+        + f'?created_before={created_at_ts_us}'
+
+
 def get_position_and_count(moderation: ModerationMixin, status: str) -> tuple[int, int]:
     counts = moderation.__class__.objects.filter(
         category=moderation.category,
@@ -135,14 +145,20 @@ def get_moderate_response(request, category: str, resource: str, status: str,
         return HttpResponseBadRequest(f"category {category} is not valid for {resource}")
 
     if moderation_uuid is None:
-        created_after_ts = int(request.GET.get('created_after', '0'))
-        created_after = ts_us_to_datetime(created_after_ts)
-        next_moderation = class_moderation.objects.filter(
-            category=category,
-            status=status,
-            created_at__gt=created_after,
-        ).order_by('created_at').first()
-        return redirect_to_moderation(next_moderation, category, resource, status)
+        moderations = class_moderation.objects.filter(category=category, status=status)
+        created_before_ts = request.GET.get('created_before')
+        if created_before_ts:
+            created_before = ts_us_to_datetime(int(created_before_ts))
+            target_moderation = moderations.filter(
+                created_at__lt=created_before,
+            ).order_by('-created_at').first()
+        else:
+            created_after_ts = int(request.GET.get('created_after', '0'))
+            created_after = ts_us_to_datetime(created_after_ts)
+            target_moderation = moderations.filter(
+                created_at__gt=created_after,
+            ).order_by('created_at').first()
+        return redirect_to_moderation(target_moderation, category, resource, status)
 
     try:
         moderation = class_moderation.objects.get(uuid=moderation_uuid)
@@ -196,6 +212,7 @@ def get_moderate_response(request, category: str, resource: str, status: str,
     return render(request, f'moderations/moderate_{moderation.resource}.html', {
         'moderation': moderation,
         'next_url': next_url,
+        'previous_url': get_previous_url(moderation),
         'back_path': request.GET.get('backPath', ''),
         'position': position,
         'count': count,
