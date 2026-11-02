@@ -29,6 +29,10 @@ urlpatterns = [
          name='website_add_text_note'),
     path('paroisse/<uuid:website_uuid>/issue/<uuid:issue_uuid>/solved',
          views.website_issue_solved, name='website_issue_solved'),
+    path('paroisse/<uuid:website_uuid>/issue/<uuid:issue_uuid>/to_text_note',
+         views.website_issue_to_text_note, name='website_issue_to_text_note'),
+    path('paroisse/<uuid:website_uuid>/text_note/<uuid:text_note_uuid>/to_issue',
+         views.website_text_note_to_issue, name='website_text_note_to_issue'),
 
     # Authentication
     path('accounts/login/', views.UserLoginView.as_view(), name='login'),
