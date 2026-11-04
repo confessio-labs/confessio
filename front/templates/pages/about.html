@@ -9,77 +9,44 @@
             <div class="container">
                <div class="row justify-content-between align-items-center">
                   <div class="col-12 col-md-9 col-lg-8 text-center text-md-left">
-                        <h1 class="display-2 mb-4">Des horaires de sacrements<br class="d-none d-md-inline"> à jour grâce à l'IA !</h1>
-                        <p class="lead mb-4 text-muted">Confessio extrait les horaires de confession, et bientôt plus, directement depuis les sites web des paroisses. Cela est rendu possible grâce à l'intelligence artificielle.</p>
+                        <h1 class="display-2 mb-4">Des horaires à jour,<br class="d-none d-md-inline"> pour le sacrement du pardon</h1>
+                        <p class="lead mb-4 text-muted">Confessio extrait les horaires de confession de nos paroisses et sanctuaires de France, depuis leurs sites web et grâce à l'intelligence artificielle.</p>
                         <a href="{% url 'home' %}" class="btn btn-tertiary me-3 animate-up-2">Voir les confessions autour de moi<span class="ms-2"><span class="fas fa-arrow-right"></span></span></a>
                     </div>
                   <div class="col-12 col-md-3 col-lg-4 d-none d-md-block text-center p-lg-4"><img src="{% static 'assets/img/confessio_graph.svg' %}" alt=""></div>
                </div>
-            </div>
-        </section>
-        <!-- End of Hero section -->
-        <!-- Section -->
-        <section class="section section-md">
-            <div class="container">
-                <div class="row align-items-center justify-content-around">
-                    <div class="col-md-6 col-xl-6 mb-5">
-                        <img class="organic-radius img-fluid" src="{% static 'assets/img/S4-E2-Confessions-The-Chosen.png' %}" alt="Confessions - The Chosen">
-                    </div>
-                    <div class="col-md-6 col-xl-5 text-center text-md-left">
-                        <h2 class="h1 mb-5">Nos 7 engagements</h2>
-                        <p class="lead"><span class="fw-bold">Renforcer</span> la maîtrise des paroisses sur leurs propres horaires en n'affichant que ce qui est visible sur leur site web.</p>
-                        <p class="lead"><span class="fw-bold">Sourcer</span> systématiquement les horaires pour permettre de vérifier leur provenance.</p>
-                        <p class="lead"><span class="fw-bold">Automatiser</span> la collecte des horaires afin qu'ils soient à jour sur l'ensemble du territoire.</p>
-                        <p class="lead"><span class="fw-bold">Contrôler</span> la qualité des données dans une démarche d'amélioration continue.</p>
-                        <p class="lead"><span class="fw-bold">Collecter</span> les retours des utilisateurs et mettre tout en œuvre pour corriger les bugs.</p>
-                        <p class="lead"><span class="fw-bold">Partager</span> largement et gratuitement les <a href="{% url 'main_api:openapi-view' %}">données</a> afin de promouvoir d'autres services liés aux sacrements.</p>
-                        <p class="lead"><span class="fw-bold">Publier</span> le <a href="https://github.com/confessio-labs">code</a> en totale transparence en espérant faire émerger une tech collaborative, ouverte et missionnaire.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <!-- End of section -->
-        <!-- Section -->
-        <section class="section section-lg pt-0">
-            <div class="container">
-                <div class="row">
+               <div class="row">
                     <div class="col-md-4 col-lg-4 text-center mt-5">
-                        <!-- Visit Box -->
                         <div class="icon-box mb-4">
-                            <div class="icon icon-primary mb-4">
+                            <div class="icon icon-white mb-4">
                                 <span class="fas fa-church"></span>
                             </div>
                             <h3 class="h5">Diocèses de France<br>opérés par Confessio</h3>
-                            <span class="counter display-3 text-gray d-block">{{ diocese_count }} / 100</span>
+                            <span class="counter display-3 text-white d-block">{{ diocese_count }} / 100</span>
                         </div>
-                        <!-- End of Visit Box -->
                     </div>
                     <div class="col-md-4 col-lg-4 text-center mt-5">
-                        <!-- Call Box -->
                         <div class="icon-box mb-4">
-                            <div class="icon icon-primary mb-4">
+                            <div class="icon icon-white mb-4">
                                 <span class="fas fa-globe"></span>
                             </div>
                             <h3 class="h5">Sites paroissiaux analysés quotidiennement</h3>
-                            <span class="counter display-3 text-gray d-block">{{ website_count }}</span>
+                            <span class="counter display-3 text-white d-block">{{ website_count }}</span>
                         </div>
-                        <!-- End of Call Box -->
                     </div>
                     <div class="col-md-4 col-lg-4 text-center mt-5">
-                        <!-- Email Box -->
                         <div class="icon-box mb-4">
-                            <div class="icon icon-primary mb-4">
+                            <div class="icon icon-white mb-4">
                                 <span class="fas fa-location-dot"></span>
                             </div>
                             <h3 class="h5">Lieux avec sacrement<br>de réconciliation</h3>
-                            <span class="counter display-3 text-gray d-block">{{ confession_places_count }}</span>
+                            <span class="counter display-3 text-white d-block">{{ confession_places_count }}</span>
                         </div>
-                        <!-- End of Email Box -->
                     </div>
-                </div>
+               </div>
             </div>
         </section>
-        <!-- End of section -->
+        <!-- End of Hero section -->
         <!-- Section -->
         <section class="section section-lg bg-gray-200">
             <figure class="position-absolute top-0 left-0 w-100 d-none d-md-block mt-n3">
@@ -100,27 +67,25 @@
                                 <!-- Timeline Item 1 -->
                                 <div class="timeline-item">
                                     <h3 class="h4 mb-4">L'idée du web-scraping 🤔</h3>
-                                    <p>L'idée de Confessio a émergé lors du passage d'Etienne chez <a href="https://hozana.org/">Hozana</a> en 2018, où, au cours d'un HozanHackathon, il a été question d'une base de données open-data d'horaires de paroisses (messes, confessions), réflexion qui à l'époque avait donné naissance à <a href="https://open-church.io/">Open&#8209;Church</a>.<br>
-                                        Comment collecter la donnée automatiquement ? Il faudrait un robot qui puisse visiter les sites web des paroisses et en extraire les horaires. Mais comment gérer les horaires écrits en langage naturel, ou bien dans des tableaux voire des images ?<br>
-                                    </p>
+                                    <p>En 2018, l'idée de Confessio a émergé au cours d'un HozanHackathon. Etienne travaillait chez <a href="https://hozana.org/">Hozana</a> et la réflexion d’une base de données open-data d'horaires de paroisses (messes, confession) avait donné naissance à l'époque à <a href="https://open-church.io/">Open&#8209;Church</a>.</p>
                                 </div>
                                 <!-- Timeline Item 2 -->
                                 <div class="timeline-item">
-                                    <h3 class="h4 mb-4">Premières lignes de code 🧑‍💻</h3>
+                                    <h3 class="h4 mb-4">1ères lignes de code 🧑‍💻</h3>
                                     <div>
                                         <img class="me-2" src="{% static 'assets/img/logo/django-logo.svg' %}" alt="Django" style="height: 1em">
                                         <img class="me-2" src="{% static 'assets/img/logo/postgresql-logo.svg' %}" alt="PostgreSQL" style="height: 1em">
                                         <img class="me-2" src="{% static 'assets/img/logo/openai-logo.svg' %}" alt="OpenAI" style="height: 1em">
                                     </div>
-                                    <p>Quelques années plus tard, c’est l’émergence des modèles de langage (LLM) qui a rendu possible le développement technique du projet. La première ligne de
-                                        <a href="https://github.com/confessio-labs/confessio">code</a> de Confessio a ainsi été écrite en janvier 2023, marquant le début d’une aventure enthousiaste mais non moins rigoureuse et innovante !
+                                    <p>En 2023, c’est l’émergence des modèles de langage (LLM) qui a rendu possible le développement technique du projet. La première ligne de
+                                        <a href="https://github.com/confessio-labs/confessio">code</a> de Confessio a ainsi été écrite, c’est le début d’une aventure enthousiaste, rigoureuse et innovante !
                                     </p>
                                 </div>
                                 <!-- Timeline Item 3 -->
                                 <div class="timeline-item">
                                     <h3 class="h4 mb-2">Confessio en prod 🚀</h3>
                                     <img src="{% static 'assets/img/logo-dark-blue.svg' %}" alt="Logo de Confessio" width="80">
-                                    <p>Après un an de mise au point des premiers algorithmes, en janvier 2024, Confessio est lancé sur internet sous le nom de domaine <a href="https://confessio.fr">confessio.fr</a></p>
+                                    <p>En 2024, après un an de mise au point des premiers algorithmes, Confessio est lancé sur internet sous le nom de domaine <a href="https://confessio.fr">confessio.fr</a></p>
                                 </div>
                                 <!-- Timeline Item 4 -->
                                 <div class="timeline-item">
@@ -130,11 +95,17 @@
                                 </div>
                                 <!-- Timeline Item 5 -->
                                 <div class="timeline-item">
-                                    <h3 class="h4 mb-4">Arrivée de Pierre 🔥</h3>
+                                    <h3 class="h4 mb-4">Une équipe Confessio engagée 🔥</h3>
                                     <div>
                                         <img class="me-2" src="{% static 'assets/img/logo/react-logo.svg' %}" alt="React" style="height: 1em">
                                     </div>
-                                    <p>En avril 2026, <a href="https://github.com/DarkPitoune">Pierre</a>, un développeur talentueux rejoint Etienne pour réinventer l'expérience utilisateur et propulser le frontend vers une nouvelle ère.</p>
+                                    <p>En 2026, viennent renforcer le projet :</p>
+                                    <p><a class="fw-bold" href="https://github.com/DarkPitoune">Pierre</a>, comme développeur talentueux au service de votre expérience utilisateur</p>
+                                    <p><span class="fw-bold">Anne</span>, comme « challengeuse » de projet</p>
+                                    <p><span class="fw-bold">Ingrid</span>, comme plume, qui a écrit <a href="https://www.laprocure.com/product/25275/ussel-ingrid-d-s-il-te-plait-maman-emmene-moi-me-confesser">« S'il te plait Maman, emmène-moi me confesser »</a> et fondé les cercles des Petits Ostensoirs</p>
+                                    <p><span class="fw-bold">Simon</span>, comme modérateur, d'une aide précieuse pour traiter tous les retours</p>
+                                    <p><span class="fw-bold">Hippolyte</span>, comme développeur de l'<a href="https://play.google.com/store/apps/details?id=com.hdgdev.confession">appli Android</a></p>
+                                    <p>Et toujours <span class="fw-bold">Etienne</span>, développeur garant de la fiabilité des horaires.</p>
                                 </div>
                             </div>
                         </div>
@@ -147,6 +118,69 @@
                 </svg>
              </figure>
         </section>
+        <!-- Section -->
+        <section class="section section-md">
+            <div class="container">
+                <div class="row align-items-start justify-content-around">
+                    <div class="col-md-6 col-xl-6 mb-5">
+                        <img class="organic-radius img-fluid" src="{% static 'assets/img/S4-E2-Confessions-The-Chosen.png' %}" alt="Confessions - The Chosen">
+                    </div>
+                    <div class="col-md-6 col-xl-5">
+                        <div class="accordion" id="aboutAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="convictionHeading">
+                                    <button class="accordion-button fs-5 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#convictionCollapse" aria-expanded="true" aria-controls="convictionCollapse">Notre conviction</button>
+                                </h2>
+                                <div id="convictionCollapse" class="accordion-collapse collapse show" aria-labelledby="convictionHeading" data-bs-parent="#aboutAccordion">
+                                    <div class="accordion-body">
+                                        <p class="lead mb-0">Le sacrement de réconciliation est incontournable à la vie du baptisé</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="ambitionHeading">
+                                    <button class="accordion-button collapsed fs-5 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#ambitionCollapse" aria-expanded="false" aria-controls="ambitionCollapse">Notre ambition</button>
+                                </h2>
+                                <div id="ambitionCollapse" class="accordion-collapse collapse" aria-labelledby="ambitionHeading" data-bs-parent="#aboutAccordion">
+                                    <div class="accordion-body">
+                                        <p class="lead mb-0">Faciliter la fréquentation du sacrement de réconciliation</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="valuesHeading">
+                                    <button class="accordion-button collapsed fs-5 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#valuesCollapse" aria-expanded="false" aria-controls="valuesCollapse">Nos valeurs</button>
+                                </h2>
+                                <div id="valuesCollapse" class="accordion-collapse collapse" aria-labelledby="valuesHeading" data-bs-parent="#aboutAccordion">
+                                    <div class="accordion-body">
+                                        <p class="lead">Rendre <span class="fw-bold">SIMPLE</span> &amp; <span class="fw-bold">FIABLE</span></p>
+                                        <p class="lead">Être <span class="fw-bold">FACILITATEUR</span> &amp; au <span class="fw-bold">SERVICE</span></p>
+                                        <p class="lead mb-0">Apporter de la <span class="fw-bold">CONSOLATION</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="commitmentsHeading">
+                                    <button class="accordion-button collapsed fs-5 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#commitmentsCollapse" aria-expanded="false" aria-controls="commitmentsCollapse">Nos 7 engagements</button>
+                                </h2>
+                                <div id="commitmentsCollapse" class="accordion-collapse collapse" aria-labelledby="commitmentsHeading" data-bs-parent="#aboutAccordion">
+                                    <div class="accordion-body">
+                                        <p class="lead"><span class="fw-bold">Renforcer</span> la maîtrise des paroisses sur leurs propres horaires en n'affichant que ce qui est visible sur leur site web.</p>
+                                        <p class="lead"><span class="fw-bold">Sourcer</span> systématiquement les horaires pour permettre de vérifier leur provenance.</p>
+                                        <p class="lead"><span class="fw-bold">Automatiser</span> la collecte des horaires afin qu'ils soient à jour sur l'ensemble du territoire.</p>
+                                        <p class="lead"><span class="fw-bold">Contrôler</span> la qualité des données dans une démarche d'amélioration continue.</p>
+                                        <p class="lead"><span class="fw-bold">Collecter</span> les retours des utilisateurs et mettre tout en œuvre pour corriger les bugs.</p>
+                                        <p class="lead"><span class="fw-bold">Partager</span> largement et gratuitement les <a href="{% url 'main_api:openapi-view' %}">données</a> afin de promouvoir d'autres services liés aux sacrements.</p>
+                                        <p class="lead mb-0"><span class="fw-bold">Publier</span> le <a href="https://github.com/confessio-labs">code</a> en totale transparence en espérant faire émerger une tech collaborative, ouverte et missionnaire.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- End of section -->
         <!-- Section -->
         <section class="section section-lg">
             <div class="container">
