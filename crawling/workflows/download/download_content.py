@@ -8,6 +8,7 @@ from httpx import HTTPError, InvalidURL, Response
 from core.utils.log_utils import info
 from crawling.workflows.download.google_calendar import is_google_calendar_url, \
     get_google_calendar_html
+from crawling.workflows.download.ical_calendar import is_ical_response, render_ical_to_html
 from crawling.workflows.refine.pdf_utils import extract_text_from_pdf_bytes
 from crawling.utils.url_utils import get_domain, are_similar_urls, replace_scheme_and_hostname, \
     replace_http_with_https
@@ -113,6 +114,10 @@ def get_content_from_url(url: str) -> tuple[str, bytes | None] | None:
         info(f'got status code {r.status_code}')
 
         return None
+
+    if is_ical_response(r):
+        html = render_ical_to_html(r.content)
+        return (html, None) if html else None
 
     if is_pdf(r):
         return extract_text_from_pdf_bytes(r.content), r.content
