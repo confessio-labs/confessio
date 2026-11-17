@@ -363,7 +363,9 @@ def _history_entries(messages: list[Message]) -> list[HistoryEntry]:
 
 def _label(message: Message) -> str:
     if message.direction == Message.Direction.OUTBOUND:
-        return message.author.username if message.author else 'Confessio'
+        if message.author:
+            return message.author.first_name or message.author.username
+        return 'Confessio'
     name, email = parse_sender('', message.from_email)
     return name or email or message.conversation.name or message.conversation.email
 

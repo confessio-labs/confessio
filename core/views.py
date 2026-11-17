@@ -186,7 +186,8 @@ def get_moderate_response(request, category: str, resource: str, status: str,
                     moderation_url = request.build_absolute_uri(get_moderation_url(moderation))
                     send_telegram_alert(
                         f"New bug on {resource} moderation ({category}) "
-                        f"by {request.user.username}\nurl: {moderation_url}"
+                        f"by {request.user.first_name or request.user.username}\n"
+                        f"url: {moderation_url}"
                         + (f"\n\ncomment:\n{comment}" if comment else ""),
                         topic=TelegramTopic.NEW_BUGS)
             else:

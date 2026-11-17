@@ -2,7 +2,7 @@
   <div class="messaging-item messaging-item--{{ message.direction }}">
     <div class="messaging-meta">
       {% if message.direction == 'outbound' %}
-        {{ message.author.username|default:'Confessio' }}
+        {{ message.author.first_name|default:message.author.username|default:'Confessio' }}
       {% else %}
         {{ message.from_email|default:message.conversation.email }}
       {% endif %}
