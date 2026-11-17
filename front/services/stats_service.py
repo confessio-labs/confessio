@@ -11,8 +11,8 @@ from request.models import Request
 from attaching.models import FileNote, FileNoteComment, TextNote, TextNoteComment
 from front.models import Approval, ApprovalComment, Issue, IssueComment, Message
 from front.services.moderation_stats_service import MODERATION_CLASSES, MODERATOR_RESOURCES
-from front.utils.stats_utils import HistoryRow, Period, bucket_start, build_chart, \
-    cohort_resolution, episodes, fold_series, transitions
+from front.utils.stats_utils import PROCESSING_QUANTILE, HistoryRow, Period, bucket_start, \
+    build_chart, cohort_resolution, episodes, fold_series, transitions
 from registry.models.base_moderation_models import ModerationStatus
 from scheduling.models import ValidatedSchedules
 
@@ -143,6 +143,7 @@ def _history_rows(moderation_class) -> list[HistoryRow]:
             is_deletion=history_type == '-',
             is_to_validate=status == ModerationStatus.TO_VALIDATE,
             is_validated=status == ModerationStatus.VALIDATED,
+            is_bug=status == ModerationStatus.BUG,
             user_id=user_id,
         )
         for uuid, history_date, created_at, history_type, status, user_id in
@@ -152,36 +153,38 @@ def _history_rows(moderation_class) -> list[HistoryRow]:
     ]
 
 
-def get_moderator_volume_chart(rows: list[HistoryRow], period: Period) -> dict:
-    arrivals, validations = transitions(rows)
+def get_moderator_volume_chart(arrivals: list[HistoryRow], validations: list[HistoryRow],
+                               bugs: list[HistoryRow], period: Period) -> dict:
     return build_chart({
         'Modérations à traiter': _count_dates([row.at for row in arrivals], period),
         'Validations': _count_dates([row.at for row in validations], period),
+        'Bugs': _count_dates([row.at for row in bugs], period),
     }, period, localdate())
 
 
 def get_resolution_chart(rows: list[HistoryRow], period: Period) -> dict:
     stats = cohort_resolution(episodes(rows), period, _local_date)
+    delay_label = f'Délai {round(100 * PROCESSING_QUANTILE)}e centile (jours)'
     chart = build_chart({
-        '% validées': {cohort: pct for cohort, (pct, _) in stats.items()},
-        'Délai médian (jours)': {cohort: median for cohort, (_, median) in stats.items()},
+        '% traitées': {cohort: pct for cohort, (pct, _) in stats.items()},
+        delay_label: {cohort: delay for cohort, (_, delay) in stats.items()},
     }, period, localdate(), fill=None)
-    chart['y_title'] = '% validées'
+    chart['y_title'] = '% traitées'
     chart['y_max'] = 100
-    chart['y2_title'] = 'Délai médian (jours)'
+    chart['y2_title'] = delay_label
     chart['datasets'][1].update(type='line', yAxisID='y2')
     return chart
 
 
-def get_validations_by_user_chart(rows: list[HistoryRow], period: Period) -> dict:
-    validations_by_user_id: dict[int, list[datetime]] = {}
-    for row in transitions(rows)[1]:
+def get_transitions_by_user_chart(transition_rows: list[HistoryRow], period: Period) -> dict:
+    dates_by_user_id: dict[int, list[datetime]] = {}
+    for row in transition_rows:
         if row.user_id is not None:
-            validations_by_user_id.setdefault(row.user_id, []).append(row.at)
+            dates_by_user_id.setdefault(row.user_id, []).append(row.at)
 
     series = _label_by_user({
         user_id: _count_dates(dates, period)
-        for user_id, dates in validations_by_user_id.items()
+        for user_id, dates in dates_by_user_id.items()
     })
     return build_chart(fold_series(series), period, localdate(), stacked=True)
 
@@ -205,12 +208,14 @@ def get_validated_schedules_by_user_chart(period: Period) -> dict:
 
 def get_stats_charts(period: Period) -> dict[str, dict]:
     moderator_rows = [row for cls in MODERATOR_CLASSES for row in _history_rows(cls)]
+    arrivals, validations, bugs = transitions(moderator_rows)
     return {
         'traffic': get_traffic_chart(period),
         'engagement': get_engagement_chart(period),
-        'moderator_volume': get_moderator_volume_chart(moderator_rows, period),
+        'moderator_volume': get_moderator_volume_chart(arrivals, validations, bugs, period),
         'resolution': get_resolution_chart(moderator_rows, period),
-        'validations_by_user': get_validations_by_user_chart(moderator_rows, period),
+        'validations_by_user': get_transitions_by_user_chart(validations, period),
+        'bugs_by_user': get_transitions_by_user_chart(bugs, period),
         'messages_by_user': get_messages_by_user_chart(period),
         'validated_schedules_by_user': get_validated_schedules_by_user_chart(period),
     }

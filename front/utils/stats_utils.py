@@ -1,5 +1,4 @@
 import math
-import statistics
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Literal
@@ -16,6 +15,7 @@ SERIES_COLORS = [
 ]
 OTHER_LABEL = 'Autres'
 OTHER_COLOR = '#8a8984'
+PROCESSING_QUANTILE = 0.75
 
 
 def parse_period(value: str | None) -> Period:
@@ -93,6 +93,7 @@ class HistoryRow:
     is_deletion: bool
     is_to_validate: bool
     is_validated: bool
+    is_bug: bool
     user_id: int | None
 
 
@@ -133,9 +134,18 @@ def _is_validation(previous: HistoryRow | None, row: HistoryRow) -> bool:
     return not previous.is_validated
 
 
-def transitions(rows: list[HistoryRow]) -> tuple[list[HistoryRow], list[HistoryRow]]:
-    """Return (arrivals, validations)."""
-    arrivals, validations = [], []
+def _is_bug(previous: HistoryRow | None, row: HistoryRow) -> bool:
+    if row.is_deletion or not row.is_bug:
+        return False
+    if previous is None:
+        return not row.is_creation
+    return not previous.is_bug
+
+
+def transitions(rows: list[HistoryRow]
+                ) -> tuple[list[HistoryRow], list[HistoryRow], list[HistoryRow]]:
+    """Return (arrivals, validations, bugs)."""
+    arrivals, validations, bugs = [], [], []
     for group in _by_uuid(rows):
         previous = None
         for row in group:
@@ -143,13 +153,16 @@ def transitions(rows: list[HistoryRow]) -> tuple[list[HistoryRow], list[HistoryR
                 arrivals.append(row)
             if _is_validation(previous, row):
                 validations.append(row)
+            if _is_bug(previous, row):
+                bugs.append(row)
             previous = row
-    return arrivals, validations
+    return arrivals, validations, bugs
 
 
 def episodes(rows: list[HistoryRow]) -> list[Episode]:
-    """An episode runs from an arrival to the next validation. One ended by a deletion is
-    dropped: the moderation was removed (or converted), not resolved."""
+    """An episode runs from an arrival to its first processing (validation or bug), which is what
+    `resolved_at` holds. One ended by a deletion is dropped: the moderation was removed (or
+    converted), not processed."""
     result = []
     for group in _by_uuid(rows):
         previous = None
@@ -157,7 +170,8 @@ def episodes(rows: list[HistoryRow]) -> list[Episode]:
         for row in group:
             if arrived_at is not None and row.is_deletion:
                 arrived_at = None
-            elif arrived_at is not None and _is_validation(previous, row):
+            elif arrived_at is not None and (_is_validation(previous, row)
+                                             or _is_bug(previous, row)):
                 result.append(Episode(arrived_at, row.at))
                 arrived_at = None
             elif _is_arrival(previous, row):
@@ -169,17 +183,17 @@ def episodes(rows: list[HistoryRow]) -> list[Episode]:
 
 
 def resolution_stats(delays_in_days: list[float | None]) -> tuple[float, float | None]:
-    """Return (% resolved, 50th percentile delay in days) over the whole cohort.
+    """Return (% resolved, PROCESSING_QUANTILE delay in days) over the whole cohort.
 
-    Unresolved items count as infinitely long, so the percentile only exists once at least half of
-    the cohort is resolved.
+    Unresolved items count as infinitely long, so the nearest-rank percentile only exists once at
+    least PROCESSING_QUANTILE of the cohort is resolved.
     """
-    delays = [math.inf if delay is None else delay for delay in delays_in_days]
+    delays = sorted(math.inf if delay is None else delay for delay in delays_in_days)
     resolved_count = sum(1 for delay in delays if not math.isinf(delay))
-    median = statistics.median_low(delays)
+    percentile = delays[math.ceil(PROCESSING_QUANTILE * len(delays)) - 1]
     return (
         round(100 * resolved_count / len(delays), 1),
-        None if math.isinf(median) else round(median, 1),
+        None if math.isinf(percentile) else round(percentile, 1),
     )
 
 

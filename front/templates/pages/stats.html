@@ -48,14 +48,14 @@
       <div class="col-12 col-lg-6 mb-4">
         <div class="card shadow-sm"><div class="card-body">
           <h3 class="h5">Volume de modération</h3>
-          <p class="small text-muted">Modérations passées à traiter et validations, par date de l'événement.</p>
+          <p class="small text-muted">Modérations passées à traiter, validées ou en bug, par date de l'événement.</p>
           <div class="stats-chart"><canvas data-chart="moderator_volume"></canvas></div>
         </div></div>
       </div>
       <div class="col-12 col-lg-6 mb-4">
         <div class="card shadow-sm"><div class="card-body">
-          <h3 class="h5">Validation par cohorte d'arrivée</h3>
-          <p class="small text-muted">Délai au bout duquel 50 % de la cohorte est validée (non validées comprises) : vide tant que moins de 50 % le sont.</p>
+          <h3 class="h5">Traitement par cohorte d'arrivée</h3>
+          <p class="small text-muted">Traitée = validée ou passée en bug. Délai au bout duquel 75 % de la cohorte est traitée (non traitées comprises) : vide tant que moins de 75 % le sont.</p>
           <div class="stats-chart"><canvas data-chart="resolution"></canvas></div>
         </div></div>
       </div>
@@ -63,21 +63,28 @@
 
     <h2 class="h3 mt-4">Activité des admins</h2>
     <div class="row">
-      <div class="col-12 col-lg-4 mb-4">
+      <div class="col-12 col-lg-6 mb-4">
         <div class="card shadow-sm"><div class="card-body">
           <h3 class="h5">Validations de modération</h3>
           <p class="small text-muted">Périmètre modérateur, hors actions automatiques.</p>
           <div class="stats-chart"><canvas data-chart="validations_by_user"></canvas></div>
         </div></div>
       </div>
-      <div class="col-12 col-lg-4 mb-4">
+      <div class="col-12 col-lg-6 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Bugs de modération</h3>
+          <p class="small text-muted">Passages en bug, périmètre modérateur, hors actions automatiques.</p>
+          <div class="stats-chart"><canvas data-chart="bugs_by_user"></canvas></div>
+        </div></div>
+      </div>
+      <div class="col-12 col-lg-6 mb-4">
         <div class="card shadow-sm"><div class="card-body">
           <h3 class="h5">Messages et commentaires</h3>
           <p class="small text-muted">Messages envoyés et commentaires écrits.</p>
           <div class="stats-chart"><canvas data-chart="messages_by_user"></canvas></div>
         </div></div>
       </div>
-      <div class="col-12 col-lg-4 mb-4">
+      <div class="col-12 col-lg-6 mb-4">
         <div class="card shadow-sm"><div class="card-body">
           <h3 class="h5">Horaires validés</h3>
           <p class="small text-muted">Seule la dernière validation de chaque site est conservée.</p>
