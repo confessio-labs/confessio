@@ -156,7 +156,7 @@ def _history_rows(moderation_class) -> list[HistoryRow]:
 def get_moderator_volume_chart(arrivals: list[HistoryRow], validations: list[HistoryRow],
                                bugs: list[HistoryRow], period: Period) -> dict:
     return build_chart({
-        'Modérations à traiter': _count_dates([row.at for row in arrivals], period),
+        'Nouvelles modérations': _count_dates([row.at for row in arrivals], period),
         'Validations': _count_dates([row.at for row in validations], period),
         'Bugs': _count_dates([row.at for row in bugs], period),
     }, period, localdate())
