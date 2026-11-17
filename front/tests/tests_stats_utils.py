@@ -19,6 +19,7 @@ def row(uuid, hours, status, history_type='~', is_backfill=False):
         is_deletion=history_type == '-',
         is_to_validate=status == 'to_validate',
         is_validated=status == 'validated',
+        user_id=None,
     )
 
 
@@ -63,15 +64,15 @@ class TransitionTests(unittest.TestCase):
             row(uuid, 5, 'validated'),
         ]
         arrivals, validations = transitions(rows)
-        self.assertEqual(arrivals, [rows[0].at, rows[4].at])
-        self.assertEqual(validations, [rows[2].at, rows[5].at])
+        self.assertEqual(arrivals, [rows[0], rows[4]])
+        self.assertEqual(validations, [rows[2], rows[5]])
 
     def test_moderation_older_than_history(self):
         uuid = uuid4()
         rows = [row(uuid, 0, 'to_validate'), row(uuid, 1, 'validated')]
         arrivals, validations = transitions(rows)
         self.assertEqual(arrivals, [])
-        self.assertEqual(validations, [rows[1].at])
+        self.assertEqual(validations, [rows[1]])
 
     def test_backfilled_moderation(self):
         pending, done = uuid4(), uuid4()
@@ -80,7 +81,7 @@ class TransitionTests(unittest.TestCase):
             row(pending, 1, 'validated'),
             row(done, 0, 'validated', '+', is_backfill=True),
         ]
-        self.assertEqual(transitions(rows), ([], [rows[1].at]))
+        self.assertEqual(transitions(rows), ([], [rows[1]]))
         self.assertEqual(episodes(rows), [])
 
     def test_created_validated_is_not_a_validation(self):
@@ -90,7 +91,7 @@ class TransitionTests(unittest.TestCase):
     def test_deletion_is_not_a_validation(self):
         uuid = uuid4()
         rows = [row(uuid, 0, 'to_validate', '+'), row(uuid, 1, 'to_validate', '-')]
-        self.assertEqual(transitions(rows), ([rows[0].at], []))
+        self.assertEqual(transitions(rows), ([rows[0]], []))
 
 
 class EpisodeTests(unittest.TestCase):

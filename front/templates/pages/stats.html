@@ -26,7 +26,7 @@
       <div class="col-12 col-lg-6 mb-4">
         <div class="card shadow-sm"><div class="card-body">
           <h3 class="h5">Visiteurs uniques</h3>
-          <p class="small text-muted">Couples (user agent, heure) venant de confessio.fr.</p>
+          <p class="small text-muted">Compte approximatif, voir posthog pour plus de précision</p>
           <div class="stats-chart"><canvas data-chart="traffic"></canvas></div>
         </div></div>
       </div>
@@ -54,8 +54,8 @@
       </div>
       <div class="col-12 col-lg-6 mb-4">
         <div class="card shadow-sm"><div class="card-body">
-          <h3 class="h5">Résolution par cohorte d'arrivée</h3>
-          <p class="small text-muted">Le délai médian n'apparaît qu'à partir de 50 % de résolution.</p>
+          <h3 class="h5">Validation par cohorte d'arrivée</h3>
+          <p class="small text-muted">Délai au bout duquel 50 % de la cohorte est validée (non validées comprises) : vide tant que moins de 50 % le sont.</p>
           <div class="stats-chart"><canvas data-chart="resolution"></canvas></div>
         </div></div>
       </div>
@@ -66,7 +66,7 @@
       <div class="col-12 col-lg-4 mb-4">
         <div class="card shadow-sm"><div class="card-body">
           <h3 class="h5">Validations de modération</h3>
-          <p class="small text-muted">Toutes ressources confondues, suppressions comprises.</p>
+          <p class="small text-muted">Périmètre modérateur, hors actions automatiques.</p>
           <div class="stats-chart"><canvas data-chart="validations_by_user"></canvas></div>
         </div></div>
       </div>

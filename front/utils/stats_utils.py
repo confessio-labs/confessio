@@ -93,6 +93,7 @@ class HistoryRow:
     is_deletion: bool
     is_to_validate: bool
     is_validated: bool
+    user_id: int | None
 
 
 @dataclass(frozen=True)
@@ -132,16 +133,16 @@ def _is_validation(previous: HistoryRow | None, row: HistoryRow) -> bool:
     return not previous.is_validated
 
 
-def transitions(rows: list[HistoryRow]) -> tuple[list[datetime], list[datetime]]:
-    """Return (arrival dates, validation dates)."""
+def transitions(rows: list[HistoryRow]) -> tuple[list[HistoryRow], list[HistoryRow]]:
+    """Return (arrivals, validations)."""
     arrivals, validations = [], []
     for group in _by_uuid(rows):
         previous = None
         for row in group:
             if _is_arrival(previous, row):
-                arrivals.append(row.at)
+                arrivals.append(row)
             if _is_validation(previous, row):
-                validations.append(row.at)
+                validations.append(row)
             previous = row
     return arrivals, validations
 
@@ -168,8 +169,11 @@ def episodes(rows: list[HistoryRow]) -> list[Episode]:
 
 
 def resolution_stats(delays_in_days: list[float | None]) -> tuple[float, float | None]:
-    """Return (% resolved, median delay in days). Unresolved items count as infinitely long, so
-    the median only exists once at least half of them are resolved."""
+    """Return (% resolved, 50th percentile delay in days) over the whole cohort.
+
+    Unresolved items count as infinitely long, so the percentile only exists once at least half of
+    the cohort is resolved.
+    """
     delays = [math.inf if delay is None else delay for delay in delays_in_days]
     resolved_count = sum(1 for delay in delays if not math.isinf(delay))
     median = statistics.median_low(delays)

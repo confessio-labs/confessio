@@ -143,69 +143,41 @@ def _history_rows(moderation_class) -> list[HistoryRow]:
             is_deletion=history_type == '-',
             is_to_validate=status == ModerationStatus.TO_VALIDATE,
             is_validated=status == ModerationStatus.VALIDATED,
+            user_id=user_id,
         )
-        for uuid, history_date, created_at, history_type, status in
+        for uuid, history_date, created_at, history_type, status, user_id in
         moderation_class.history.order_by('uuid', 'history_date', 'history_id')
-        .values_list('uuid', 'history_date', 'created_at', 'history_type', 'status')
+        .values_list('uuid', 'history_date', 'created_at', 'history_type', 'status',
+                     'history_user_id')
     ]
-
-
-def _user_validations(moderation_class) -> list[tuple[datetime, int]]:
-    """Return (date, user id) of each validation made by someone.
-
-    A deletion counts too: some categories are deleted on validation, and the history can't tell
-    that apart from the delete button, which is a moderation action as well.
-    """
-    table = moderation_class.history.model._meta.db_table
-    # Done in SQL: the scheduling and crawling histories are too big to load in Python. The window
-    # only runs on moderations someone touched.
-    query = f"""
-        SELECT history_date, history_user_id
-        FROM (
-            SELECT history_date, history_user_id, history_type, status,
-                   lag(status) OVER (PARTITION BY uuid ORDER BY history_date, history_id)
-                       AS previous_status
-            FROM {table}
-            WHERE uuid IN (SELECT uuid FROM {table} WHERE history_user_id IS NOT NULL)
-        ) h
-        WHERE history_user_id IS NOT NULL
-          AND (
-              (history_type = '~' AND status = %(validated)s
-               AND previous_status IS DISTINCT FROM %(validated)s)
-              OR (history_type = '-' AND status <> %(validated)s)
-          )
-    """
-    with connection.cursor() as cursor:
-        cursor.execute(query, {'validated': ModerationStatus.VALIDATED.value})
-        return cursor.fetchall()
 
 
 def get_moderator_volume_chart(rows: list[HistoryRow], period: Period) -> dict:
     arrivals, validations = transitions(rows)
     return build_chart({
-        'Modérations à traiter': _count_dates(arrivals, period),
-        'Validations': _count_dates(validations, period),
+        'Modérations à traiter': _count_dates([row.at for row in arrivals], period),
+        'Validations': _count_dates([row.at for row in validations], period),
     }, period, localdate())
 
 
 def get_resolution_chart(rows: list[HistoryRow], period: Period) -> dict:
     stats = cohort_resolution(episodes(rows), period, _local_date)
     chart = build_chart({
-        '% résolues': {cohort: pct for cohort, (pct, _) in stats.items()},
+        '% validées': {cohort: pct for cohort, (pct, _) in stats.items()},
         'Délai médian (jours)': {cohort: median for cohort, (_, median) in stats.items()},
     }, period, localdate(), fill=None)
-    chart['y_title'] = '% résolues'
+    chart['y_title'] = '% validées'
     chart['y_max'] = 100
     chart['y2_title'] = 'Délai médian (jours)'
     chart['datasets'][1].update(type='line', yAxisID='y2')
     return chart
 
 
-def get_validations_by_user_chart(period: Period) -> dict:
+def get_validations_by_user_chart(rows: list[HistoryRow], period: Period) -> dict:
     validations_by_user_id: dict[int, list[datetime]] = {}
-    for moderation_class in MODERATION_CLASSES:
-        for history_date, user_id in _user_validations(moderation_class):
-            validations_by_user_id.setdefault(user_id, []).append(history_date)
+    for row in transitions(rows)[1]:
+        if row.user_id is not None:
+            validations_by_user_id.setdefault(row.user_id, []).append(row.at)
 
     series = _label_by_user({
         user_id: _count_dates(dates, period)
@@ -238,7 +210,7 @@ def get_stats_charts(period: Period) -> dict[str, dict]:
         'engagement': get_engagement_chart(period),
         'moderator_volume': get_moderator_volume_chart(moderator_rows, period),
         'resolution': get_resolution_chart(moderator_rows, period),
-        'validations_by_user': get_validations_by_user_chart(period),
+        'validations_by_user': get_validations_by_user_chart(moderator_rows, period),
         'messages_by_user': get_messages_by_user_chart(period),
         'validated_schedules_by_user': get_validated_schedules_by_user_chart(period),
     }
