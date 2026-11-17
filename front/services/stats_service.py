@@ -158,7 +158,7 @@ def get_moderator_volume_chart(arrivals: list[HistoryRow], validations: list[His
     return build_chart({
         'Nouvelles modérations': _count_dates([row.at for row in arrivals], period),
         'Validations': _count_dates([row.at for row in validations], period),
-        'Passages en bugs': _count_dates([row.at for row in bugs], period),
+        'Passages en bug': _count_dates([row.at for row in bugs], period),
     }, period, localdate())
 
 
