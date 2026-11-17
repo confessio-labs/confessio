@@ -70,6 +70,9 @@ urlpatterns = [
          name='messaging_message'),
     path('messaging/images/<uuid:image_uuid>', views.messaging_image, name='messaging_image'),
 
+    # stats (admin)
+    path('stats', views.stats, name='stats'),
+
     # moderation
     path('moderate', views.moderation_home, name='moderation_home'),
     path('moderate/issue/<category>/<str:status>',
