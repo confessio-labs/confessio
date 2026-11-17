@@ -1,0 +1,98 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block stylesheets %}
+    <style>
+        .stats-chart { position: relative; height: 320px; }
+    </style>
+{% endblock stylesheets %}
+
+{% block content %}
+<main>
+<section class="section-header bg-primary pt-6 pb-1">
+</section>
+<section class="section pt-3 pb-5">
+  <div class="container">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+      <h1 class="mb-0">Stats</h1>
+      <div class="btn-group" role="group" aria-label="Granularité">
+        <a href="?period=month" class="btn btn-sm {% if period == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">Mois</a>
+        <a href="?period=week" class="btn btn-sm {% if period == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semaine</a>
+      </div>
+    </div>
+
+    <h2 class="h3 mt-4">Trafic et engagement</h2>
+    <div class="row">
+      <div class="col-12 col-lg-6 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Visiteurs uniques</h3>
+          <p class="small text-muted">Couples (user agent, heure) venant de confessio.fr.</p>
+          <div class="stats-chart"><canvas data-chart="traffic"></canvas></div>
+        </div></div>
+      </div>
+      <div class="col-12 col-lg-6 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Contributions des visiteurs</h3>
+          <p class="small text-muted">Par date de création, hors utilisateurs connectés.</p>
+          <div class="stats-chart"><canvas data-chart="engagement"></canvas></div>
+        </div></div>
+      </div>
+    </div>
+
+    <h2 class="h3 mt-4">Modération</h2>
+    <p class="small text-muted">
+      Périmètre modérateur : issues, approvals, conversations, notes fichier et notes texte.
+      L'historique de modération n'est complet que depuis le 9 octobre 2026.
+    </p>
+    <div class="row">
+      <div class="col-12 col-lg-6 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Volume de modération</h3>
+          <p class="small text-muted">Modérations passées à traiter et validations, par date de l'événement.</p>
+          <div class="stats-chart"><canvas data-chart="moderator_volume"></canvas></div>
+        </div></div>
+      </div>
+      <div class="col-12 col-lg-6 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Résolution par cohorte d'arrivée</h3>
+          <p class="small text-muted">Le délai médian n'apparaît qu'à partir de 50 % de résolution.</p>
+          <div class="stats-chart"><canvas data-chart="resolution"></canvas></div>
+        </div></div>
+      </div>
+    </div>
+
+    <h2 class="h3 mt-4">Activité des admins</h2>
+    <div class="row">
+      <div class="col-12 col-lg-4 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Validations de modération</h3>
+          <p class="small text-muted">Toutes ressources confondues, suppressions comprises.</p>
+          <div class="stats-chart"><canvas data-chart="validations_by_user"></canvas></div>
+        </div></div>
+      </div>
+      <div class="col-12 col-lg-4 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Messages et commentaires</h3>
+          <p class="small text-muted">Messages envoyés et commentaires écrits.</p>
+          <div class="stats-chart"><canvas data-chart="messages_by_user"></canvas></div>
+        </div></div>
+      </div>
+      <div class="col-12 col-lg-4 mb-4">
+        <div class="card shadow-sm"><div class="card-body">
+          <h3 class="h5">Horaires validés</h3>
+          <p class="small text-muted">Seule la dernière validation de chaque site est conservée.</p>
+          <div class="stats-chart"><canvas data-chart="validated_schedules_by_user"></canvas></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+{{ charts|json_script:"stats-data" }}
+{% endblock content %}
+
+{% block javascripts %}
+    {{ block.super }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="{% static 'js/stats0.js' %}"></script>
+{% endblock javascripts %}
