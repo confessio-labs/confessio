@@ -27,12 +27,12 @@ class LLMClientWithCache(LLMClientInterface):
                               ) -> tuple[Optional[SchedulesList], Optional[str]]:
         current_directory = os.path.dirname(os.path.abspath(__file__))
         cache_filename = (f'{current_directory}/fixtures/parse/'
-                          f'llm_cache_{self.get_provider().value}_{self.get_model()}.cache')
+                          f'llm_cache_{self.get_provider().value}_{self.get_model()}'
+                          f'_{self.llm_client.reasoning_effort}.cache')
 
         key = (
             json.dumps(messages),
             json.dumps(SchedulesList.model_json_schema()),
-            self.llm_client.reasoning_effort
         )
         value = simple_cache.load_key(cache_filename, key)
 

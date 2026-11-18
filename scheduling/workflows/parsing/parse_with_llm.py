@@ -36,12 +36,15 @@ Here is the schedule dictionary format:
 {{
     "church_id": int | null,  # the id of the respective church, can be null if the
         church information is not explicit in the text. Can be -1 if the church is explicit and is
-        not in the provided list. Sometimes, you can guess the church_id when it says
-        "à la chapelle" and there is only one church called "chapelle" in the list.
+        not in the provided list. You can guess the church_id when the text refers to a kind of
+        building without naming it (e.g. "à la chapelle", "dans l'église", "à la cathédrale")
+        and there is only one building of this kind in the list.
         But if there is no mention, the church_id must be null.
     "date_rule": OneOffRule | RegularRule,  # the recurrence rule for the confession (see below)
-    "is_cancellation": bool,  # whether this is a cancellation of a confession, e.g "pas de
-        confession en août"
+    "is_cancellation": bool,  # whether this is the cancellation of a dated confession, e.g.
+        "Dimanche 29/09 16h30-17h30 : pas de confession". A recurring exclusion of a regular
+        schedule (e.g. "pas de confession en août", "ni le lundi de Pâques") is not a
+        cancellation: use the "not_in_periods" or "not_on_dates" of this regular schedule.
     "start_time_iso8601": str | null,  # the start time of the confession in "HH:MM:SS" format,
 null if not explicit.
     "end_time_iso8601": str | null  # the end time of the confession in "HH:MM:SS" format,
@@ -105,7 +108,7 @@ CustomPeriod is a dictionary with the following fields:
     "end": OneOffRule,  # the end date of the period
 }}
 For example, if the expression says "sauf en août", the "not_in_periods" would be:
-{{"start":{{"month":8,"day":1}},"end":{{"month":8,"day":30}}}}
+{{"start":{{"month":8,"day":1}},"end":{{"month":8,"day":31}}}}
 
 DailyRule is an empty dictionary, WeeklyRule is a dictionary with the following format:
 {{
@@ -145,19 +148,30 @@ or return a one off rule with all fields null.
 - If there is no explicit time in the text (e.g. "dans la matinée", "dans l'après-midi",
 "dans la soirée", "après la messe" or no time at all), you can skip this schedule or
 set start_time_iso8601 and end_time_iso8601 to null.
+- If the text gives a specific schedule for a period (e.g. "pendant les vacances scolaires" or
+"en été"), it replaces during that period the regular schedules it refers to: add the period to
+the "not_in_periods" of these regular schedules and to the "only_in_periods" of the period
+schedules. When the period schedule is a full schedule of its own (e.g. a section "Horaires
+pendant les vacances"), it replaces all the regular schedules: the regular slots it does not list
+do not happen during that period. A slot listed identically in both is returned once, without
+period.
 - Usually, the lack of precision means some of the booleans for mass, adoration, permanence or
 seasonal events should be set to True.
 - A mass lasts 30 minutes, except on Sundays and feast days when it lasts 1 hour. Therefore, if the
 confession starts "après la messe", two cases : either the schedule is explicit, e.g
 "après la messe de Xh le vendredi" would give a start time of Xh30, or the schedule is not explicit,
 e.g. "après la messe" would not give a schedule item dictionary.
-- If the church is not explicit in the text, the church_id must be null.
+- If the church is not explicit in the text and can not be guessed as explained above, the
+church_id must be null.
 - Sometimes you will be given a calendar, with month as title, day number as headers. In this case
-you should return one-off date rules for each day number mentioned in the calendar.
-- Sometimes, only the the start time of events are mentioned. In this case, you can set
-end_time_iso8601 to null, or infer it from next event start time if relevant.
-Example: "Xh confessions; Xh30 messe;"
-would give start_time_iso8601 "0X:00:00" and end_time_iso8601 "0X:30:00".
+you should return one-off date rules for each day number mentioned in the calendar. Days of the
+previous or next month shown in the calendar belong to that month: return them with their own
+month.
+- Sometimes, only the start time of events is mentioned. If the next event of the same day is a
+mass starting at most 2 hours later, set end_time_iso8601 to the start time of this mass,
+otherwise set it to null. Example: "Xh confessions; Xh30 messe;" would give start_time_iso8601
+"0X:00:00" and end_time_iso8601 "0X:30:00", but "Xh confessions; Xh30 catéchisme;" would give
+a null end_time_iso8601.
 
 Here is the HTML extract to parse:
 {truncated_html}
