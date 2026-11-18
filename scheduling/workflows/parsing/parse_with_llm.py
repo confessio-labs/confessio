@@ -225,7 +225,6 @@ async def parse_with_llm(truncated_html: str, church_desc_by_id: dict[int, str],
                          ) -> tuple[SchedulesList | None, str | None]:
     schedules_list, llm_error_detail = await llm_client.get_completions(
         messages=build_input_messages(prompt_template, truncated_html, church_desc_by_id),
-        temperature=0.0,
     )
     if schedules_list:
         schedules_list.schedules = filter_valid_schedules(schedules_list.schedules)

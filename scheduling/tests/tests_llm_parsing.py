@@ -18,14 +18,13 @@ from scheduling.workflows.parsing.schedules import SchedulesList, get_merged_sch
 
 
 class LLMClientWithCache(LLMClientInterface):
-    llm_client: LLMClientInterface
+    llm_client: OpenAILLMClient
 
-    def __init__(self, llm_client: LLMClientInterface):
+    def __init__(self, llm_client: OpenAILLMClient):
         self.llm_client = llm_client
 
-    async def get_completions(self,
-                              messages: list[dict],
-                              temperature: float) -> tuple[Optional[SchedulesList], Optional[str]]:
+    async def get_completions(self, messages: list[dict]
+                              ) -> tuple[Optional[SchedulesList], Optional[str]]:
         current_directory = os.path.dirname(os.path.abspath(__file__))
         cache_filename = (f'{current_directory}/fixtures/parse/'
                           f'llm_cache_{self.get_provider().value}_{self.get_model()}.cache')
@@ -33,13 +32,13 @@ class LLMClientWithCache(LLMClientInterface):
         key = (
             json.dumps(messages),
             json.dumps(SchedulesList.model_json_schema()),
-            temperature
+            self.llm_client.reasoning_effort
         )
         value = simple_cache.load_key(cache_filename, key)
 
         if value is None:
             print('LLM Cache miss')
-            value = await self.llm_client.get_completions(messages, temperature)
+            value = await self.llm_client.get_completions(messages)
             simple_cache.save_key(cache_filename, key, value,
                                   ttl=3600 * 24 * 365 * 100  # 100 years
                                   )

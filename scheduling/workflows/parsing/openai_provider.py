@@ -19,25 +19,21 @@ if TYPE_CHECKING:
 class OpenAILLMClient(LLMClientInterface):
     client: AsyncOpenAI
 
-    def __init__(self, client: AsyncOpenAI, model: str, reasoning_effort: Optional[str] = None):
+    def __init__(self, client: AsyncOpenAI, model: str, reasoning_effort: str):
         self.client = client
         self.model = model
         self.reasoning_effort = reasoning_effort
 
-    async def get_completions(self,
-                              messages: list[dict],
-                              temperature: float) -> tuple[Optional[SchedulesList], Optional[str]]:
+    async def get_completions(self, messages: list[dict]
+                              ) -> tuple[Optional[SchedulesList], Optional[str]]:
         from openai import BadRequestError
 
         try:
-            # Reasoning models reject a temperature once a reasoning effort is set
-            sampling_args = ({'reasoning_effort': self.reasoning_effort} if self.reasoning_effort
-                             else {'temperature': temperature})
             response = await self.client.chat.completions.parse(
                 model=self.model,
                 messages=messages,
                 response_format=SchedulesList,
-                **sampling_args
+                reasoning_effort=self.reasoning_effort,
             )
         except BadRequestError as e:
             print(e)
