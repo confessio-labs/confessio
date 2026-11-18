@@ -15,7 +15,7 @@
   "output": {
     "schedules_list": {
       "schedules": [],
-      "possible_by_appointment": true,
+      "possible_by_appointment": false,
       "is_related_to_mass": false,
       "is_related_to_adoration": false,
       "is_related_to_permanence": false,

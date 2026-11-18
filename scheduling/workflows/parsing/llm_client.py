@@ -7,9 +7,8 @@ from scheduling.workflows.parsing.schedules import SchedulesList
 
 class LLMClientInterface:
     @abstractmethod
-    async def get_completions(self,
-                              messages: list[dict],
-                              temperature: float) -> tuple[Optional[SchedulesList], Optional[str]]:
+    async def get_completions(self, messages: list[dict]
+                              ) -> tuple[Optional[SchedulesList], Optional[str]]:
         pass
 
     async def aclose(self) -> None:

@@ -19,22 +19,21 @@ if TYPE_CHECKING:
 class OpenAILLMClient(LLMClientInterface):
     client: AsyncOpenAI
 
-    def __init__(self, client: AsyncOpenAI, model: str):
+    def __init__(self, client: AsyncOpenAI, model: str, reasoning_effort: str):
         self.client = client
         self.model = model
+        self.reasoning_effort = reasoning_effort
 
-    async def get_completions(self,
-                              messages: list[dict],
-                              temperature: float) -> tuple[Optional[SchedulesList], Optional[str]]:
+    async def get_completions(self, messages: list[dict]
+                              ) -> tuple[Optional[SchedulesList], Optional[str]]:
         from openai import BadRequestError
 
         try:
-            temperature_args = {'temperature': temperature} if self.model != 'o3' else {}
             response = await self.client.chat.completions.parse(
                 model=self.model,
                 messages=messages,
                 response_format=SchedulesList,
-                **temperature_args
+                reasoning_effort=self.reasoning_effort,
             )
         except BadRequestError as e:
             print(e)
@@ -72,6 +71,6 @@ def get_openai_client(openai_api_key: Optional[str] = None) -> AsyncOpenAI:
 def get_openai_llm_client() -> OpenAILLMClient:
     # TODO get latest fine-tuned model
     # openai_model = 'ft:gpt-4o-2024-08-06:confessio::AHfh95wJ'
-    openai_model = 'o3'  # or "gpt-4o-mini"
+    openai_model = 'gpt-6-luna'
 
-    return OpenAILLMClient(get_openai_client(), openai_model)
+    return OpenAILLMClient(get_openai_client(), openai_model, reasoning_effort='medium')

@@ -67,7 +67,7 @@
       "is_related_to_mass": false,
       "is_related_to_adoration": false,
       "is_related_to_permanence": true,
-      "will_be_seasonal_events": true
+      "will_be_seasonal_events": false
     }
   }
 }

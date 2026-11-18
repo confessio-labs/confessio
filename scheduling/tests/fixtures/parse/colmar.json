@@ -19,7 +19,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "08:30:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "09:45:00"
         },
         {
           "church_id": 0,
@@ -71,7 +71,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "09:45:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "11:00:00"
         },
         {
           "church_id": 0,
@@ -97,7 +97,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "10:45:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "12:00:00"
         },
         {
           "church_id": -1,
@@ -110,7 +110,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "18:30:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "19:15:00"
         },
         {
           "church_id": 0,
@@ -136,7 +136,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "08:45:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "09:45:00"
         },
         {
           "church_id": 0,
@@ -214,7 +214,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "17:30:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "18:30:00"
         },
         {
           "church_id": 0,
@@ -227,7 +227,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "08:30:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "09:30:00"
         },
         {
           "church_id": 0,
@@ -370,7 +370,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "17:30:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "18:30:00"
         },
         {
           "church_id": 0,
@@ -383,7 +383,7 @@
           },
           "is_cancellation": false,
           "start_time_iso8601": "18:30:00",
-          "end_time_iso8601": null
+          "end_time_iso8601": "19:00:00"
         },
         {
           "church_id": 0,
@@ -452,9 +452,9 @@
         }
       ],
       "possible_by_appointment": false,
-      "is_related_to_mass": false,
+      "is_related_to_mass": true,
       "is_related_to_adoration": true,
-      "is_related_to_permanence": false,
+      "is_related_to_permanence": true,
       "will_be_seasonal_events": false
     }
   }
