@@ -162,10 +162,8 @@ def prepare_parsing(pruning: Pruning, churches: list[Church]) -> None | ParsingP
 
     # check the parsing does not already exist
     parsing = get_existing_parsing(truncated_html_hash, church_desc_by_id)
-    if parsing \
-            and parsing.llm_provider == llm_client.get_provider() \
-            and parsing.llm_model == llm_client.get_model() \
-            and parsing.prompt_template_hash == prompt_template_hash:
+    # A model change alone must not re-parse every existing parsing, only a prompt change does
+    if parsing and parsing.prompt_template_hash == prompt_template_hash:
 
         # Adding necessary moderation if missing
         add_necessary_parsing_moderation(parsing)
