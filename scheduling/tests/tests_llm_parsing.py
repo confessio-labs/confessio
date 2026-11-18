@@ -59,11 +59,12 @@ class LlmParsingTests(unittest.TestCase):
         openai_api_key = os.getenv("OPENAI_API_KEY") or 'thisIsNotARealKey'
 
         # llm_model = 'ft:gpt-4o-2024-08-06:confessio::AHfh95wJ'
-        llm_model = 'o3'
+        llm_model = 'gpt-6-luna'
 
         self.llm_client = LLMClientWithCache(OpenAILLMClient(
             get_openai_client(openai_api_key),
-            llm_model
+            llm_model,
+            reasoning_effort='medium',
         ))
 
     @staticmethod
