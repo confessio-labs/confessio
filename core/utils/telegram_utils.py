@@ -34,7 +34,14 @@ def send_telegram_alert(message: str, topic: TelegramTopic):
         # No parse_mode: alerts embed user-provided text, which would break markdown parsing.
         "text": message[:MAX_TELEGRAM_TEXT],
     }
-    response = httpx.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=data)
+    # Best-effort: a Telegram outage must not break the caller (e.g. a scheduling indexation).
+    try:
+        response = httpx.post(f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                              json=data, timeout=10)
+    except httpx.HTTPError as e:
+        # Don't print the request URL: it contains the bot token.
+        print(f"Erreur lors de l'envoi de l'alerte Telegram : {type(e).__name__} - {e}")
+        return
 
     if response.status_code != 200:
         print(f"Erreur lors de l'envoi de l'alerte Telegram : "
