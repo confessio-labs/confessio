@@ -1,6 +1,16 @@
 import json
+import time
 
 import httpx
+
+# OClocher sometimes answers 502 transiently
+RETRY_DELAYS_SECONDS = (0, 10)
+
+
+def get_json(client: httpx.Client, url: str) -> list[dict]:
+    resp = client.get(url)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def fetch_oclocher_url(oclocher_url: str) -> list[dict]:
@@ -12,13 +22,13 @@ def fetch_oclocher_url(oclocher_url: str) -> list[dict]:
     )
 
     with httpx.Client(timeout=timeout) as client:
-        try:
-            resp = client.get(oclocher_url)
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPError as e:
-            print("Request failed:", e)
-            raise
+        for delay in RETRY_DELAYS_SECONDS:
+            try:
+                return get_json(client, oclocher_url)
+            except httpx.HTTPError as e:
+                print(f"Request failed, retrying in {delay}s: {e}")
+                time.sleep(delay)
+        return get_json(client, oclocher_url)
 
 
 def fetch_organizations() -> list[dict]:
