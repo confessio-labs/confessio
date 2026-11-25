@@ -14,6 +14,15 @@ class Conversation(TimeStampMixin):
     email = models.EmailField()
     name = models.CharField(max_length=255, blank=True)
     subject = models.CharField(max_length=255)
+    # The head of the report thread this conversation answers, if any. A bare uuid rather than one
+    # foreign key per head class: converting an issue to a text note keeps its uuid.
+    report_uuid = models.UUIDField(null=True, blank=True)
+
+    class Meta(TimeStampMixin.Meta):
+        constraints = [
+            models.UniqueConstraint(fields=['report_uuid', 'email'],
+                                    name='unique_conversation_report_email'),
+        ]
 
     def __str__(self):
         return f'{self.subject} — {self.email}'

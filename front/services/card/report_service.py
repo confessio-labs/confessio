@@ -14,10 +14,15 @@ from attaching.public_service import attaching_extract_text_note
 from core.models.base_models import BaseUserReport
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.models import Approval, ApprovalComment, ApprovalModeration, Issue, IssueComment, \
-    IssueModeration
+    IssueModeration, Message
+from front.services.card.report_thread_service import ReportThread
+from front.services.messaging.messaging_service import get_or_create_report_conversation, \
+    send_message
 from registry.models import Church, Website
 from registry.models.base_moderation_models import ModerationStatus
 from core.services.admin_email_service import send_email_to_admin
+from front.utils.messaging_utils import ReportPlace, ReportQuote, build_report_place, \
+    build_report_reply_bodies
 from front.utils.web_utils import clean_email, find_error_in_email, \
     get_user_user_agent_and_ip, is_staff_user
 
@@ -177,12 +182,17 @@ def new_report(request, website: Website) -> str:
 
     save_report(request, website, None, feedback_type, content, main_report_uuid, email)
 
-    if is_staff_user(request) and request.POST.get('mark_solved') and main_report_uuid:
+    success_message = 'Merci pour votre retour !'
+    if is_staff_user(request) and main_report_uuid:
         head = get_thread_head(website, main_report_uuid)
-        if isinstance(head, Issue):
+        if request.POST.get('mark_solved') and isinstance(head, Issue):
             solve_issue(head)
+        if content:
+            messages = reply_by_email(request, head, content,
+                                      request.POST.getlist('reply_to_email'))
+            success_message = ' '.join([success_message, *map(get_reply_outcome, messages)])
 
-    return 'Merci pour votre retour !'
+    return success_message
 
 
 def add_necessary_moderation(website: Website, head: Issue | Approval | FileNote | TextNote,
@@ -212,6 +222,64 @@ def add_necessary_moderation(website: Website, head: Issue | Approval | FileNote
     if not created and moderation.status != ModerationStatus.TO_VALIDATE:
         moderation.status = ModerationStatus.TO_VALIDATE
         moderation.save()
+
+
+##################
+# REPLY BY EMAIL #
+##################
+
+def reply_by_email(request: HttpRequest, head: Issue | Approval | FileNote | TextNote,
+                   content: str, emails: list[str]) -> list[Message]:
+    thread = ReportThread(head=head, comments=list(head.comments.order_by('created_at')))
+    place = get_report_place(request, head)
+
+    messages = []
+    for email in thread.emails:
+        # Walking the thread's own addresses is what keeps a forged POST from mailing anyone else
+        if email not in emails:
+            continue
+        conversation, created = get_or_create_report_conversation(
+            head.uuid, email,
+            f'Votre retour sur Confessio sur {(head.church or head.website).name}')
+        # Later mails carry the first one in their history, quotes included
+        quotes = get_report_quotes(thread, email) if created else []
+        body, body_html = build_report_reply_bodies(
+            request.user.first_name or request.user.username, place, content, quotes)
+        messages.append(send_message(request, conversation, body, request.user,
+                                     body_html=body_html))
+
+    return messages
+
+
+def get_report_place(request: HttpRequest, head: Issue | Approval | FileNote | TextNote
+                     ) -> ReportPlace:
+    if head.church:
+        # Served by the Next.js front, on the same domain
+        church_url = request.build_absolute_uri(f'/church/{head.church.uuid}')
+        return build_report_place(head.church.name, "l'", 'église', church_url)
+
+    website_url = request.build_absolute_uri(
+        reverse('website_view', kwargs={'website_uuid': head.website.uuid}))
+    return build_report_place(head.website.name, 'la ', 'paroisse', website_url)
+
+
+def get_report_quotes(thread: ReportThread, email: str) -> list[ReportQuote]:
+    return [ReportQuote(timezone.localtime(message.created_at).strftime('%d/%m/%Y'),
+                        get_report_body(message))
+            for message in [thread.head, *thread.comments] if message.email == email]
+
+
+def get_report_body(message: BaseUserReport) -> str:
+    if isinstance(message, FileNote):
+        return message.caption or 'Photo ajoutée'
+    return message.content or ''
+
+
+def get_reply_outcome(message: Message) -> str:
+    email = message.conversation.email
+    if message.status == Message.Status.FAILED:
+        return f"L'envoi à {email} a échoué."
+    return f'Réponse envoyée à {email}.'
 
 
 ###############

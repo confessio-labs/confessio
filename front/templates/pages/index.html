@@ -407,6 +407,14 @@
                                             <label class="form-check-label" for="mark-solved-{{ thread.head.uuid }}">Marquer le problème comme résolu</label>
                                         </div>
                                     {% endif %}
+                                    {% if request|is_staff %}
+                                        {% for email in thread.emails %}
+                                            <div class="form-check mt-2">
+                                                <input class="form-check-input" type="checkbox" name="reply_to_email" value="{{ email }}" id="reply-to-{{ thread.head.uuid }}-{{ forloop.counter }}">
+                                                <label class="form-check-label" for="reply-to-{{ thread.head.uuid }}-{{ forloop.counter }}">Et aussi répondre à {{ email }}</label>
+                                            </div>
+                                        {% endfor %}
+                                    {% endif %}
                                 </form>
                             </div>
                         </div>
