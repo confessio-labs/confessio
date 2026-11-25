@@ -17,7 +17,7 @@ from scheduling.workflows.parsing.parse_with_llm import parse_with_llm, get_prom
     get_llm_client
 from scheduling.workflows.parsing.schedules import SchedulesList, SCHEDULES_LIST_VERSION
 
-TRUNCATION_LENGTH = 32
+TRUNCATION_LENGTH = 80
 MAX_LENGTH_FOR_PARSING = 15000
 
 
