@@ -12,7 +12,6 @@ Everything we mail to the contact address goes out from no-reply@, which is prec
 inbound webhook filters on so our own mirrors never come back in as new messages.
 """
 import os
-from uuid import UUID
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
@@ -21,6 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from email.utils import formataddr
 
+from core.models.base_models import BaseUserReport
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.models import Conversation, Message, MessageImage
 from front.services.messaging.conversation_moderation_service import (
@@ -116,10 +116,10 @@ def send_message(request, conversation: Conversation, body: str, author,
     return message
 
 
-def get_or_create_report_conversation(report_uuid: UUID, email: str, subject: str
-                                      ) -> tuple[Conversation, bool]:
+def get_or_create_report_conversation(head_field: str, head: BaseUserReport, email: str,
+                                      subject: str) -> tuple[Conversation, bool]:
     return Conversation.objects.get_or_create(
-        report_uuid=report_uuid,
+        **{head_field: head},
         email=email,
         defaults={'subject': _fit(Conversation, 'subject', subject)},
     )

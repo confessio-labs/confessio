@@ -239,7 +239,7 @@ def reply_by_email(request: HttpRequest, head: Issue | Approval | FileNote | Tex
         if email not in emails:
             continue
         conversation, created = get_or_create_report_conversation(
-            head.uuid, email,
+            get_thread_type(head), head, email,
             f'Votre retour sur Confessio sur {(head.church or head.website).name}')
         # Later mails carry the first one in their history, quotes included
         quotes = get_report_quotes(thread, email) if created else []
