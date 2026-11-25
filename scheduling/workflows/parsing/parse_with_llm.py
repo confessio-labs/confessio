@@ -14,6 +14,18 @@ def get_prompt_template():
 extract. A confession can be called "confession", "sacrement de réconciliation"
 or "soirée de réconciliation, but not "heure de la miséricorde".
 
+A time is a confession time when the text presents it as such, on the same line or through a title,
+even with other words (e.g. "Confessions : jeudi à Xh", "célébration pénitentielle", "sacrement du
+pardon"): always return it. But the extract is made of lines selected from a web page because one
+of them mentions confession, and the title or sentence saying what a list of times is about can be
+missing. Only for a list of times that does not say what it is about, assume it is a list of
+masses, even if one of its lines mentions confession:
+- A list introduced by a pronoun without antecedent in the extract (e.g. "Elle a lieu aussi :") is a
+list of masses.
+- In such a list, "Samedi à Xh, suivi de confessions" is a mass at Xh followed by confessions: the
+rule about confessions after the mass below applies to this line only, and the other lines are
+masses, not confessions.
+
 The output should be a dictionary with this format:
 {{
     "schedules": list[ScheduleItem],  # list of schedule objects, see below
@@ -160,7 +172,14 @@ seasonal events should be set to True.
 - A mass lasts 30 minutes, except on Sundays and feast days when it lasts 1 hour. Therefore, if the
 confession starts "après la messe", two cases : either the schedule is explicit, e.g
 "après la messe de Xh le vendredi" would give a start time of Xh30, or the schedule is not explicit,
-e.g. "après la messe" would not give a schedule item dictionary.
+e.g. "après la messe" would not give a schedule item dictionary. A mass followed by an adoration
+and confessions is explicit: "messe à Xh suivie de l'adoration et des confessions" gives a start
+time of Xh30.
+- If the confession follows an office other than a mass, directly or after an adoration (e.g.
+"Xh Laudes suivies de l'adoration et des confessions"), set start_time_iso8601 to the start time
+of this office, since its duration is unknown. If there is a mass in the same church at most 2 hours
+after the start of this office, whatever their order in the text, set end_time_iso8601 to the start
+time of this mass.
 - If the church is not explicit in the text and can not be guessed as explained above, the
 church_id must be null.
 - Sometimes you will be given a calendar, with month as title, day number as headers. In this case
