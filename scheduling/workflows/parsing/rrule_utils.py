@@ -228,38 +228,19 @@ def filter_valid_schedules(schedules: list[ScheduleItem]) -> list[ScheduleItem]:
 # COMPARE #
 ###########
 
-def are_schedules_list_equivalent(sl1: SchedulesList, sl2: SchedulesList,
-                                  start_date: date, end_date: date, holiday_zone: HolidayZoneEnum
-                                  ) -> tuple[bool, Optional[str]]:
+def are_schedules_equivalent(schedules1: list[ScheduleItem], schedules2: list[ScheduleItem],
+                             start_date: date, end_date: date, holiday_zone: HolidayZoneEnum
+                             ) -> bool:
+    if set(schedules1) == set(schedules2):
+        return True
+
     default_year = start_date.year
-
-    if sl1.is_related_to_mass != sl2.is_related_to_mass:
-        return False, 'is_related_to_mass differs'
-
-    if sl1.is_related_to_adoration != sl2.is_related_to_adoration:
-        return False, 'is_related_to_adoration differs'
-
-    if sl1.is_related_to_permanence != sl2.is_related_to_permanence:
-        return False, 'is_related_to_permanence differs'
-
-    if sl1.will_be_seasonal_events != sl2.will_be_seasonal_events:
-        return False, 'will_be_seasonal_events differs'
-
-    if sl1.possible_by_appointment != sl2.possible_by_appointment:
-        return False, 'possible_by_appointment differs'
-
-    if set(sl1.schedules) == set(sl2.schedules):
-        return True, None
-
-    events1 = get_events_from_schedule_items(sl1.schedules, start_date, default_year, holiday_zone,
+    events1 = get_events_from_schedule_items(schedules1, start_date, default_year, holiday_zone,
                                              end_date)
-    events2 = get_events_from_schedule_items(sl2.schedules, start_date, default_year, holiday_zone,
+    events2 = get_events_from_schedule_items(schedules2, start_date, default_year, holiday_zone,
                                              end_date)
 
-    if set(events1) == set(events2):
-        return True, None
-
-    return False, 'events differ'
+    return set(events1) == set(events2)
 
 
 if __name__ == '__main__':
