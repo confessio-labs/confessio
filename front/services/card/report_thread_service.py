@@ -15,6 +15,11 @@ class ReportThread:
     comments: list[IssueComment | ApprovalComment | FileNoteComment | TextNoteComment]
 
     @property
+    def emails(self) -> list[str]:
+        return list(dict.fromkeys(message.email for message in [self.head, *self.comments]
+                                  if message.email))
+
+    @property
     def is_approval(self) -> bool:
         return isinstance(self.head, Approval)
 

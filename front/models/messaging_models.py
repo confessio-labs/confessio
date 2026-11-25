@@ -14,6 +14,27 @@ class Conversation(TimeStampMixin):
     email = models.EmailField()
     name = models.CharField(max_length=255, blank=True)
     subject = models.CharField(max_length=255)
+    # The head of the report thread this conversation answers: one of them at most
+    issue = models.ForeignKey('front.Issue', on_delete=models.SET_NULL, null=True, blank=True,
+                              related_name='conversations')
+    approval = models.ForeignKey('front.Approval', on_delete=models.SET_NULL,
+                                 null=True, blank=True, related_name='conversations')
+    file_note = models.ForeignKey('attaching.FileNote', on_delete=models.SET_NULL,
+                                  null=True, blank=True, related_name='conversations')
+    text_note = models.ForeignKey('attaching.TextNote', on_delete=models.SET_NULL,
+                                  null=True, blank=True, related_name='conversations')
+
+    class Meta(TimeStampMixin.Meta):
+        constraints = [
+            models.UniqueConstraint(fields=['issue', 'email'],
+                                    name='unique_conversation_issue_email'),
+            models.UniqueConstraint(fields=['approval', 'email'],
+                                    name='unique_conversation_approval_email'),
+            models.UniqueConstraint(fields=['file_note', 'email'],
+                                    name='unique_conversation_file_note_email'),
+            models.UniqueConstraint(fields=['text_note', 'email'],
+                                    name='unique_conversation_text_note_email'),
+        ]
 
     def __str__(self):
         return f'{self.subject} — {self.email}'

@@ -4,9 +4,11 @@ import unittest
 
 from front.utils.messaging_utils import (MAX_IMAGES_PER_MESSAGE, MAX_IMAGES_SIZE,
                                          MIN_INBOUND_IMAGE_SIZE, HistoryEntry, ImageAttachment,
+                                         ReportPlace, ReportQuote,
                                          append_conversation_footer, build_history_block,
                                          build_history_block_html, build_outbound_bodies,
-                                         build_reply_subject, build_ses_message_id,
+                                         build_reply_subject, build_report_place,
+                                         build_report_reply_bodies, build_ses_message_id,
                                          build_thread_headers, conversation_footer,
                                          conversation_footer_html, extract_conversation_uuid,
                                          find_error_in_outbound_images, first_external_address,
@@ -247,7 +249,56 @@ class BuildHistoryBlockTests(unittest.TestCase):
                          '> Une question ?', block)
 
 
+class BuildReportPlaceTests(unittest.TestCase):
+    def test_place_is_never_named_twice(self):
+        for name, article, noun, expected in [
+            ('Saulieu', 'la ', 'paroisse', 'la paroisse Saulieu'),
+            ('Paroisse Chatou', 'la ', 'paroisse', 'la paroisse Chatou'),
+            ('Paroisses Saint Sixte', 'la ', 'paroisse', 'la paroisse Paroisses Saint Sixte'),
+            ('Église Saint-Léger', "l'", 'église', "l'église Saint-Léger"),
+            ('Eglise Ostwald', "l'", 'église', "l'eglise Ostwald"),
+            ('ÉGLISE SAINT-LÉGER', "l'", 'église', "l'église SAINT-LÉGER"),
+            ('Eglise', "l'", 'église', "l'eglise"),
+            ('Chapelle des Praz', "l'", 'église', "l'église Chapelle des Praz"),
+        ]:
+            with self.subTest(name):
+                place = build_report_place(name, article, noun, HOME)
+                self.assertEqual(expected, place.article + place.name)
+
+
+class BuildReportReplyBodiesTests(unittest.TestCase):
+    PLACE = ReportPlace('la ', 'paroisse Chatou', 'https://confessio.fr/paroisse/1')
+
+    def test_reply_with_quote(self):
+        text, html = build_report_reply_bodies('Anne', self.PLACE, 'Merci !',
+                                               [ReportQuote('25/11/2026', "C'est faux")])
+        self.assertEqual('Anne a répondu à votre commentaire sur la paroisse Chatou '
+                         '(https://confessio.fr/paroisse/1) :\n\nMerci !\n\n'
+                         "Votre commentaire du 25/11/2026 :\n« C'est faux »", text)
+        self.assertIn('sur la <a href="https://confessio.fr/paroisse/1">paroisse Chatou</a> :',
+                      html)
+        self.assertIn('<p>Merci !</p>', html)
+        self.assertIn('<p>C&#x27;est faux</p></blockquote>', html)
+
+    def test_reply_without_quote(self):
+        text, html = build_report_reply_bodies('Anne', self.PLACE, 'Merci !', [])
+        self.assertTrue(text.endswith('\n\nMerci !'))
+        self.assertNotIn('<blockquote', html)
+
+    def test_everything_is_escaped(self):
+        _, html = build_report_reply_bodies('<b>', ReportPlace('la ', '<i>', HOME), '<u>',
+                                            [ReportQuote('25/11/2026', '<script>')])
+        for tag in ('<b>', '<i>', '<u>', '<script>'):
+            self.assertNotIn(tag, html)
+
+
 class BuildOutboundBodiesTests(unittest.TestCase):
+    def test_content_html_replaces_the_rendered_content(self):
+        text, html = build_outbound_bodies('Bonjour', [], URL, HOME, content_html='<b>Salut</b>')
+        self.assertTrue(text.startswith('Bonjour\n\n'))
+        self.assertTrue(html.startswith('<b>Salut</b><hr'))
+        self.assertNotIn('Bonjour', html)
+
     def test_footer_on_the_first_mail_of_a_thread(self):
         text, html = build_outbound_bodies('Bonjour', [], URL, HOME)
         self.assertEqual(f'Bonjour\n\n{FOOTER}', text)

@@ -15,6 +15,7 @@ from email.utils import getaddresses, parseaddr
 from html import escape
 
 from django.utils.html import urlize
+from unidecode import unidecode
 
 FOOTER_INTRO = "Ce message est traité par l'équipe de"
 FOOTER_LABEL = 'Espace administrateur'
@@ -51,6 +52,20 @@ class HistoryEntry:
     sent_at: str  # already formatted for display
     body: str
     is_outbound: bool
+
+
+@dataclass(frozen=True)
+class ReportPlace:
+    """The church or parish a report is about, as it reads in the mail answering it."""
+    article: str
+    name: str
+    url: str
+
+
+@dataclass(frozen=True)
+class ReportQuote:
+    reported_on: str  # already formatted for display
+    body: str
 
 
 @dataclass(frozen=True)
@@ -128,6 +143,32 @@ def html_paragraphs(text: str) -> str:
     return ''.join('<p>' + '<br>'.join(urlize(line, autoescape=True)
                                        for line in block.split('\n')) + '</p>'
                    for block in blocks)
+
+
+def build_report_place(name: str, article: str, noun: str, url: str) -> ReportPlace:
+    """Many names start with the noun already: "l'église Église Saint-Léger" would stutter."""
+    first_word = name.split(' ')[0]
+    if unidecode(first_word).lower() == unidecode(noun):
+        return ReportPlace(article, first_word.lower() + name[len(first_word):], url)
+    return ReportPlace(f'{article}{noun} ', name, url)
+
+
+def build_report_reply_bodies(author: str, place: ReportPlace, reply: str,
+                              quotes: list[ReportQuote]) -> tuple[str, str]:
+    """The mail answering a report, text part first, HTML part second.
+
+    The text part is also what the conversation stores, so it has to stand on its own.
+    """
+    intro = f'{author} a répondu à votre commentaire sur {place.article}'
+    text_parts = [f'{intro}{place.name} ({place.url}) :', reply]
+    html = (f'<p>{escape(intro)}<a href="{escape(place.url, quote=True)}">'
+            f'{escape(place.name)}</a> :</p>{html_paragraphs(reply)}')
+    for quote in quotes:
+        attribution = f'Votre commentaire du {quote.reported_on} :'
+        text_parts.append(f'{attribution}\n« {quote.body} »')
+        html += (f'<p style="{ATTRIBUTION_STYLE}">{escape(attribution)}</p>'
+                 f'<blockquote style="{QUOTE_STYLE}">{html_paragraphs(quote.body)}</blockquote>')
+    return '\n\n'.join(text_parts), html
 
 
 def extract_conversation_uuid(*texts: str) -> str | None:
@@ -262,7 +303,8 @@ def build_history_block_html(entries: list[HistoryEntry], conversation_url: str,
 
 
 def build_outbound_bodies(content: str, entries: list[HistoryEntry], conversation_url: str,
-                          home_url: str, always_footer: bool = False) -> tuple[str, str]:
+                          home_url: str, always_footer: bool = False,
+                          content_html: str | None = None) -> tuple[str, str]:
     """Assemble one outgoing mail, text part first, HTML part second.
 
     Both carry the same thing in the same order — the new text, the conversation link, the quoted
@@ -279,7 +321,7 @@ def build_outbound_bodies(content: str, entries: list[HistoryEntry], conversatio
     if history:
         parts.append(history)
 
-    html = html_paragraphs(content) if content else ''
+    html = html_paragraphs(content) if content_html is None else content_html
     if with_footer:
         html += '<hr style="border:none;border-top:1px solid #dddddd;margin:16px 0">'
         html += conversation_footer_html(conversation_url, home_url)

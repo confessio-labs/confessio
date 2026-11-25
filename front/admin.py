@@ -44,4 +44,5 @@ class CopilotDiscussionAdmin(ModelAdmin):
 @admin.register(Conversation)
 class ConversationAdmin(ModelAdmin):
     list_display = ['__str__', 'email', 'subject', 'updated_at']
+    readonly_fields = ['issue', 'approval', 'file_note', 'text_note']
     search_fields = ['email', 'subject']

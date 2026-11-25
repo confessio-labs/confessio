@@ -1,9 +1,10 @@
 """Send and receive the admin messaging's emails.
 
-Four flows feed the same Conversation, which is the source of truth:
+Five flows feed the same Conversation, which is the source of truth:
 
   - the contact form, recorded on the spot and mirrored to the contact mailbox;
   - a send from /messaging, mailed to the correspondent through SES;
+  - a comment on a report, mailed the same way to whoever left their address on it;
   - a mail received on the contact address, handed over by Mailgun's inbound route;
   - a mail sent from the contact mailbox, reported by Mailgun's event webhook.
 
@@ -19,6 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from email.utils import formataddr
 
+from core.models.base_models import BaseUserReport
 from core.utils.telegram_utils import TelegramTopic, send_telegram_alert
 from front.models import Conversation, Message, MessageImage
 from front.services.messaging.conversation_moderation_service import (
@@ -53,14 +55,15 @@ def get_home_url(request) -> str:
 
 def _build_mail(subject: str, content: str, entries: list[HistoryEntry], request,
                 conversation: Conversation, always_footer: bool = False,
-                images: list[MessageImage] | None = None,
+                images: list[MessageImage] | None = None, content_html: str | None = None,
                 **kwargs) -> EmailMultiAlternatives:
     """One mail, two parts. The text part is the one that matters on the way back: Mailgun strips
     it at the footer's `--` and we read the thread key out of it."""
     text_body, html_body = build_outbound_bodies(content, entries,
                                                  get_conversation_url(request, conversation),
                                                  get_home_url(request),
-                                                 always_footer=always_footer)
+                                                 always_footer=always_footer,
+                                                 content_html=content_html)
     mail = EmailMultiAlternatives(subject=subject, body=text_body, **kwargs)
     mail.attach_alternative(html_body, 'text/html')
     # Plain attachments rather than images inlined in the HTML: clients preview them anyway, and
@@ -71,7 +74,8 @@ def _build_mail(subject: str, content: str, entries: list[HistoryEntry], request
 
 
 def send_message(request, conversation: Conversation, body: str, author,
-                 images: list[ImageAttachment] | None = None) -> Message:
+                 images: list[ImageAttachment] | None = None,
+                 body_html: str | None = None) -> Message:
     """Record an outgoing message and mail it to the correspondent.
 
     Sending is synchronous: a failure is stored on the row rather than raised, so the admin sees
@@ -101,6 +105,7 @@ def send_message(request, conversation: Conversation, body: str, author,
         request=request,
         conversation=conversation,
         images=message_images,
+        content_html=body_html,
         from_email=formataddr(('Confessio', os.environ.get('CONTACT_EMAIL'))),
         to=[conversation.email],
         headers=build_thread_headers([one.message_id for one in previous]),
@@ -109,6 +114,15 @@ def send_message(request, conversation: Conversation, body: str, author,
 
     _touch(conversation)
     return message
+
+
+def get_or_create_report_conversation(head_field: str, head: BaseUserReport, email: str,
+                                      subject: str) -> tuple[Conversation, bool]:
+    return Conversation.objects.get_or_create(
+        **{head_field: head},
+        email=email,
+        defaults={'subject': _fit(Conversation, 'subject', subject)},
+    )
 
 
 def record_contact_form(request, name: str, email: str, subject: str, body: str) -> Message:
