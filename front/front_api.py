@@ -5,8 +5,7 @@ from uuid import UUID
 
 from django.contrib.auth.models import User
 from django.http import Http404
-from django.utils import timezone
-from ninja import NinjaAPI, Schema, File, Form, Field
+from ninja import NinjaAPI, Schema, File, Form
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
@@ -18,8 +17,7 @@ from attaching.public_service import attaching_get_file_note_public_url, \
     attaching_extract_text_note, attaching_find_error_in_text_note_content
 from core.models.base_models import BaseComment
 from front.models import Approval, ApprovalComment, AutocompleteHit, Issue, IssueComment
-from front.services.card.report_service import save_report, NewReportError, FeedbackType, \
-    save_issue, save_approval, save_comment
+from front.services.card.report_service import save_issue, save_approval, save_comment
 from front.services.card.report_thread_service import get_report_threads, ReportThread
 from front.services.card.scraping_url_service import get_scraping_parsing_urls
 from front.services.card.sources_service import get_website_parsings_and_prunings, \
@@ -147,66 +145,6 @@ class ParsingOut(Schema):
             uuid=parsing_uuid,
             scraping_url=scraping_url,
             image_url=attaching_get_file_note_public_url(file_note) if file_note else None,
-        )
-
-
-class FeedbackTypeEnum(str, Enum):
-    GOOD = "good"
-    ERROR = "error"
-    COMMENT = "comment"
-
-
-class ReportIn(Schema):
-    website_uuid: UUID
-    church_uuid: UUID | None = None
-    feedback_type: FeedbackTypeEnum
-    comment: str | None = None
-    main_report_uuid: UUID | None = None
-    email: str | None = None
-    valid_until: datetime | None = None
-
-
-class ReportOut(Schema):
-    uuid: UUID
-    created_at: datetime
-    feedback_type: FeedbackTypeEnum
-    comment: str | None
-    sub_reports: list['ReportOut']
-
-    @classmethod
-    def from_report(cls, report: Issue | Approval | TextNote | BaseComment,
-                    sub_reports: list[BaseComment]) -> 'ReportOut':
-        if isinstance(report, Approval):
-            feedback_type = FeedbackTypeEnum.GOOD
-        elif isinstance(report, Issue):
-            feedback_type = FeedbackTypeEnum.ERROR
-        else:
-            feedback_type = FeedbackTypeEnum.COMMENT
-
-        return cls(
-            uuid=report.uuid,
-            created_at=report.created_at,
-            feedback_type=feedback_type,
-            comment=report.content or None,
-            sub_reports=[ReportOut.from_report(sub_report, []) for sub_report in sub_reports],
-        )
-
-    @classmethod
-    def from_thread(cls, thread: ReportThread) -> 'ReportOut':
-        return cls.from_report(thread.head, thread.comments)
-
-
-class ImageOut(Schema):
-    image_uuid: UUID
-    public_url: str
-    comment: str | None
-
-    @classmethod
-    def from_file_note(cls, file_note: FileNote) -> 'ImageOut':
-        return cls(
-            image_uuid=file_note.uuid,
-            public_url=attaching_get_file_note_public_url(file_note),
-            comment=file_note.caption,
         )
 
 
@@ -344,8 +282,6 @@ class WebsiteOut(Schema):
     uuid: UUID
     name: str
     home_url: str
-    reports: list[ReportOut] = Field(deprecated='Use issues, approvals and text_notes instead')
-    images: list[ImageOut] = Field(deprecated='Use file_notes instead')
     issues: list[IssueOut]
     approvals: list[ApprovalOut]
     text_notes: list[TextNoteOut]
@@ -356,16 +292,10 @@ class WebsiteOut(Schema):
                                  website: Website,
                                  threads: list[ReportThread],
                                  ):
-        # Legacy images are listed oldest first, threads newest first
-        file_notes = FileNote.objects.filter(website=website).order_by('created_at')
-
         return cls(
             uuid=website.uuid,
             name=website.name,
             home_url=website.home_url,
-            reports=[ReportOut.from_thread(thread) for thread in threads
-                     if thread.is_issue or thread.is_approval or thread.is_text_note],
-            images=[ImageOut.from_file_note(file_note) for file_note in file_notes],
             issues=[IssueOut.from_issue(thread.head, thread.comments)
                     for thread in threads if thread.is_issue],
             approvals=[ApprovalOut.from_approval(thread.head, thread.comments)
@@ -744,45 +674,6 @@ def clean_and_check_email(email: str | None) -> str | None:
     return email
 
 
-@api.post("/reports", response={200: ReportOut, 400: ErrorSchema, 404: ErrorSchema},
-          deprecated=True)
-def api_front_post_reports(request, report_in: ReportIn) -> ReportOut:
-    website = get_website_or_404(report_in.website_uuid)
-    church = get_church_or_404(report_in.church_uuid)
-    email = clean_and_check_email(report_in.email)
-
-    # Temporary, until the front posts its complements to /text_notes
-    if report_in.feedback_type == FeedbackTypeEnum.COMMENT and not report_in.main_report_uuid:
-        text_note = create_text_note(request, website, church, report_in.comment, email,
-                                     get_closest_note_ttl(report_in.valid_until))
-        return ReportOut.from_report(text_note, [])
-
-    try:
-        report = save_report(
-            request, website, church,
-            FeedbackType(report_in.feedback_type),
-            report_in.comment, report_in.main_report_uuid, email,
-        )
-    except NewReportError as e:
-        if e.status == 404:
-            raise Http404(e.message)
-        raise HttpError(e.status, e.message)
-
-    return ReportOut.from_report(report, [])
-
-
-@api.post("/images", response={200: ImageOut, 400: ErrorSchema, 404: ErrorSchema},
-          deprecated=True)
-def api_front_post_images(request,
-                          website_uuid: UUID = Form(...),
-                          document: UploadedFile = File(...),
-                          comment: str | None = Form(None),
-                          email: str | None = Form(None)) -> ImageOut:
-    file_note = upload_file_note(request, website_uuid, None, document, comment, email,
-                                 NoteTtl.ONE_YEAR)
-    return ImageOut.from_file_note(file_note)
-
-
 @api.post("/issues", response={200: IssueOut, 400: ErrorSchema, 404: ErrorSchema})
 def api_front_post_issue(request, issue_in: IssueIn) -> IssueOut:
     website = get_website_or_404(issue_in.website_uuid)
@@ -828,15 +719,6 @@ def create_text_note(request, website: Website, church: Church | None, content: 
     attaching_extract_text_note(text_note)
 
     return text_note
-
-
-def get_closest_note_ttl(valid_until: datetime | None) -> NoteTtl:
-    if valid_until is None:
-        return NoteTtl.ONE_YEAR
-
-    # Closest rather than a threshold, to absorb the client clock skew
-    remaining = valid_until - timezone.now()
-    return min(NoteTtl, key=lambda ttl: abs(ttl.duration - remaining))
 
 
 @api.post("/file_notes", response={200: FileNoteOut, 400: ErrorSchema, 404: ErrorSchema})
