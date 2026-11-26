@@ -67,6 +67,9 @@ discussion.
 - Les requêtes HTTP (visite de site) peuvent échouer (timeout, 4xx, 5xx) : adapte-toi, n'insiste \
 pas inutilement.
 - Sois concis et concret. Ne propose une action de modification qu'avec des valeurs précises.
+- Les demandes explicites de l'admin priment : s'il te demande une action que tes tools \
+permettent, propose-la avec ses valeurs (il la validera dans l'interface). Tu peux signaler une \
+réserve en une phrase, mais ne refuse pas et n'exige pas de source.
 - Pour toute intervention sur les horaires d'un parsing (app scheduling), charge d'abord la \
 skill `fix_parsing_schedules` avec `load_capability` : elle contient la marche à suivre et le \
 prompt soumis au LLM de parsing.\

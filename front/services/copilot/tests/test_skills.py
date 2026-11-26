@@ -20,10 +20,17 @@ class TestFixParsingSchedulesSkill(unittest.TestCase):
     def test_states_when_to_correct(self):
         static_text = fix_parsing_schedules.get_instructions()[0]
         self.assertIn("QUAND corriger", static_text)
-        self.assertIn("Ne modifie un parsing QUE si le LLM de parsing s'est effectivement "
+        self.assertIn("ne modifie un parsing QUE si le LLM de parsing s'est effectivement "
                       "trompé", static_text)
         self.assertIn("JAMAIS un parsing artificiellement", static_text)
         self.assertIn('report_bug', static_text)
+
+    def test_explicit_admin_request_overrides_the_caution(self):
+        static_text = fix_parsing_schedules.get_instructions()[0]
+        self.assertIn("Sur DEMANDE EXPLICITE DE L'ADMIN", static_text)
+        self.assertIn("ne refuse pas", static_text)
+        self.assertIn("De ta PROPRE INITIATIVE, ne modifie un parsing QUE", static_text)
+        self.assertIn("De ta propre initiative, ne « corrige » JAMAIS", static_text)
 
     def test_carries_the_parsing_prompt_unformatted(self):
         text = _parsing_prompt_instructions()
