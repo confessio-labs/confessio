@@ -14,7 +14,7 @@ import os
 from asgiref.sync import sync_to_async
 from openai import AsyncOpenAI
 from pydantic_ai import Agent, DeferredToolRequests, RunContext
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from front.models import CopilotDiscussion
@@ -25,7 +25,7 @@ from front.services.copilot.schema_introspection import describe_table, get_sche
 from front.services.copilot.skills import SKILLS
 from scheduling.public_model import SchedulesList
 
-COPILOT_MODEL = 'gpt-5'
+COPILOT_MODEL = 'gpt-6.1-terra'
 
 
 SYSTEM_PROMPT = """\
@@ -87,23 +87,26 @@ def _schema_instructions(ctx: RunContext[CopilotDeps]) -> str:
         + get_schema_text()
 
 
-def build_provider_and_model() -> tuple[OpenAIProvider, OpenAIChatModel]:
+def build_provider_and_model() -> tuple[OpenAIProvider, OpenAIResponsesModel]:
     """Build the OpenAI provider + model. The provider is returned too so the caller can close
     its AsyncOpenAI client in the same event loop (see core.utils.async_utils.run_and_close)."""
     api_key = os.getenv('OPENAI_API_KEY_COPILOT')
     if not api_key:
         raise RuntimeError('OPENAI_API_KEY_COPILOT is not set')
     # Use a DEDICATED AsyncOpenAI client per turn. If we let OpenAIProvider build the client
-    # (OpenAIProvider(api_key=...)), it reuses pydantic-ai's process-global cached httpx client
-    # (cached_async_http_client('openai')). run_and_close() then closes that SHARED client at the
-    # end of every turn, so with concurrent copilot turns (BACKGROUND_TASK_ASYNC_THREADS) one turn
-    # finishing would close the client out from under another turn mid-request — surfacing as
-    # "Cannot send a request, as the client has been closed" / APIConnectionError. A dedicated
-    # client is scoped to this turn, so run_and_close only ever closes its own. Defaults (600s read
-    # timeout, max_retries=2) are inherited from the SDK.
+    # (OpenAIProvider(api_key=...)), it may share pydantic-ai's process-wide HTTP client.
+    # run_and_close() then closes that SHARED client at the end of every turn, so with concurrent
+    # copilot turns (BACKGROUND_TASK_ASYNC_THREADS) one turn finishing would close the client out
+    # from under another turn mid-request — surfacing as "Cannot send a request, as the client has
+    # been closed" / APIConnectionError. A dedicated client is scoped to this turn, so
+    # run_and_close only ever closes its own. Defaults (600s read timeout, max_retries=2) are
+    # inherited from the SDK.
     client = AsyncOpenAI(api_key=api_key)
     provider = OpenAIProvider(openai_client=client)
-    return provider, OpenAIChatModel(COPILOT_MODEL, provider=provider)
+    # Responses API: gpt-6.x rejects function tools with reasoning on Chat Completions.
+    # Responses stores conversations at OpenAI by default; Chat Completions didn't.
+    settings = OpenAIResponsesModelSettings(openai_store=False, openai_reasoning_effort='medium')
+    return provider, OpenAIResponsesModel(COPILOT_MODEL, provider=provider, settings=settings)
 
 
 # --------------------------------------------------------------------------- #
