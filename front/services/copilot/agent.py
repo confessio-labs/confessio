@@ -10,13 +10,11 @@ The detailed procedures live in skills.py as deferred capabilities: the base pro
 them, and the model pulls one in with `load_capability` when a discussion needs it.
 """
 import os
-from dataclasses import replace
 
 from asgiref.sync import sync_to_async
 from openai import AsyncOpenAI
 from pydantic_ai import Agent, DeferredToolRequests, RunContext
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
-from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from front.models import CopilotDiscussion
@@ -96,25 +94,19 @@ def build_provider_and_model() -> tuple[OpenAIProvider, OpenAIResponsesModel]:
     if not api_key:
         raise RuntimeError('OPENAI_API_KEY_COPILOT is not set')
     # Use a DEDICATED AsyncOpenAI client per turn. If we let OpenAIProvider build the client
-    # (OpenAIProvider(api_key=...)), it reuses pydantic-ai's process-global cached httpx client
-    # (cached_async_http_client('openai')). run_and_close() then closes that SHARED client at the
-    # end of every turn, so with concurrent copilot turns (BACKGROUND_TASK_ASYNC_THREADS) one turn
-    # finishing would close the client out from under another turn mid-request — surfacing as
-    # "Cannot send a request, as the client has been closed" / APIConnectionError. A dedicated
-    # client is scoped to this turn, so run_and_close only ever closes its own. Defaults (600s read
-    # timeout, max_retries=2) are inherited from the SDK.
+    # (OpenAIProvider(api_key=...)), it may share pydantic-ai's process-wide HTTP client.
+    # run_and_close() then closes that SHARED client at the end of every turn, so with concurrent
+    # copilot turns (BACKGROUND_TASK_ASYNC_THREADS) one turn finishing would close the client out
+    # from under another turn mid-request — surfacing as "Cannot send a request, as the client has
+    # been closed" / APIConnectionError. A dedicated client is scoped to this turn, so
+    # run_and_close only ever closes its own. Defaults (600s read timeout, max_retries=2) are
+    # inherited from the SDK.
     client = AsyncOpenAI(api_key=api_key)
     provider = OpenAIProvider(openai_client=client)
     # Responses API: gpt-6.x rejects function tools with reasoning on Chat Completions.
-    # pydantic-ai 1.x doesn't know gpt-6.x reasons; without this profile the encrypted reasoning
-    # is not replayed between tool calls (drop it once on pydantic-ai 2.x).
-    profile = replace(openai_model_profile(COPILOT_MODEL), supports_thinking=True,
-                      openai_supports_reasoning=True,
-                      openai_supports_encrypted_reasoning_content=True)
     # Responses stores conversations at OpenAI by default; Chat Completions didn't.
     settings = OpenAIResponsesModelSettings(openai_store=False, openai_reasoning_effort='medium')
-    return provider, OpenAIResponsesModel(COPILOT_MODEL, provider=provider, profile=profile,
-                                          settings=settings)
+    return provider, OpenAIResponsesModel(COPILOT_MODEL, provider=provider, settings=settings)
 
 
 # --------------------------------------------------------------------------- #
